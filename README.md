@@ -138,6 +138,8 @@ Agents can use the [local replay command](docs/diagnostic-replay.md) to rerun Vi
 
 ## Development
 
+See [project status](docs/status.md) for what is verified and what remains open.
+
 ```sh
 make format
 make check
