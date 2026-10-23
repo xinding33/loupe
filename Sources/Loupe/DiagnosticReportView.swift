@@ -7,8 +7,11 @@ struct DiagnosticControls: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Toggle("Buffer diagnostic crops", isOn: Binding(get: { flow.optedIn }, set: flow.setOptedIn))
-        .toggleStyle(.switch).controlSize(.small)
+      Toggle(
+        "Buffer diagnostic crops",
+        isOn: Binding(get: { flow.optedIn }, set: { flow.setOptedIn($0) })
+      )
+      .toggleStyle(.switch).controlSize(.small)
       Text("Off at each launch. Memory only, up to 10 s / 24 MiB. Inventory evidence is partial.")
         .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if flow.optedIn {
