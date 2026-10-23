@@ -97,7 +97,7 @@ public enum CharacterAssessment {
       let grades = TierCalibration.evaluate(artifact, role: role, potential: potential)
       if grades == nil {
         reasons.append(
-          "Ungraded: this role, slot, and main-stat cell has no reviewed calibration.")
+          "Ungraded: no final score or forecast, or no core substat can appear on this piece.")
       }
       return CharacterMatch(
         role: role, setFit: fit, conditions: conditions, reasons: reasons,

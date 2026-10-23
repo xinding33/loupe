@@ -1,12 +1,13 @@
 # Artifact grading: approach
 
 Date: 2026-10-22
-Status: direction agreed with the user. Step 1 is implemented; the rest is planned.
+Status: direction agreed with the user. Steps 1 and 2 are implemented; the rest is planned.
 
 This page records the research behind the grading direction, the decisions the
 user made, and the work order. It supersedes the "no keep/discard threshold"
 stance in the [evaluation proposal](evaluation-design.md) and
-[next features](next-features-plan.md). The app still never clicks in the game.
+[next features](next-features-plan.md). Grading never acts in the game; its
+verdicts are advice.
 
 ## Questions to answer
 
@@ -81,21 +82,47 @@ This enables questions across profiles that a single-profile score histogram
 cannot answer, such as the chance of a strong result for any character, and
 later ER handling that stops counting past a requirement.
 
-### 2. Intrinsic quality: rarity among possible drops
+### 2. Intrinsic quality: rarity among possible drops — implemented
 
-For each character role, slot, and main stat, compute the share of all
-possible new drops that would finish at or above this piece. The published
-odds make this exact: main-stat odds, the four-line start chance, new-line
-weights, and the four roll tiers. Unfinished pieces use their outcome
-distribution.
+`DropRarity` computes, for one profile, slot, and main stat, the exact final
++20 score distribution of a new drop: main-stat odds and substat appearance
+weights from Genshin Optimizer's constants, the domain's 20% four-line start
+(34% for bosses and the Strongbox), and uniform roll tiers. A three-line start
+reveals its fourth line by the same weighted draw as a four-line start, so
+both share one set of final lines and differ only in the number of upgrades. A
+seeded simulation of the actual drop process agrees within half a percentage
+point. A table takes under 1 ms and is cached per slot, main stat, and weights.
 
-- Tiers derive from rarity, for example S top 1%, A top 5%, B top 20%, C top
-  50%, adjustable. The 15 hand-calibrated cells become a validation check.
-- Rarity is comparable across characters, so the shortlist can be ordered.
-- Rarity converts to a replacement cost: the expected number of domain runs
-  to farm a better piece. An on-set EM goblet alone is about 1 in 400 drops.
-- Rarity is not value. A rare piece for an unwanted role is still unused; the
-  account checks below cover that.
+A piece's share is the fraction of new drops finishing at or above its score.
+Tiers come from the share; every reviewed role is graded. A piece is ungraded
+only when no core substat can appear on it or when it has no final score or
+forecast.
+
+The cutoffs were fitted to the 15 cells reviewed by hand. Those hand cutoffs
+correspond to consistent shares across very different cells:
+
+| Hand cutoff | Share of new drops reaching it | Chosen bound |
+| --- | --- | --- |
+| C | 43–65% | 50% |
+| B | 11–17% | 15% |
+| A | 0.6–1.3% | 1% |
+| S | 0.008–0.035% | 0.05% |
+
+With these bounds, the derived B, A, and S cutoffs fall within 0.3 rolls of the
+hand cutoffs in every cell; C differs by up to half a roll, stricter on flowers
+and plumes and looser on sands and HP% goblets. The original proposal of S top
+1% and A top 5% would have been far more lenient than the reviewed anchors.
+Tests keep every hand anchor within one tier of its hand label.
+
+`expectedDropsToBeat` gives the expected five-star domain drops, counting both
+of the domain's sets, before a piece of the same set, slot, and main stat
+finishes strictly higher: two sets per domain, five slots, the main-stat odds,
+and the share above. An EM goblet of the wanted set alone is 1 in 400 domain
+drops. The dashboard and overlay show the share and this estimate.
+
+Rarity is not value. A rare piece for an unwanted role is still unused; the
+account checks below cover that. Rarity is comparable across characters, so
+it can order the shortlist in step 3.
 
 ### 3. Account value: margin over saved pieces
 
@@ -144,11 +171,11 @@ review report. The output is local-only.
 
 1. Final-substat enumeration. Done.
 2. Rarity and replacement cost; rarity-derived tiers checked against the 15
-   calibrated cells.
+   calibrated cells. Done.
 3. Stat-profile groups and Keep / Level verdicts in the overlay.
 4. Whole-bag OCR scan of all five-star levels, then the fodder list.
 5. Reviewed weights for all characters; damage-derived weights for close calls.
 
-Open questions: default rarity cutoffs and the leveling bar per checkpoint;
+Open questions: the leveling bar per checkpoint;
 whether the inventory card's equipped-by line can be read reliably; how to
 model reshaped and Transmuter pieces, which the ordinary model excludes.

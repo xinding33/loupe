@@ -50,10 +50,11 @@ import Testing
     #expect(grades.p50 == .b)
     #expect(grades.p90 == .a)
     #expect(grades.bestPossible == .a)
-    #expect(grades.chanceOfAOrBetter == 0.25)
+    // A starts at 4.7 useful rolls among new HP% sands, so four of the eight outcomes reach it.
+    #expect(grades.chanceOfAOrBetter == 0.5)
   }
 
-  @Test func identicalCoreWeightsDoNotGrantAnotherRoleACalibrationCell() throws {
+  @Test func identicalCoreWeightsShareOneRarityGrade() throws {
     let piece = try artifact(
       .flower, .hp,
       [
@@ -65,10 +66,8 @@ import Testing
     let neuvillette = try #require(results.first { $0.characterID == "neuvillette" })
     #expect(furina.profile.weights == neuvillette.profile.weights)
     #expect(furina.grades?.current == .s)
-    #expect(neuvillette.grades == nil)
-    #expect(
-      Set(results.filter { $0.grades != nil }.map(\.characterID))
-        == ["furina", "itto", "kuki-shinobu"])
+    #expect(neuvillette.grades?.current == furina.grades?.current)
+    #expect(neuvillette.grades?.rarityShare == furina.grades?.rarityShare)
   }
 
   @Test func neighboringEligibleMainsRemainUngradedAndExcludedMainsDoNotMatch() throws {
@@ -80,7 +79,8 @@ import Testing
       ])
     let furina = try match(erSands, character: "furina")
     #expect(furina.potential?.currentScore == 8)
-    #expect(furina.grades == nil)
+    // Eight core rolls is the most any new ER sands can reach for this profile.
+    #expect(furina.grades?.current == .s)
     let hpCirclet = try artifact(
       .circlet, .hpPercent,
       [
