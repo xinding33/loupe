@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-  name: "ArtifactLens",
+  name: "Loupe",
   platforms: [.macOS(.v14)],
-  products: [.executable(name: "ArtifactLens", targets: ["ArtifactLens"])],
+  products: [.executable(name: "Loupe", targets: ["Loupe"])],
   targets: [
-    .target(name: "ArtifactCore"),
-    .executableTarget(name: "ArtifactLens", dependencies: ["ArtifactCore"]),
-    .testTarget(name: "ArtifactCoreTests", dependencies: ["ArtifactCore"]),
-    .testTarget(name: "ArtifactLensTests", dependencies: ["ArtifactLens", "ArtifactCore"]),
+    .target(name: "LoupeCore"),
+    .executableTarget(name: "Loupe", dependencies: ["LoupeCore"]),
+    .testTarget(name: "LoupeCoreTests", dependencies: ["LoupeCore"]),
+    .testTarget(name: "LoupeTests", dependencies: ["Loupe", "LoupeCore"]),
   ]
 )

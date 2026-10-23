@@ -1,4 +1,4 @@
-# Artifact Lens: next features
+# Loupe: next features
 
 Date: 2026-09-27
 Status: character expansion and broader calibration passed offline integration.
@@ -38,7 +38,7 @@ The work order below records the original proposal, including the now-replaced
 unknown-fourth-stat branch. No automatic upgrade or discard actions were added.
 
 Offline integration on 2026-09-27: `make check` passed strict formatting and
-reported 61 ArtifactLens tests and 94 ArtifactCore tests. The two optional
+reported 61 Loupe tests and 94 LoupeCore tests. The two optional
 private recording tests were skipped. Synthetic Vision tests needed normal
 execution outside the process sandbox; they passed without private fixtures.
 New calibration dispatch tests failed before implementation and passed after it.
@@ -46,12 +46,12 @@ Synthetic shortlist renders show five of 15 eligible users with manual selection
 preserved. Rendering does not verify live interaction or OCR performance.
 
 `make build` passed. The executable was packaged separately as
-`dist/Artifact Lens 2026-09-27.app` to leave the running app's bundle untouched.
+`dist/Loupe 2026-09-27.app` to leave the running app's bundle untouched.
 The new bundle passed strict signature verification and headless replay help;
 its source fingerprint is
 `sha256-96cfbabf05f58cc0f671a22fc9edfbb2e890e187f71dff3f65a46c412818332b`.
 It was not launched. The default `make app` target still writes
-`dist/Artifact Lens.app` on future builds.
+`dist/Loupe.app` on future builds.
 
 Prioritize understandable evaluation, character matches, and tiers. Verify the
 existing overlay and report flow on the live game in parallel. Keep the current

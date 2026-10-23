@@ -1,4 +1,4 @@
-# Artifact Lens overlay redesign
+# Loupe overlay redesign
 
 Date: 2026-09-26
 
@@ -47,7 +47,7 @@ Default, configurable shortcuts:
 | Shortcut | Action |
 | --- | --- |
 | Option + backtick | Expand or collapse |
-| Option + Shift + backtick | Enable or disable Artifact Lens |
+| Option + Shift + backtick | Enable or disable Loupe |
 
 Shortcut registration failure or a conflict must be visible. Expansion must not
 silently resume disabled capture. Avoid repeating a toggle while a key is held.
@@ -206,7 +206,7 @@ or mutate inventory from a user's annotation.
 ## Workstreams and ownership
 
 All work uses this existing checkout because the current app is uncommitted:
-`/Users/xinding/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
+`~/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
 Do not edit the empty project-root checkout or create a worktree missing these
 files. Preserve unrelated changes. No commits, branches, PRs, or pushes in this
 phase. No child thread may launch/restart the app or control the game.
@@ -214,7 +214,7 @@ phase. No child thread may launch/restart the app or control the game.
 | Workstream | Owned changes | Handoff |
 | --- | --- | --- |
 | Runtime and overlay | App.swift, Model.swift, Views.swift, Capture.swift; new runtime/overlay files and dedicated tests | Placement, compact shell, shortcuts, real stop/resume, lifecycle tests |
-| Evaluation | Potential.swift; new ArtifactCore evaluation files and dedicated tests; docs/evaluation-design.md | P50/P90/max API plus sourced matching/tier calibration proposal; no unreviewed grades |
+| Evaluation | Potential.swift; new LoupeCore evaluation files and dedicated tests; docs/evaluation-design.md | P50/P90/max API plus sourced matching/tier calibration proposal; no unreviewed grades |
 | Diagnostics | FrameRecording.swift; new diagnostic files and dedicated tests; docs/diagnostics-design.md | Bounded buffer/export/replay components and explicit integration contract |
 | Parent | This plan, dispatch briefs, README and final shared integration | Review evaluation rules, wire diagnostics and evaluation, verify end to end |
 
@@ -281,7 +281,7 @@ the character matcher and tier cutoffs are still unimplemented.
 Parent verification: `make check` and `make app` passed. Both recorded fixture
 checks passed independently: circlet 39/40 and plume 38/40 recognized, identical
 counts with buffering off, on, and replay, and no post-acquisition clearing.
-The built app is at `dist/Artifact Lens.app`. Native inspection could not access
+The built app is at `dist/Loupe.app`. Native inspection could not access
 its window (`cgWindowNotFound`), although the app inventory reported it running.
 Live sharing, native report/save interaction, monitor placement, and performance
 verification are still pending. Buffering remains off by default.

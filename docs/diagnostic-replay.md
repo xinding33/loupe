@@ -10,8 +10,8 @@ report directory and optional context file. Nothing is uploaded.
 Use the executable inside a packaged app, not `open -a`:
 
 ```sh
-"dist/Artifact Lens.app/Contents/MacOS/ArtifactLens" replay --help
-"dist/Artifact Lens.app/Contents/MacOS/ArtifactLens" replay /absolute/report-directory --context /absolute/context.json
+dist/Loupe.app/Contents/MacOS/Loupe replay --help
+dist/Loupe.app/Contents/MacOS/Loupe replay /absolute/report-directory --context /absolute/context.json
 ```
 
 The report directory must contain an existing schema-2 `manifest.json` and its
@@ -59,7 +59,7 @@ A legal but incorrect context can still fail the real Enhance parser.
 Omit `--context` to inspect fresh OCR alone. No implicit context is loaded:
 
 ```sh
-"dist/Artifact Lens.app/Contents/MacOS/ArtifactLens" replay /absolute/report-directory
+dist/Loupe.app/Contents/MacOS/Loupe replay /absolute/report-directory
 ```
 
 No arguments starts the normal desktop app. Use `--help` when inspecting an
@@ -132,14 +132,13 @@ to output or filesystem errors, but it does not redact user-supplied text.
 
 ## Build identity
 
-`make app` embeds `ArtifactLensBuildFingerprint` in the packaged `Info.plist`
-before code signing. The value is `sha256-` followed by a deterministic content
-hash of all Swift files under `Sources`, `Package.swift`, `Resources/Info.plist`,
-and `Makefile`. It includes untracked sources and does not depend on Git HEAD.
-Only the digest is embedded; no checkout paths are included.
-
-Use `make build-fingerprint` to print the current source fingerprint without
-building or launching anything. Keep sources unchanged during packaging.
+`scripts/build.sh` (run by `make app` and releases) embeds
+`LoupeBuildFingerprint` in the packaged `Info.plist` before code signing. The
+value is `sha256-` followed by a deterministic content hash of all Swift files
+under `Sources`, `Package.swift`, `scripts/Info.plist`, and `scripts/build.sh`.
+It includes untracked sources and does not depend on Git HEAD. Only the digest
+is embedded; no checkout paths are included. Keep sources unchanged during
+packaging.
 The fingerprint identifies relevant source content, not the compiler, SDK,
 build flags, or binary integrity. Direct SwiftPM executables report
 `replayBuild: "unpackaged"`; packaged replay reports its embedded fingerprint.
@@ -157,7 +156,7 @@ Run the command tests with an isolated Swift build/cache directory:
 
 ```sh
 scratch=$(mktemp -d /tmp/artifact-replay.XXXXXX)
-env -u ARTIFACT_LENS_FIXTURES \
+env -u LOUPE_FIXTURES \
   CLANG_MODULE_CACHE_PATH="$scratch/module-cache" \
   SWIFTPM_MODULECACHE_OVERRIDE="$scratch/module-cache" \
   swift test --disable-sandbox \

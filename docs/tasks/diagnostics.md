@@ -5,8 +5,8 @@ and a tested handoff contract for the parent to integrate after runtime changes.
 
 ## Checkout and coordination
 
-Work only in `/Users/xinding/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
-T3 may start in the empty `/Users/xinding/src/xinding33/gi-artifacts` directory.
+Work only in `~/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
+T3 may start in the empty `~/src/xinding33/gi-artifacts` directory.
 Use explicit command workdirs and normal approval flows for the shared path.
 The current app is uncommitted; do not create a worktree or copy it elsewhere.
 
@@ -16,9 +16,9 @@ and stop-slop where applicable. Keep prose ASCII and preserve unrelated edits.
 
 ## Ownership
 
-You own `Sources/ArtifactLens/FrameRecording.swift`, new diagnostic files and
+You own `Sources/Loupe/FrameRecording.swift`, new diagnostic files and
 dedicated tests, and `docs/diagnostics-design.md`. Do not edit Capture.swift,
-LiveCardOCR.swift, Model.swift, Views.swift, App.swift, existing tests, ArtifactCore,
+LiveCardOCR.swift, Model.swift, Views.swift, App.swift, existing tests, LoupeCore,
 Package.swift, Makefile, README, or the parent plan. Describe required hooks in
 the handoff instead of patching another thread's files.
 

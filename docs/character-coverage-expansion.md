@@ -177,7 +177,7 @@ only to reflect the intentional registry expansion, with parent approval.
 
 All 88 core tests in the shared checkout passed on 2026-09-27, including the
 concurrent tier-anchor suite. They used an isolated Swift scratch/cache build
-with `ARTIFACT_LENS_FIXTURES` unset. Scoped strict Swift formatting passed.
+with `LOUPE_FIXTURES` unset. Scoped strict Swift formatting passed.
 A temporary wrong-expectation mutation was rejected by auto-review before
 editing; no red-check claim is made and the correct assertion remains intact.
 No app launch, game control, screenshot,

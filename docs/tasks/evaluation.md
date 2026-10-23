@@ -6,8 +6,8 @@ tier cutoffs and role weights are not approved; do not ship arbitrary grades.
 
 ## Checkout and coordination
 
-Work only in `/Users/xinding/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
-T3 may start in the empty `/Users/xinding/src/xinding33/gi-artifacts` directory.
+Work only in `~/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
+T3 may start in the empty `~/src/xinding33/gi-artifacts` directory.
 Use explicit command workdirs and normal approval flows for the shared path.
 The current app is uncommitted; do not create another worktree or copy it away.
 
@@ -17,9 +17,9 @@ and stop-slop where applicable. Preserve unrelated changes; keep prose ASCII.
 
 ## Ownership
 
-You own `Sources/ArtifactCore/Potential.swift`, new evaluation files in
-ArtifactCore, new dedicated ArtifactCoreTests files, and
-`docs/evaluation-design.md`. No changes to ArtifactLens, existing tests,
+You own `Sources/LoupeCore/Potential.swift`, new evaluation files in
+LoupeCore, new dedicated LoupeCoreTests files, and
+`docs/evaluation-design.md`. No changes to Loupe, existing tests,
 Artifact.swift, Package.swift, Makefile, README, or the parent plan.
 
 ## Deliverable
