@@ -50,12 +50,11 @@ final class Updates {
         status = "Downloading \(appName) \(release.version)…"
         let zip = try await Updater.download(release)
         defer { try? FileManager.default.removeItem(at: zip) }
-        // Something may have started during the download. Try again within the hour.
-        guard !isBusy() else {
-          lastCheck = .distantPast
-          return
-        }
-        try install(zip: zip, version: release.version)
+        // Asked again just before the swap: something may have started, or automatic updates
+        // been switched off, while it downloaded and unzipped. A busy app tries again within the hour.
+        try install(zip: zip, version: release.version) { automatic && !isBusy() }
+      } catch UpdateError.postponed {
+        if automatic { lastCheck = .distantPast }
       } catch {
         log.error("Automatic update failed: \(error.localizedDescription, privacy: .public)")
       }
@@ -127,9 +126,10 @@ final class Updates {
     Relaunch.now()
   }
 
-  private func install(zip: URL, version: Version) throws {
+  private func install(zip: URL, version: Version, proceed: () -> Bool) throws {
     status = "Installing \(appName) \(version)…"
-    try Updater.install(zip: zip, version: version, replacing: Bundle.main.bundleURL)
+    try Updater.install(
+      zip: zip, version: version, replacing: Bundle.main.bundleURL, proceed: proceed)
     log.info("Installed \(version.description, privacy: .public), relaunching")
     Relaunch.now()
   }

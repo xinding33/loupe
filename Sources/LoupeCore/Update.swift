@@ -40,6 +40,7 @@ public enum UpdateError: LocalizedError, Equatable {
   case httpStatus(Int)
   case unzipFailed, badSignature, wrongVersion, notARelease, notInstalledFromRelease
   case needsNewerMacOS(String)
+  case postponed
 
   public var errorDescription: String? {
     switch self {
@@ -52,6 +53,7 @@ public enum UpdateError: LocalizedError, Equatable {
     case .notInstalledFromRelease:
       return "This copy wasn't installed from a release, so it can't update itself."
     case .needsNewerMacOS(let version): return "The update needs macOS \(version) or later."
+    case .postponed: return "The update was postponed."
     }
   }
 }
@@ -120,9 +122,11 @@ public enum Updater {
 
   /// Unzips Loupe.app from `zip`, checks that it is a release build of `version` signed to satisfy
   /// `app`'s designated requirement and runs on `system`, then swaps it in for `app`.
+  /// `proceed` is asked last, just before the swap, and throws `.postponed` when it says no.
   public static func install(
     zip: URL, version: Version, replacing app: URL,
-    system: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion
+    system: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion,
+    proceed: () -> Bool = { true }
   ) throws {
     let requirement = try designatedRequirement(of: app)
     let files = FileManager.default
@@ -153,6 +157,8 @@ public enum Updater {
     }
     // Checked again here, not just at launch: a local build may have replaced the running copy since.
     guard isRelease(app) else { throw UpdateError.notInstalledFromRelease }
+    // Unzipping waits on the run loop, so whatever `proceed` checks may have changed since the start.
+    guard proceed() else { throw UpdateError.postponed }
     _ = try files.replaceItemAt(app, withItemAt: update)
   }
 

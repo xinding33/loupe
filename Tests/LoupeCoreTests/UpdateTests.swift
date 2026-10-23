@@ -118,6 +118,20 @@ import Testing
     #expect(installedVersion(app) == "1.1.0")
   }
 
+  @Test func postponesWhenAskedJustBeforeTheSwap() throws {
+    let app = try makeApp(in: "installed", version: "1.1.0")
+    let update = try zip(makeApp(in: "update", version: "1.2.0"))
+    var asked = 0
+    #expect(throws: UpdateError.postponed) {
+      try Updater.install(zip: update, version: #require(Version("1.2.0")), replacing: app) {
+        asked += 1
+        return false
+      }
+    }
+    #expect(asked == 1)
+    #expect(installedVersion(app) == "1.1.0")
+  }
+
   @Test func rejectsAnUpdateForANewerMacOS() throws {
     let app = try makeApp(in: "installed", version: "1.1.0")
     let update = try zip(makeApp(in: "update", version: "1.2.0", minimumSystem: "99.0"))
