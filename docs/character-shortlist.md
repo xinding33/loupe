@@ -28,6 +28,10 @@ line remains forecast information. Neither roll amounts nor the number of
 useful lines affect ordering. Set fit does not prove set-bonus activation;
 off-pieces remain accessible even when on-set candidates precede them.
 
+Since 2026-10-22, the character behind the current verdict moves to the front
+when present; the others keep this order. See
+[grading approach](grading-approach.md).
+
 The first ordered match is the default headline. A manual choice overrides
 that default while it is eligible. At most five distinct characters appear
 in the shortlist. A manual choice outside the first five replaces the fifth
@@ -57,8 +61,8 @@ A stale manual ID falls back to the current default without fabricating a
 match. No shortlist is cached, so the existing pending-evaluation, cancellation,
 disable, and stale-result guards also clear the derived list.
 
-Raw scores, experimental grades, ownership, and saved inventory do not affect
-ordering. Missing calibration stays ungraded, never D. Kuki does not gain
+Raw scores, experimental grades, ownership, and saved inventory affect ordering
+only through the verdict's leading character. Missing calibration stays ungraded, never D. Kuki does not gain
 priority merely because her flower/plume cells have grades. The no-eligible-core
 suppression remains intact: an EM-only role on an EM main still has no scalar
 comparison. Manual profiles, ordinary roll math, grade thresholds, actual +20

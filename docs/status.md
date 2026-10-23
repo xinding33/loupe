@@ -80,9 +80,9 @@ In suggested order. The first two need the game running.
 3. Recorded fixtures: no recorded Enhance sequence is available to the two
    skipped tests, so live-reader regressions are covered only by synthetic
    images.
-4. Tiers: all 15 reviewed roles are graded by rarity among new drops, with
-   cutoffs fitted to the earlier hand calibration. Keep / Level verdicts and
-   shortlist ordering by rarity are next. See
+4. Grading: all 15 reviewed roles are graded by rarity among new drops, and
+   verdicts are shown. Next: a whole-bag scan, then roles for all characters.
+   Verdict defaults still need tuning on a real inventory. See
    [grading approach](grading-approach.md).
 5. Character coverage: 15 roles, one per character. This is not a roster-wide
    search and the app says so.
@@ -91,7 +91,8 @@ Grading direction changed on 2026-10-22: see [grading approach](grading-approach
 Its first step, enumerating final substat outcomes once for every profile, is
 implemented as `RollOutcomes`. Its second step replaces the hand-calibrated
 tier cells with tiers from rarity among new drops (`DropRarity`), so every
-reviewed role is graded.
+reviewed role is graded. Its third step adds Keep / Level / Review / Fodder
+verdicts (`VerdictEngine`) to the overlay and dashboard.
 
 Deferred by decision: crafted and Dust probability models, full-build damage
 optimization, automatic character ownership syncing, cloud reports, and

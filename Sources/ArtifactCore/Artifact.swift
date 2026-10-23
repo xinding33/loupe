@@ -64,6 +64,8 @@ public enum Slot: String, Codable, CaseIterable, Sendable, Identifiable {
   case flower, plume, sands, goblet, circlet
   public var id: String { rawValue }
   public var label: String { rawValue.capitalized }
+  /// Lowercase plural for running text; "sands" is already plural.
+  public var plural: String { self == .sands ? "sands" : rawValue + "s" }
   public var mainStats: [Stat] {
     switch self {
     case .flower: [.hp]

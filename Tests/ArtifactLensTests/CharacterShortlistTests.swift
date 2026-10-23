@@ -298,3 +298,25 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
     to: URL(fileURLWithPath: output).appending(path: "shortlist-dashboard.png"),
     options: .withoutOverwriting)
 }
+
+@Test func verdictCharacterLeadsUnlessTheUserChoseAnother() throws {
+  let artifact = try shortlistFlower()
+  let matches = try expandedMatches(artifact)
+  let plain = CharacterShortlist(matches: matches, artifact: artifact, selectedCharacterID: nil)
+  let led = CharacterShortlist(
+    matches: matches, artifact: artifact, selectedCharacterID: nil, leadingCharacterID: "margaret")
+  #expect(led.allMatches.first?.characterID == "margaret")
+  #expect(led.selectedMatch?.characterID == "margaret")
+  #expect(led.visibleMatches.first?.characterID == "margaret")
+  // The rest keep their browsing order.
+  #expect(
+    led.allMatches.dropFirst().map(\.characterID)
+      == plain.allMatches.map(\.characterID).filter { $0 != "margaret" })
+  let manual = CharacterShortlist(
+    matches: matches, artifact: artifact, selectedCharacterID: "ada",
+    leadingCharacterID: "margaret")
+  #expect(manual.selectedMatch?.characterID == "ada")
+  let unknown = CharacterShortlist(
+    matches: matches, artifact: artifact, selectedCharacterID: nil, leadingCharacterID: "nobody")
+  #expect(unknown.allMatches.map(\.characterID) == plain.allMatches.map(\.characterID))
+}

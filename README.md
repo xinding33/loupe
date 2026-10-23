@@ -67,9 +67,18 @@ Before upgrading a candidate, save it and choose **Link upgrade** on its invento
 
 ## What the numbers mean
 
+**The verdict** comes first in the overlay and dashboard: **Keep**, **Level to +N**, **Review**, or **Fodder**, with one reason. It is advice only; nothing acts in the game.
+
+- **Keep** a finished piece when a better one would take at least 1,000 five-star domain drops for some reviewed character, or when it is B or better for a character and beats enough of your saved +20 pieces of that slot and main stat.
+- **Level to +N** an unfinished piece when its exact chance of becoming a keeper at +20 clears a bar that rises from 5% at +0 to 30% at +16, because the last levels cost the most.
+- **Fodder** when no reviewed character uses the slot and main stat, when it is in the bottom half of new drops for every one, when saved pieces already beat it for every one, or when its keeper chance is below the bar.
+- **Review** otherwise, including good pieces with no saved +20 pieces to compare. Save your +20 pieces first (see above) so the verdicts can use them.
+
+The character behind the verdict leads the shortlist. Defaults and measurements are in the [grading approach](docs/grading-approach.md).
+
 **Character uses** is the default assessment. Coverage includes one reviewed role each for 15 characters: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, Kokomi, Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun, Sucrose, Xiangling, Xingqiu, and Yelan. It includes unowned characters and off-pieces. Roles are specific: Raiden covers Hyperbloom, for example, not her Burst-carry build. See the [coverage and source limits](docs/character-coverage-expansion.md).
 
-The dashboard and overlay show the same shortlist of up to five potential users. Ordering uses useful-stat presence, main-stat fit, and set fit, not cross-character damage or raw scores. Select a character in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible users** reveals the remaining reviewed candidates. This is partial coverage, not a complete roster search.
+The dashboard and overlay show the same shortlist of up to five potential users. The verdict's character comes first; the rest are ordered by useful-stat presence, main-stat fit, and set fit, not cross-character damage or raw scores. Select a character in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible users** reveals the remaining reviewed candidates. This is partial coverage, not a complete roster search.
 
 Experimental S/A/B/C/D tiers grade every reviewed role. A tier says how rare the piece's useful rolls are among every possible new five-star drop of the same slot and main stat, scored with that role's useful stats:
 

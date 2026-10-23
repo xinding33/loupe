@@ -9,6 +9,8 @@ final class Model: ObservableObject {
   @Published var current: Artifact?
   @Published var potential: Potential?
   @Published var characterMatches: [CharacterMatch] = []
+  /// Keep / Level / Review / Fodder advice across every character match and the saved inventory.
+  @Published var verdict: Verdict?
   @Published var assessmentMode: AssessmentMode = .characters {
     didSet { refreshDiagnosticRecommendation() }
   }
@@ -132,7 +134,8 @@ final class Model: ObservableObject {
   var canSaveCurrent: Bool { enabled && current != nil && stability.isVerified }
   var characterShortlist: CharacterShortlist {
     CharacterShortlist(
-      matches: characterMatches, artifact: current, selectedCharacterID: selectedCharacterID)
+      matches: characterMatches, artifact: current, selectedCharacterID: selectedCharacterID,
+      leadingCharacterID: verdict?.characterID)
   }
   var selectedMatch: CharacterMatch? { characterShortlist.selectedMatch }
   var displayedPotential: Potential? {
@@ -230,6 +233,7 @@ final class Model: ObservableObject {
     potential = nil
     allProfiles = []
     characterMatches = []
+    verdict = nil
     evaluationIssue = nil
   }
 
@@ -269,6 +273,7 @@ final class Model: ObservableObject {
       potential = nil
       allProfiles = []
       characterMatches = []
+      verdict = nil
       evaluationIssue = nil
     }
   }
@@ -279,6 +284,7 @@ final class Model: ObservableObject {
     potential = nil
     allProfiles = []
     characterMatches = []
+    verdict = nil
     evaluationIssue = nil
     diagnosticRecommendation = nil
     recordDiagnosticDisplay()
@@ -291,7 +297,10 @@ final class Model: ObservableObject {
     let diagnosticKey = latestDiagnosticSample
     let worker = Task.detached(priority: .userInitiated) {
       guard !Task.isCancelled else {
-        return (nil as Result<Potential, Error>?, [(String, Potential)](), [CharacterMatch]())
+        return (
+          nil as Result<Potential, Error>?, [(String, Potential)](), [CharacterMatch](),
+          nil as Verdict?
+        )
       }
       let result =
         Result {
@@ -307,10 +316,14 @@ final class Model: ObservableObject {
       }
       let matches = CharacterAssessment.evaluate(
         current, inventory: pool, scope: scope, excluding: excluded)
-      return (Optional(result), overview, matches)
+      let verdict =
+        Task.isCancelled
+        ? nil
+        : VerdictEngine.evaluate(current, matches: matches, inventory: pool, excluding: excluded)
+      return (Optional(result), overview, matches, verdict)
     }
     evaluation = Task {
-      let (result, overview, matches) = await withTaskCancellationHandler {
+      let (result, overview, matches, verdict) = await withTaskCancellationHandler {
         await worker.value
       } onCancel: {
         worker.cancel()
@@ -325,6 +338,7 @@ final class Model: ObservableObject {
       }
       allProfiles = overview
       characterMatches = matches
+      self.verdict = verdict
       refreshDiagnosticRecommendation()
       if let diagnosticKey {
         capture.recordDiagnosticState(diagnosticState(), key: diagnosticKey)

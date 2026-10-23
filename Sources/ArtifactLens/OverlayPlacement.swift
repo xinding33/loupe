@@ -136,7 +136,7 @@ final class OverlayController {
         scale: screen.backingScaleFactor)
     }
     let size = CGSize(
-      width: model.overlayExpanded ? 360 : 280, height: model.overlayExpanded ? 630 : 140)
+      width: model.overlayExpanded ? 360 : 280, height: model.overlayExpanded ? 630 : 168)
     guard
       let next = OverlayPlacement.resolve(
         window: OverlayPlacement.appKitFrame(quartz, primaryTop: primary.frame.maxY),

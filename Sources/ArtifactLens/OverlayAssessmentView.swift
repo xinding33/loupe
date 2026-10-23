@@ -20,6 +20,11 @@ struct OverlayView: View {
     VStack(alignment: .leading, spacing: expanded ? 10 : 7) {
       statusRow
       if let artifact = model.current {
+        if model.assessmentMode == .characters, let verdict = model.verdict {
+          VerdictBanner(
+            verdict: verdict, compact: true, lines: expanded ? 2 : 1,
+            displayedCharacterID: model.selectedMatch?.characterID)
+        }
         hero(artifact)
         if expanded {
           details(artifact)
