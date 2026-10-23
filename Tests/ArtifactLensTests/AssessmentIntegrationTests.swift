@@ -158,7 +158,13 @@ private let assessmentFlower = """
     try write(try #require(renderer.cgImage), name)
   }
   func dashboard(_ name: String) throws {
-    let host = NSHostingView(rootView: Dashboard(model: model))
+    // A target that is never frontmost, so the test never installs the toggle or presses keys.
+    let defaults = try #require(UserDefaults(suiteName: "ArtifactLensTests.autoPress"))
+    var settings = AutoPressSettings()
+    settings.target = AutoPressTarget(bundleID: "invalid.artifactlens.tests", name: "GeForce NOW")
+    defaults.set(try JSONEncoder().encode(settings), forKey: AutoPress.defaultsKey)
+    let host = NSHostingView(
+      rootView: Dashboard(model: model, autoPress: AutoPress(defaults: defaults)))
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1080, height: 1000), styleMask: [.borderless],
       backing: .buffered, defer: false)

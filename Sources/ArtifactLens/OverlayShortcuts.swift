@@ -86,6 +86,8 @@ final class OverlayShortcuts {
 
 @MainActor
 final class CarbonShortcutBackend: ShortcutBackend {
+  /// 'ALEN'.
+  static let signature: OSType = 0x414C_454E
   var event: ((UInt32, Bool) -> Void)?
   private var handler: EventHandlerRef?
   private var registrations: [EventHotKeyRef] = []
@@ -107,6 +109,10 @@ final class CarbonShortcutBackend: ShortcutBackend {
             event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
             nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
           guard status == noErr else { return status }
+          // Auto-press registers its toggle on the same event target with its own signature.
+          guard id.signature == CarbonShortcutBackend.signature else {
+            return OSStatus(eventNotHandledErr)
+          }
           let backend = Unmanaged<CarbonShortcutBackend>.fromOpaque(context).takeUnretainedValue()
           let pressed = GetEventKind(event) == UInt32(kEventHotKeyPressed)
           MainActor.assumeIsolated { backend.event?(id.id, pressed) }
@@ -119,7 +125,7 @@ final class CarbonShortcutBackend: ShortcutBackend {
     var reference: EventHotKeyRef?
     let status = RegisterEventHotKey(
       shortcut.keyCode, shortcut.modifiers,
-      EventHotKeyID(signature: 0x414C_454E, id: id), GetApplicationEventTarget(),
+      EventHotKeyID(signature: Self.signature, id: id), GetApplicationEventTarget(),
       OptionBits(kEventHotKeyExclusive), &reference)
     guard status == noErr, let reference else {
       throw ArtifactError("Shortcut registration failed or conflicts with another app (\(status)).")

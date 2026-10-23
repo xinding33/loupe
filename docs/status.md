@@ -54,6 +54,10 @@ behavior on the real game, or performance.
 - Opt-in diagnostic buffer, report preview and export, and a headless
   [replay command](diagnostic-replay.md).
 - Manual profiles and pasted card text for cases outside reviewed coverage.
+- Auto-press, ported from Mash on 2026-10-22: repeats one key while the chosen
+  app is in front, with a toggle shortcut, banner and auto-off timer. Needs
+  Accessibility. Settings and timer logic are covered by ArtifactCore tests;
+  key posting and the toggle have not been checked live.
 
 ## Live checks so far
 
@@ -112,7 +116,7 @@ Historical, kept for the reasoning behind decisions:
 
 - No CI. The synthetic Vision tests need macOS Vision services and normal
   execution outside a restricted process sandbox.
-- `make app` produces an ad-hoc signed bundle for this Mac only. There is no
-  notarized distribution.
+- `make app` signs with this Mac's Developer ID when it has one, otherwise ad
+  hoc. There is no notarized distribution.
 - Live capture and window tracking require macOS 15.2 or later. The package
   still targets macOS 14 for manual entry.
