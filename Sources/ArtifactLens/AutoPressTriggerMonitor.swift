@@ -51,27 +51,34 @@ final class AutoPressTriggerMonitor {
       issue = nil
     }
     let wanted = active ? trigger : nil
-    guard wanted != installed else { return }
+    let registered = hotKeyRef != nil || eventTap != nil
+    guard wanted != installed || (wanted == nil && registered) else { return }
 
     uninstall()
     guard let wanted else { return }
 
+    // Judge this attempt alone: an earlier failure's issue must not mark a successful retry as
+    // failed, or `installed` stays nil and deactivation leaves the hot key or tap live.
+    let problem: String?
     switch wanted {
     case .key(let keyCode, let modifiers):
       let status = RegisterEventHotKey(
         UInt32(keyCode), modifiers.carbon, EventHotKeyID(signature: Self.signature, id: 1),
         GetApplicationEventTarget(), 0, &hotKeyRef)
-      if status != noErr {
+      if status == noErr {
+        problem = nil
+      } else {
         hotKeyRef = nil
-        issue = "\(wanted.displayName) is taken by another shortcut (\(status)). Choose another."
+        problem = "\(wanted.displayName) is taken by another shortcut (\(status)). Choose another."
       }
     case .mouse(let button):
-      if !installMouseTap(button: button) {
-        issue = "A mouse-button toggle needs Accessibility access."
-      }
+      problem =
+        installMouseTap(button: button) ? nil : "A mouse-button toggle needs Accessibility access."
     }
-    if issue == nil {
+    issue = problem
+    if problem == nil {
       installed = wanted
+      failed = nil
     } else {
       failed = wanted
     }
