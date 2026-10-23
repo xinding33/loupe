@@ -9,6 +9,7 @@ func percent(_ value: Double) -> String {
 
 struct Dashboard: View {
   @ObservedObject var model: Model
+  let autoPress: AutoPress
   @State private var textEditor = false
   @State private var guide = false
 
@@ -17,9 +18,11 @@ struct Dashboard: View {
       header
       Divider()
       HStack(spacing: 0) {
-        ScrollView { Sidebar(model: model, textEditor: $textEditor).padding(14) }
-          .frame(width: 290)
-          .background(Color.black.opacity(0.12))
+        ScrollView {
+          Sidebar(model: model, autoPress: autoPress, textEditor: $textEditor).padding(14)
+        }
+        .frame(width: 290)
+        .background(Color.black.opacity(0.12))
         Divider()
         ScrollView {
           VStack(alignment: .leading, spacing: 18) {
@@ -147,6 +150,7 @@ struct Dashboard: View {
 
 private struct Sidebar: View {
   @ObservedObject var model: Model
+  let autoPress: AutoPress
   @Binding var textEditor: Bool
 
   var body: some View {
@@ -217,6 +221,7 @@ private struct Sidebar: View {
             .fixedSize(horizontal: false, vertical: true)
         }
       }
+      AutoPressPanel(autoPress: autoPress)
       Panel(title: "Diagnostics", systemImage: "stethoscope") {
         DiagnosticControls(flow: model.diagnostics, report: model.reportIssue)
         Divider()

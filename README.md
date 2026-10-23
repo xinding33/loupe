@@ -2,7 +2,7 @@
 
 A local macOS overlay for inspecting Genshin Impact artifact potential while playing through GeForce NOW.
 
-The app reads a selected game window, recognizes five-star English artifact cards, and compares their possible +20 outcomes with your saved +20 artifacts. It does not click in the game, upgrade artifacts, or recommend automatic salvage.
+The app reads a selected game window, recognizes five-star English artifact cards, and compares their possible +20 outcomes with your saved +20 artifacts. The reader does not click in the game, upgrade artifacts, or recommend automatic salvage. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
 
 ## Run
 
@@ -13,7 +13,7 @@ make app
 open "dist/Artifact Lens.app"
 ```
 
-The local build uses an ad-hoc signature. It is not a notarized distribution for other Macs.
+`make app` signs with this Mac's Developer ID certificate if it has one, so the Accessibility grant that auto-press needs survives rebuilds. Otherwise it signs ad hoc, and macOS asks again after each build. Either way it is not a notarized distribution for other Macs. Set `SIGN_IDENTITY` to choose another identity.
 
 1. Click **Choose game window**.
 2. Select **Genshin Impact on GeForce NOW** in the macOS sharing picker.
@@ -32,6 +32,20 @@ Edit the shortcuts in the main window and click **Apply shortcuts**. Keys use US
 **Collapsed** still reads artifacts. **Disabled** hides the overlay, stops capture and new OCR, cancels evaluation, and clears live results. Inventory and settings remain. An in-flight read may finish, but cannot publish results or save artifacts. If macOS cannot stop sharing, the app reports the error and keeps OCR disabled.
 
 Enable again to reuse the selected window if sharing permission remains valid. Otherwise choose the window again. Read a fresh Inventory card before entering Enhance. Disabling also stops collection and clears an upgrade link; re-enable collection or relink explicitly when needed. Expanding alone never enables capture. Reopen the main window from the Dock.
+
+## Auto-press
+
+Auto-press repeatedly presses a key while a chosen app is in front. It comes from [Mash](https://github.com/xinding33/mash) and starts with **F** in **NVIDIA GeForce NOW**, several times a second, which talks, picks up items and skips dialogue in Genshin Impact.
+
+1. Turn on **Press F repeatedly** under Auto-press in the main window, or press the toggle (`` ` `` to start with) while GeForce NOW is in front. A banner shows **Auto-press on** or **Auto-press off**, since the menu bar is hidden in full screen.
+2. It presses only while GeForce NOW is in front. Switch away and it pauses; come back and it carries on.
+3. It turns itself off after 10 minutes unless you change that.
+
+The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. The app menu has **Turn auto-press on / off**.
+
+Auto-press needs **Accessibility** access to press keys and to use a mouse button as its toggle. It asks the first time you turn it on; until then the panel shows **Open Accessibility settings** and auto-press stays off. It notices the grant without a restart.
+
+Key presses are `CGEvent`s posted only while the chosen app is frontmost. A keyboard toggle is a Carbon hot key registered only while that app is in front, so it never takes the key from other apps. A mouse-button toggle is an event tap. Both swallow the toggle, so the game never sees it. The toggle can't be the key being pressed or one of the overlay's shortcuts. Auto-press works whether or not the reader is enabled. Don't run Mash at the same time: both would answer the same toggle.
 
 ## Build the inventory baseline
 
@@ -146,8 +160,8 @@ make check
 make app
 ```
 
-- `ArtifactCore`: validated artifact data, card parsing, per-field OCR confirmation, probability distributions, and inventory persistence.
-- `ArtifactLens`: ScreenCaptureKit, Vision OCR, native windows, and user workflows.
+- `ArtifactCore`: auto-press settings and timer, validated artifact data, card parsing, per-field OCR confirmation, probability distributions, and inventory persistence.
+- `ArtifactLens`: ScreenCaptureKit, Vision OCR, key posting and global shortcuts, native windows, and user workflows.
 - `ArtifactCoreTests`: roll events, ties, ranking scope, invalid input, imports, duplicates, upgrade identity, persistence, and live-reading stability.
 - `ArtifactLensTests`: synthetic Enhance images passed through Vision and the card parser at two resolutions, plus an opt-in recorded-sequence test. These tests need access to macOS Vision services and may not run inside a restricted process sandbox.
 

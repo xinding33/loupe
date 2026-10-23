@@ -8,9 +8,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var shortcuts: OverlayShortcuts!
   private let shortcutBackend = CarbonShortcutBackend()
   private var model: Model!
+  private var autoPress: AutoPress!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     model = Model()
+    autoPress = AutoPress()
+    autoPress.overlayShortcuts = { [weak self] in
+      guard let self else { return [] }
+      return [model.expandShortcut, model.enableShortcut].compactMap { try? OverlayShortcut($0) }
+    }
     let menu = NSMenu()
     let appItem = NSMenuItem()
     menu.addItem(appItem)
@@ -27,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ).target = self
     appMenu.addItem(
       withTitle: "Reset overlay placement", action: #selector(resetPlacement), keyEquivalent: ""
+    ).target = self
+    appMenu.addItem(
+      withTitle: "Turn auto-press on / off", action: #selector(toggleAutoPress), keyEquivalent: ""
     ).target = self
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Report issue", action: #selector(reportIssue), keyEquivalent: "")
@@ -51,7 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false
     )
     window.title = "Artifact Lens"
-    window.contentView = NSHostingView(rootView: Dashboard(model: model))
+    window.contentView = NSHostingView(
+      rootView: Dashboard(model: model, autoPress: autoPress))
     window.isReleasedWhenClosed = false
     window.center()
     window.makeKeyAndOrderFront(nil)
@@ -87,8 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @objc private func toggleEnabled() { model.setEnabled(!model.enabled) }
   @objc private func resetPlacement() { model.resetOverlayPlacement?() }
   @objc private func reportIssue() { model.reportIssue() }
+  @objc private func toggleAutoPress() { autoPress.toggle() }
   func applicationWillTerminate(_ notification: Notification) {
     model.setEnabled(false)
+    autoPress.shutdown()
     shortcutBackend.close()
   }
   func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool

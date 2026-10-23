@@ -1,6 +1,9 @@
 SWIFT_FLAGS = --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security
 export CLANG_MODULE_CACHE_PATH = $(CURDIR)/.build/module-cache
 export SWIFTPM_MODULECACHE_OVERRIDE = $(CURDIR)/.build/module-cache
+# A stable identity keeps the Accessibility grant that auto-press needs across rebuilds. Ad-hoc
+# signatures change with every build, so macOS treats each one as a new app.
+SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -n 1)
 BUILD_FINGERPRINT = sha256-$(shell { find Sources -type f -name '*.swift' -exec shasum -a 256 {} \; ; shasum -a 256 Package.swift Resources/Info.plist Makefile; } | LC_ALL=C sort | shasum -a 256 | cut -d ' ' -f 1)
 
 .PHONY: build test check format app build-fingerprint
@@ -20,4 +23,9 @@ app: build
 	cp "$$(swift build $(SWIFT_FLAGS) --show-bin-path)/ArtifactLens" "dist/Artifact Lens.app/Contents/MacOS/ArtifactLens"
 	cp Resources/Info.plist "dist/Artifact Lens.app/Contents/Info.plist"
 	/usr/libexec/PlistBuddy -c "Add :ArtifactLensBuildFingerprint string $(BUILD_FINGERPRINT)" "dist/Artifact Lens.app/Contents/Info.plist"
-	codesign --force --sign - "dist/Artifact Lens.app"
+	if [ -n "$(SIGN_IDENTITY)" ]; then \
+	  codesign --force --options runtime --timestamp=none --sign "$(SIGN_IDENTITY)" "dist/Artifact Lens.app"; \
+	else \
+	  codesign --force --sign - "dist/Artifact Lens.app"; \
+	fi
+	codesign --verify --strict "dist/Artifact Lens.app"
