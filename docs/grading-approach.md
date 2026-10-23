@@ -1,7 +1,7 @@
 # Artifact grading: approach
 
 Date: 2026-10-22
-Status: direction agreed with the user. Steps 1 and 2 are implemented; the rest is planned.
+Status: direction agreed with the user. Steps 1 to 3 are implemented; the rest is planned.
 
 This page records the research behind the grading direction, the decisions the
 user made, and the work order. It supersedes the "no keep/discard threshold"
@@ -127,23 +127,60 @@ it can order the shortlist in step 3.
 ### 3. Account value: margin over saved pieces
 
 - Rank and chance to beat the best saved piece, already implemented.
+- Saved-pool position per role, used by the verdicts below. Implemented.
 - Chance to beat the equipped piece, once equipped data is available.
-- Dominance count: how many saved pieces with the same slot and main stat beat
-  this one on every non-flat substat. Three or more makes it fodder whatever
-  the weights say.
+- Role-free dominance count: how many saved pieces with the same slot and main
+  stat beat this one on every non-flat substat. Not implemented; it would
+  protect uses outside the reviewed roles.
 
-### 4. Verdicts
+### 4. Verdicts — implemented
 
-| Question | Rule (defaults to tune) |
-| --- | --- |
-| Keep | A or better for some stat-profile group; or top few in a group's pool; or a rare main stat with nothing better saved; or a +20 piece worth reshaping |
-| Fodder | Beaten on every stat by three or more saved pieces, and no keep reason |
-| Review | Neither of the above |
-| Level | Exact chance of becoming a keeper, against a bar that rises with each checkpoint |
-| Off-piece | Rank across all sets, and margin over the best on-set piece in that slot |
+`VerdictEngine` returns Keep, Level to +N, Review, or Fodder with one reason
+and the character it concerns. The Model computes it with the character
+matches; the overlay and dashboard show it first, and that character leads
+the shortlist unless the user picked another. Defaults live in
+`VerdictPolicy` and are starting points, not reviewed thresholds.
 
-Group roles with the same stat profile, such as the HP% and Crit roles, and
-count a piece once per group, not once per character.
+A finished piece is a **keeper** for a role when either holds:
+
+- **Hard to replace:** a better piece of the same slot and main stat would take
+  at least 1,000 five-star domain drops (`keepDrops`). On-set roles need this
+  set, which halves the odds; off-piece roles accept any set.
+- **Fills a gap:** it is B or better for the role (share at most 15%,
+  `gapShare`) and fewer saved +20 pieces beat it than the role's group can
+  use. A group is the matching roles with the same profile, capped at three
+  (`maxBackups`). With no saved pieces of that slot and main stat there is no
+  gap to measure, so this rule does not apply.
+- A role that fits by main stat only (no core substat can appear) keeps the
+  piece while fewer saved pieces of that slot and main stat exist than the
+  group can use.
+
+| Verdict | Finished piece | Unfinished piece |
+| --- | --- | --- |
+| Keep | A keeper for some role; the reason with the largest replacement count wins | — |
+| Level to +N | — | Exact chance of becoming a keeper at +20, across all roles at once, meets the bar for its checkpoint: 5%, 10%, 15%, 20%, 30% from +0 to +16 |
+| Fodder | No reviewed role uses it; bottom half of new drops for every role; or enough saved pieces beat it for every role | The keeper chance is below the bar |
+| Review | Anything else, including good pieces with nothing saved to compare | No ordinary forecast (missing fourth stat, special rolls) |
+
+The keeper chance uses one enumeration of the piece's outcomes. Each role's
+keeper scores form an upper set, so one threshold per role decides every
+outcome. Ties between roles go to the preferred set, then the alternative set.
+
+Measured on 1,500 random domain drops per row with the 15 reviewed roles:
+
+| Saved inventory | +0 leveled: flower / sands / goblet / circlet | +20 Keep / Review / Fodder: flower; goblet |
+| --- | --- | --- |
+| None | 13% / 50% / 37% / 39% | 5 / 88 / 7%; 22 / 10 / 68% |
+| 30 random +20 per slot | 65% / 39% / 25% / 40% | 25 / 4 / 71%; 8 / 26 / 66% |
+
+A curated real inventory beats random saved pieces, so real verdicts should
+level less. Many goblets are Fodder only because no reviewed role uses their
+main stat; that falls as coverage grows.
+
+Not implemented: role-free dominance, reshape candidates, chance against the
+equipped piece, and an off-piece margin over the best on-set piece. The
+shortlist leads with the verdict's character but is otherwise not ordered by
+rarity: main-stat-only fits have no share to compare.
 
 ### 5. Weights
 
@@ -172,10 +209,10 @@ review report. The output is local-only.
 1. Final-substat enumeration. Done.
 2. Rarity and replacement cost; rarity-derived tiers checked against the 15
    calibrated cells. Done.
-3. Stat-profile groups and Keep / Level verdicts in the overlay.
+3. Stat-profile groups and Keep / Level verdicts in the overlay. Done.
 4. Whole-bag OCR scan of all five-star levels, then the fodder list.
 5. Reviewed weights for all characters; damage-derived weights for close calls.
 
-Open questions: the leveling bar per checkpoint;
+Open questions: verdict defaults tuned on a real scanned inventory;
 whether the inventory card's equipped-by line can be read reliably; how to
 model reshaped and Transmuter pieces, which the ordinary model excludes.

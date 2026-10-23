@@ -10,6 +10,15 @@ enum Theme {
   static let surfaceStrong = Color.white.opacity(0.08)
   static let hairline = Color.white.opacity(0.09)
 
+  static func verdict(_ kind: VerdictKind) -> Color {
+    switch kind {
+    case .keep: Color(red: 0.42, green: 0.85, blue: 0.55)
+    case .level: Color(red: 0.45, green: 0.68, blue: 1.0)
+    case .review: attention
+    case .fodder: Color(white: 0.6)
+    }
+  }
+
   static func tier(_ tier: ArtifactTier?) -> Color {
     switch tier {
     case .s: Color(red: 1.0, green: 0.78, blue: 0.36)
@@ -32,7 +41,7 @@ func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: B
   -> String?
 {
   guard let share = grades?.rarityShare else { return nil }
-  let kind = "new \(artifact.main.label) \(artifact.slot.label.lowercased())s"
+  let kind = "new \(artifact.main.label) \(artifact.slot.plural)"
   let standing = share <= 0.5 ? "top \(percent(share)) of \(kind)" : "bottom half of \(kind)"
   let replacement =
     grades?.replacementDrops.map {
@@ -43,13 +52,6 @@ func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: B
     ? standing.prefix(1).uppercased() + standing.dropFirst()
     : "Median +20: " + standing
   return headline + " · " + replacement
-}
-
-/// Two significant figures with grouping, for expected counts that are only estimates.
-func roughCount(_ value: Double) -> String {
-  guard value >= 100 else { return Int(value.rounded()).formatted() }
-  let scale = pow(10, floor(log10(value)) - 1)
-  return Int((value / scale).rounded() * scale).formatted()
 }
 
 /// Which grade the headline shows: the actual tier at +20, otherwise the median projection.
@@ -143,6 +145,40 @@ struct TierChip: View {
       .background(
         Theme.tier(tier).opacity(tier == nil ? 0.08 : 0.18),
         in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+  }
+}
+
+/// The at-a-glance answer for the current piece: what to do with it, and the main reason.
+struct VerdictBanner: View {
+  let verdict: Verdict
+  /// Smaller type for the overlay.
+  var compact = false
+  var lines = 2
+  /// The character shown beside the banner. The name is omitted only when it is the verdict's.
+  var displayedCharacterID: String?
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Text(verdict.title.uppercased())
+        .font(.system(size: compact ? 11 : 13, weight: .heavy)).lineLimit(1).fixedSize()
+        .foregroundStyle(Theme.hud)
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .background(Theme.verdict(verdict.kind), in: Capsule())
+      Text(Self.text(verdict, lines: lines, displayedCharacterID: displayedCharacterID))
+        .font(compact ? .caption2 : .callout).foregroundStyle(.secondary)
+        .lineLimit(lines).minimumScaleFactor(0.85)
+        .fixedSize(horizontal: false, vertical: lines > 1)
+      Spacer(minLength: 0)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(verdict.title). \(verdict.summary)")
+    .help("Advice only. Rules and defaults: docs/grading-approach.md")
+  }
+
+  /// One line sits just above the displayed character, so it drops the name only when that
+  /// character is the verdict's; otherwise the name leads.
+  static func text(_ verdict: Verdict, lines: Int, displayedCharacterID: String?) -> String {
+    lines == 1 && displayedCharacterID == verdict.characterID ? verdict.reason : verdict.summary
   }
 }
 

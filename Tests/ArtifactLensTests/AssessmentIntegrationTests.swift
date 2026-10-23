@@ -31,8 +31,14 @@ private let assessmentFlower = """
   #expect(ids.contains("alhaitham"))
   #expect(ids.contains("kuki-shinobu"))
   #expect(Set(ids).count == ids.count)
-  #expect(model.selectedMatch?.characterID == "alhaitham")
+  // The verdict's character leads by default: five EM rolls are rarest for an EM-only role.
+  #expect(model.verdict?.kind == .keep)
+  #expect(model.verdict?.characterID == "kuki-shinobu")
+  #expect(model.selectedMatch?.characterID == model.verdict?.characterID)
+  #expect(model.characterShortlist.visibleMatches.first?.characterID == "kuki-shinobu")
   #expect(model.characterShortlist.visibleMatches.count <= 5)
+  model.selectedCharacterID = "alhaitham"
+  #expect(model.selectedMatch?.characterID == "alhaitham")
   #expect(model.characterShortlist.visibleMatches.contains { $0.characterID == "alhaitham" })
   model.selectedCharacterID = "kuki-shinobu"
   let result = try #require(model.displayedPotential)
@@ -59,6 +65,7 @@ private let assessmentFlower = """
   model.setEnabled(false)
   await pending?.value
   #expect(model.characterMatches.isEmpty)
+  #expect(model.verdict == nil)
   #expect(model.displayedPotential == nil)
   #expect(model.current == nil)
 }
@@ -153,7 +160,7 @@ private let assessmentFlower = """
     // Matches OverlayController: the 28-point control strip sits above the result surface.
     let renderer = ImageRenderer(
       content: OverlayView(model: model).frame(
-        width: expanded ? 360 : 280, height: expanded ? 602 : 112))
+        width: expanded ? 360 : 280, height: expanded ? 602 : 140))
     renderer.scale = 2
     try write(try #require(renderer.cgImage), name)
   }

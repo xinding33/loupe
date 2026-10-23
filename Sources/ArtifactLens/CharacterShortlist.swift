@@ -1,12 +1,16 @@
 import ArtifactCore
 
 /// A browsing order based on stat presence and set context, never cross-role strength.
+/// The character behind the current verdict, when there is one, leads the list.
 struct CharacterShortlist {
   let allMatches: [CharacterMatch]
   let visibleMatches: [CharacterMatch]
   let selectedMatch: CharacterMatch?
 
-  init(matches: [CharacterMatch], artifact: Artifact?, selectedCharacterID: String?) {
+  init(
+    matches: [CharacterMatch], artifact: Artifact?, selectedCharacterID: String?,
+    leadingCharacterID: String? = nil
+  ) {
     guard let artifact else {
       allMatches = []
       visibleMatches = []
@@ -25,8 +29,11 @@ struct CharacterShortlist {
       )
     }
     var seen = Set<String>()
-    let ordered = matches.sorted { priority($0) < priority($1) }
+    var ordered = matches.sorted { priority($0) < priority($1) }
       .filter { seen.insert($0.characterID).inserted }
+    if let index = ordered.firstIndex(where: { $0.characterID == leadingCharacterID }) {
+      ordered.insert(ordered.remove(at: index), at: 0)
+    }
     allMatches = ordered
     let selected = ordered.first { $0.characterID == selectedCharacterID } ?? ordered.first
     selectedMatch = selected

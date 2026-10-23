@@ -62,3 +62,33 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
   #expect(
     rarityLine(kuki.grades, artifact: flower)?.hasPrefix("Top <0.1% of new HP flowers") == true)
 }
+
+@Test func sandsAreAlreadyPlural() throws {
+  let sands = try Artifact(
+    setName: "Test", slot: .sands, main: .hpPercent, level: 20,
+    substats: [
+      Substat(.critRate, 11.67), Substat(.critDamage, 7.77), Substat(.def, 46.30),
+      Substat(.energyRecharge, 12.96),
+    ])
+  #expect(
+    rarityLine(grades(share: 0.1, drops: 50), artifact: sands)
+      == "Top 10.0% of new HP% sands · about 50 domain drops to beat")
+}
+
+@Test func compactVerdictNamesItsCharacterWhenAnotherIsSelected() throws {
+  let flower = try Artifact(
+    setName: "Gilded Dreams", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.elementalMastery, 116.55), Substat(.hpPercent, 5.83), Substat(.critRate, 7.78),
+      Substat(.def, 23.15),
+    ])
+  let verdict = VerdictEngine.evaluate(
+    flower, matches: CharacterAssessment.evaluate(flower), inventory: [])
+  let id = try #require(verdict.characterID)
+  let name = try #require(verdict.characterName)
+  #expect(VerdictBanner.text(verdict, lines: 1, displayedCharacterID: id) == verdict.reason)
+  #expect(
+    VerdictBanner.text(verdict, lines: 1, displayedCharacterID: "someone-else")
+      == "\(name) · \(verdict.reason)")
+  #expect(VerdictBanner.text(verdict, lines: 2, displayedCharacterID: id) == verdict.summary)
+}
