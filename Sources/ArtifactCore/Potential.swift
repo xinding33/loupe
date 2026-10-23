@@ -68,7 +68,7 @@ public struct Potential: Sendable {
 
   public static func evaluate(
     _ artifact: Artifact, profile: Profile, inventory: [Artifact],
-    scope: ComparisonScope, excluding: UUID? = nil
+    scope: ComparisonScope, excluding: UUID? = nil, outcomes: RollOutcomes? = nil
   ) throws -> Potential {
     guard artifact.rule == .ordinary else {
       throw ArtifactError(
@@ -77,30 +77,12 @@ public struct Potential: Sendable {
     guard profile.weights.values.contains(where: { $0 > 0 }) else {
       throw ArtifactError("Choose at least one useful stat.")
     }
-    guard artifact.substats.count == 4 || artifact.unactivated != nil else {
-      throw ArtifactError("Read or enter the fourth stat shown as unactivated; it activates at +4.")
-    }
-    let finalStats = artifact.substats + (artifact.unactivated.map { [$0] } ?? [])
-    let events = (20 - artifact.level) / 4 + (artifact.level % 4 == 0 ? 0 : 1)
-    let upgrades = events - (artifact.unactivated == nil ? 0 : 1)
-    let base = profile.score(finalStats)
-    // Each ordinary event chooses one of four stats and one of four roll tiers.
-    var increments: [Int: Double] = [:]
-    for stat in finalStats {
-      for tier in 7...10 {
-        increments[tier * profile.weights[stat.key, default: 0], default: 0] += 1.0 / 16
-      }
-    }
-    var distribution = [base: 1.0]
-    for _ in 0..<upgrades {
-      var next: [Int: Double] = [:]
-      for (score, probability) in distribution {
-        for (increment, chance) in increments {
-          next[score + increment, default: 0] += probability * chance
-        }
-      }
-      distribution = next
-    }
+    // Callers scoring several profiles share one enumeration; another artifact's is ignored.
+    let outcomes =
+      try outcomes.flatMap { $0.artifact == artifact ? $0 : nil }
+      ?? RollOutcomes(artifact)
+    let upgrades = outcomes.upgradesRemaining
+    let distribution = outcomes.scores(profile)
     let pool = inventory.filter {
       $0.id != (excluding ?? artifact.id) && $0.level == 20 && $0.slot == artifact.slot
         && $0.main == artifact.main && (scope == .offPiece || $0.setKey == artifact.setKey)
@@ -110,8 +92,8 @@ public struct Potential: Sendable {
       return a == b ? $0.id.uuidString < $1.id.uuidString : a > b
     }
     let scores = pool.map { profile.score($0.substats) }
-    let low = distribution.keys.min() ?? base
-    let high = distribution.keys.max() ?? base
+    let low = distribution.keys.min() ?? 0
+    let high = distribution.keys.max() ?? 0
     var cumulative = 0.0
     var p50 = low
     var p90 = low

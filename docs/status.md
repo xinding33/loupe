@@ -82,6 +82,10 @@ In suggested order. The first two need the game running.
 5. Character coverage: 15 roles, one per character. This is not a roster-wide
    search and the app says so.
 
+Grading direction changed on 2026-10-22: see [grading approach](grading-approach.md).
+Its first step, enumerating final substat outcomes once for every profile, is
+implemented as `RollOutcomes`.
+
 Deferred by decision: crafted and Dust probability models, full-build damage
 optimization, automatic character ownership syncing, cloud reports, and
 adaptive OCR scheduling. No automatic upgrade, salvage, or discard actions.
@@ -90,6 +94,9 @@ adaptive OCR scheduling. No automatic upgrade, salvage, or discard actions.
 
 Current reference:
 
+- [Grading approach](grading-approach.md): agreed 2026-10-22 direction for
+  Keep / Level / Fodder verdicts across all characters, and its work order.
+  It supersedes the earlier no-verdict stance.
 - [Coverage and source limits](character-coverage-expansion.md)
 - [Shortlist behavior](character-shortlist.md)
 - [Original calibration](character-pilot.md) and
