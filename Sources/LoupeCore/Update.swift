@@ -103,10 +103,19 @@ public enum Updater {
 
   /// Downloads `release` and installs it in place of `app`. Relaunch afterwards to run it.
   public static func install(_ release: Release, replacing app: URL) async throws {
-    let (zip, response) = try await URLSession.shared.download(from: release.download)
+    let zip = try await download(release)
     defer { try? FileManager.default.removeItem(at: zip) }
-    try check(response)
     try install(zip: zip, version: release.version, replacing: app)
+  }
+
+  /// Downloads `release` to a temporary file, which the caller removes.
+  public static func download(_ release: Release) async throws -> URL {
+    let (zip, response) = try await URLSession.shared.download(from: release.download)
+    do { try check(response) } catch {
+      try? FileManager.default.removeItem(at: zip)
+      throw error
+    }
+    return zip
   }
 
   /// Unzips Loupe.app from `zip`, checks that it is a release build of `version` signed to satisfy

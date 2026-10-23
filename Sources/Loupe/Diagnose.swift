@@ -26,17 +26,33 @@ enum Diagnose {
 }
 
 /// Carries over the inventory and settings of Artifact Lens, the app's name before Loupe.
+@MainActor
 enum Migration {
   private static let doneKey = "importedArtifactLensSettings"
+  /// Why the old data couldn't all be moved, for the main window to show.
+  private(set) static var problem: String?
 
+  /// Runs on every launch, before the model reads the inventory, so a move that failed is retried.
   static func run() {
     let support = URL.applicationSupportDirectory
+    let old = support.appending(path: LegacyData.folderName).path
     do {
       let folder = support.appending(path: appName, directoryHint: .isDirectory)
-      if try LegacyData.moveFolder(in: support, to: folder) {
-        log.info("Moved the Artifact Lens folder to \(folder.path, privacy: .public)")
+      let move = try LegacyData.moveFolder(in: support, to: folder)
+      if !move.moved.isEmpty {
+        log.info(
+          "Moved from Artifact Lens: \(move.moved.joined(separator: ", "), privacy: .public)")
+      }
+      if !move.kept.isEmpty {
+        problem =
+          "Some Artifact Lens data wasn't moved because Loupe already has files with the same names: "
+          + "\(move.kept.joined(separator: ", ")). They're still in \(old). "
+          + "Import an old inventory.json with Import to merge it."
       }
     } catch {
+      problem =
+        "Couldn't move your Artifact Lens data from \(old): \(error.localizedDescription) "
+        + "Loupe tries again at its next launch, or import the old inventory.json with Import."
       log.error(
         "Couldn't move the Artifact Lens folder: \(error.localizedDescription, privacy: .public)")
     }

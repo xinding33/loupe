@@ -98,6 +98,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
       }
     }
     model.applyShortcuts?()
+    if let problem = Migration.problem {
+      model.issue = [model.issue, problem].compactMap { $0 }.joined(separator: " ")
+    }
+    updates.isBusy = { [weak self] in
+      guard let self else { return false }
+      return model.isBusy || autoPress.session.isOn
+    }
     updates.start()
     NSApplication.shared.activate(ignoringOtherApps: true)
   }

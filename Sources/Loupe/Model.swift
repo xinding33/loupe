@@ -432,6 +432,11 @@ final class Model: ObservableObject {
     setEnabled(false)
   }
 
+  /// Whether restarting now would interrupt the user: a capture, a recording, or a report.
+  var isBusy: Bool {
+    capture.isCapturing || isRecording || diagnostics.isPresented || diagnostics.isSaving
+  }
+
   func reportIssue() {
     recordDiagnosticDisplay()
     let context = DiagnosticReportContext(

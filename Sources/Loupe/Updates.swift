@@ -12,6 +12,9 @@ final class Updates {
       checkAutomatically()
     }
   }
+  /// Whether a restart now would interrupt something: a capture, a recording or a report.
+  /// Automatic updates wait until it's false; Install and Restart is the user's own choice.
+  var isBusy: () -> Bool = { false }
   /// What the updater is doing, or nil when it is idle.
   private(set) var status: String?
 
@@ -35,13 +38,25 @@ final class Updates {
   }
 
   func checkAutomatically() {
-    guard automatic, canInstall, status == nil, Date().timeIntervalSince(lastCheck) > 24 * 60 * 60
+    guard automatic, canInstall, status == nil, !isBusy(),
+      Date().timeIntervalSince(lastCheck) > 24 * 60 * 60
     else { return }
     status = "Checking for updates…"
     Task {
       defer { status = nil }
       // A failed check is retried within the hour; a failed install at the next daily check.
-      do { if let release = try await newerRelease() { try await install(release) } } catch {
+      do {
+        guard let release = try await newerRelease() else { return }
+        status = "Downloading \(appName) \(release.version)…"
+        let zip = try await Updater.download(release)
+        defer { try? FileManager.default.removeItem(at: zip) }
+        // Something may have started during the download. Try again within the hour.
+        guard !isBusy() else {
+          lastCheck = .distantPast
+          return
+        }
+        try install(zip: zip, version: release.version)
+      } catch {
         log.error("Automatic update failed: \(error.localizedDescription, privacy: .public)")
       }
     }
@@ -109,6 +124,13 @@ final class Updates {
     status = "Installing \(appName) \(release.version)…"
     try await Updater.install(release, replacing: Bundle.main.bundleURL)
     log.info("Installed \(release.version.description, privacy: .public), relaunching")
+    Relaunch.now()
+  }
+
+  private func install(zip: URL, version: Version) throws {
+    status = "Installing \(appName) \(version)…"
+    try Updater.install(zip: zip, version: version, replacing: Bundle.main.bundleURL)
+    log.info("Installed \(version.description, privacy: .public), relaunching")
     Relaunch.now()
   }
 }

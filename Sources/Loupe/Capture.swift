@@ -260,6 +260,8 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
   private(set) var selectedWindowID: CGWindowID?
   private var currentConnection: StreamConnection?
   private var currentStream: SCStream? { currentConnection?.stream }
+  /// Whether a game window is being captured.
+  var isCapturing: Bool { currentConnection != nil }
   private var pickerRequested = false
   private var observingPicker = false
   private(set) var enabled = false
