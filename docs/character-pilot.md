@@ -177,7 +177,7 @@ roll monotonicity, inventory independence and linked-ID exclusion, final point
 masses, unfinished median/ceiling separation, A-or-better distribution mass,
 missing fourth stats, special rules, and cancellation.
 
-All 68 ArtifactCore tests passed in an isolated Swift scratch/cache build on
+All 68 LoupeCore tests passed in an isolated Swift scratch/cache build on
 2026-09-26. The A-or-better assertion was temporarily changed from 3/16 to
 4/16, failed with actual 0.1875 versus expected 0.25, and was restored before
 the final green run. Scoped strict Swift formatting and ASCII/whitespace

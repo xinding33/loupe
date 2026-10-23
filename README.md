@@ -1,19 +1,28 @@
-# Artifact Lens
+# Loupe
 
-A local macOS overlay for inspecting Genshin Impact artifact potential while playing through GeForce NOW.
+A macOS overlay that tells you which Genshin Impact artifacts to keep, level or feed, while you play through GeForce NOW.
 
-The app reads a selected game window, recognizes five-star English artifact cards, and compares their possible +20 outcomes with your saved +20 artifacts. The reader does not click in the game, upgrade artifacts, or recommend automatic salvage. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
+Loupe reads the game window you share with it, recognizes five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
 
-## Run
+Loupe is a fan-made tool. It isn't affiliated with or endorsed by HoYoverse or NVIDIA.
 
-Live capture and automatic monitor placement require macOS 15.2 or later. Manual card entry remains available on macOS 14. Building requires Xcode with a Swift 6 toolchain. No external packages, accounts, or API keys.
+## Install
 
 ```sh
-make app
-open "dist/Artifact Lens.app"
+brew install --cask xinding33/tap/loupe
 ```
 
-`make app` signs with this Mac's Developer ID certificate if it has one, so the Accessibility grant that auto-press needs survives rebuilds. Otherwise it signs ad hoc, and macOS asks again after each build. Either way it is not a notarized distribution for other Macs. Set `SIGN_IDENTITY` to choose another identity.
+Or download `Loupe-x.y.z.zip` from the [latest release](https://github.com/xinding33/loupe/releases/latest), unzip it and move `Loupe.app` to Applications. It needs macOS 14 or later; live capture and automatic monitor placement need macOS 15.2 or later. On macOS 14, enter card text by hand.
+
+Loupe asks for no permission to read the game: you pick the window in the macOS sharing picker each session. Auto-press needs Accessibility access, and asks the first time you turn it on.
+
+### Updating
+
+Loupe checks for a new release once a day and installs it. Turn that off with **Install Updates Automatically** in the app menu, or use **Check for Updates…**. `brew upgrade` leaves it alone, because it updates itself.
+
+Artifact Lens, Loupe's earlier name, kept its data elsewhere. On first launch Loupe moves the saved inventory and diagnostics from `~/Library/Application Support/ArtifactLens/` and imports its settings.
+
+## Run
 
 1. Click **Choose game window**.
 2. Select **Genshin Impact on GeForce NOW** in the macOS sharing picker.
@@ -35,7 +44,7 @@ Enable again to reuse the selected window if sharing permission remains valid. O
 
 ## Auto-press
 
-Auto-press repeatedly presses a key while a chosen app is in front. It comes from [Mash](https://github.com/xinding33/mash) and starts with **F** in **NVIDIA GeForce NOW**, several times a second, which talks, picks up items and skips dialogue in Genshin Impact.
+Auto-press repeatedly presses a key while a chosen app is in front. Sending inputs to an online game may break its terms of service; use it at your own risk. It comes from [Mash](https://github.com/xinding33/mash) and starts with **F** in **NVIDIA GeForce NOW**, several times a second, which talks, picks up items and skips dialogue in Genshin Impact.
 
 1. Turn on **Press F repeatedly** under Auto-press in the main window, or press the toggle (`` ` `` to start with) while GeForce NOW is in front. A banner shows **Auto-press on** or **Auto-press off**, since the menu bar is hidden in full screen.
 2. It presses only while GeForce NOW is in front. Switch away and it pauses; come back and it carries on.
@@ -57,7 +66,7 @@ Start with upgraded artifacts, not the whole bag:
 4. Check the saved count and recognized stats.
 5. Turn collection off before evaluating new pieces.
 
-Alternatively, use **Import** under Saved inventory for GOOD JSON or an Artifact Lens backup. Imports merge without deleting existing records. Repeated imports do not multiply identical records; duplicates within an imported inventory are preserved.
+Alternatively, use **Import** under Saved inventory for GOOD JSON or a Loupe or Artifact Lens backup. Imports merge without deleting existing records. Repeated imports do not multiply identical records; duplicates within an imported inventory are preserved.
 
 Screen scanning cannot distinguish two identical physical artifacts. Use **Save copy** for an additional real copy. This matters for top-two and top-three comparisons. Expand **Saved +20 coverage by slot and main stat** to find sparse comparison groups; counts do not establish that the scan is complete.
 
@@ -129,19 +138,19 @@ A missed reading keeps the last verified result visible for up to three seconds,
 
 Enhance reading can still fail when particles overlap text. Rechecking changes a small status label rather than replacing the recommendation heading. The diagnostic recorder below captures failures for local regression testing.
 
-There is no universal discard verdict. A piece that cannot enter a profile's top five may still have set value or a use outside that profile.
+A **Fodder** verdict only covers the reviewed characters. A piece may still have set value or a use outside them.
 
 ## Data and privacy
 
-Only the window selected in the sharing picker is captured. Vision OCR runs on this Mac. The app has no network client. Diagnostic buffering is off at each launch. Without opt-in buffering or explicit recording, normal reading retains no diagnostic images. Recognized inventory records are plain JSON at:
+Only the window selected in the sharing picker is captured. Vision OCR runs on this Mac. The only network request is the daily update check, which asks GitHub for the latest release and sends nothing about you or your artifacts. Diagnostic buffering is off at each launch. Without opt-in buffering or explicit recording, normal reading retains no diagnostic images. Recognized inventory records are plain JSON at:
 
 ```text
-~/Library/Application Support/ArtifactLens/inventory.json
+~/Library/Application Support/Loupe/inventory.json
 ```
 
 Writes are atomic. **Undo** under Saved inventory reverses the last inventory change during the current session. Export backups before a large scan. A damaged inventory file disables saving rather than replacing the file.
 
-**Record 40 test frames** explicitly saves 40 PNG images from the shared window, normally about 20 seconds. They may contain your UID. The app shows the saved folder under `~/Library/Application Support/ArtifactLens/Diagnostics/`. Recording stops after 40 frames or when capture stops. These files stay outside the repository and are never uploaded automatically.
+**Record 40 test frames** explicitly saves 40 PNG images from the shared window, normally about 20 seconds. They may contain your UID. The app shows the saved folder under `~/Library/Application Support/Loupe/Diagnostics/`. Recording stops after 40 frames or when capture stops. These files stay outside the repository and are never uploaded automatically.
 
 ## Report a reading or overlay problem
 
@@ -165,22 +174,32 @@ A saved folder contains `manifest.json` and raw `.rgba` inputs. The [diagnostic 
 
 Agents can use the [local replay command](docs/diagnostic-replay.md) to rerun Vision and parsing without launching the desktop app or reading its inventory. Replay compares parsed artifact identities; free-text corrections remain annotations for review.
 
+## Build
+
+Building needs Xcode with a Swift 6 toolchain. No external packages, accounts or API keys.
+
+```sh
+make check   # strict swift-format lint, then every test
+make app     # dist/Loupe.app
+open dist/Loupe.app
+```
+
+`make app` runs `scripts/build.sh`, which signs with this Mac's Developer ID certificate if it has one, so the Accessibility grant that auto-press needs survives rebuilds. Otherwise it signs ad hoc, and macOS asks again after each build. Set `SIGN_IDENTITY` to choose another identity. Builds from source never update themselves. `make format` fixes formatting.
+
+### Release
+
+Push a `v` tag, e.g. `git tag v0.1.0 && git push origin v0.1.0`. The release workflow tests, signs, notarizes and publishes `Loupe-0.1.0.zip`, then updates the cask in [xinding33/homebrew-tap](https://github.com/xinding33/homebrew-tap). To make a release on this Mac instead, run `scripts/release.sh`.
+
 ## Development
 
 See [project status](docs/status.md) for what is verified and what remains open.
 
-```sh
-make format
-make check
-make app
-```
+- `LoupeCore`: auto-press settings and timer, validated artifact data, card parsing, per-field OCR confirmation, probability distributions, and inventory persistence.
+- `Loupe`: ScreenCaptureKit, Vision OCR, key posting and global shortcuts, native windows, and user workflows.
+- `LoupeCoreTests`: roll events, ties, ranking scope, invalid input, imports, duplicates, upgrade identity, persistence, and live-reading stability.
+- `LoupeTests`: synthetic Enhance images passed through Vision and the card parser at two resolutions, plus an opt-in recorded-sequence test. These tests need access to macOS Vision services and may not run inside a restricted process sandbox.
 
-- `ArtifactCore`: auto-press settings and timer, validated artifact data, card parsing, per-field OCR confirmation, probability distributions, and inventory persistence.
-- `ArtifactLens`: ScreenCaptureKit, Vision OCR, key posting and global shortcuts, native windows, and user workflows.
-- `ArtifactCoreTests`: roll events, ties, ranking scope, invalid input, imports, duplicates, upgrade identity, persistence, and live-reading stability.
-- `ArtifactLensTests`: synthetic Enhance images passed through Vision and the card parser at two resolutions, plus an opt-in recorded-sequence test. These tests need access to macOS Vision services and may not run inside a restricted process sandbox.
-
-For a recorded Enhance sequence, put its expected Inventory card text in `expected.txt` alongside the PNG files. Set `ARTIFACT_LENS_FIXTURES` to that folder when running `make check`. The replay test checks card identity, requires at least 95% readable frames, and rejects any clearing of the result after initial verification. It is skipped without that environment variable. Synthetic tests alone do not establish live-reader reliability.
+For a recorded Enhance sequence, put its expected Inventory card text in `expected.txt` alongside the PNG files. Set `LOUPE_FIXTURES` to that folder when running `make check`. The replay test checks card identity, requires at least 95% readable frames, and rejects any clearing of the result after initial verification. It is skipped without that environment variable. Synthetic tests alone do not establish live-reader reliability.
 
 The core does not capture screens or depend on the UI. OCR waits for two consistent readings before enabling advice or collection.
 
@@ -191,3 +210,9 @@ The core does not capture screens or depend on the UI. OCR waits for two consist
 - [Apple ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-in-macos): selected-window capture.
 - [Apple Vision text recognition](https://developer.apple.com/documentation/vision/recognizing-text-in-images): on-device OCR.
 - [Apple fullscreen auxiliary windows](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct/fullscreenauxiliary): fullscreen overlay window behavior.
+
+## License
+
+Copyright 2026 Xin Ding. Licensed under the [Apache License, Version 2.0](LICENSE). Loupe was developed with AI assistance.
+
+Genshin Impact is a trademark of HoYoverse. Game data such as stat values and drop odds comes from community research, credited above.

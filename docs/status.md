@@ -1,4 +1,4 @@
-# Artifact Lens: project status
+# Loupe: project status
 
 Date: 2026-10-13
 Status: offline build, lint, and tests pass. Live verification, performance
@@ -13,10 +13,10 @@ behavior. Update this page when a listed item changes.
 Checked at commit `f64b9fd` with Xcode 27.0 (Swift 6.4) on macOS 27.0.1:
 
 - `make check` passed. Strict `swift-format` lint reported nothing.
-- 94 ArtifactCore tests and 61 ArtifactLens tests passed.
+- 94 LoupeCore tests and 61 Loupe tests passed.
 - Two recorded-sequence tests were skipped. They need private PNG fixtures
-  through `ARTIFACT_LENS_FIXTURES`, which are not in the repository.
-- `make app` built `dist/Artifact Lens.app` and its ad-hoc signature passed
+  through `LOUPE_FIXTURES`, which are not in the repository.
+- `make app` built `dist/Loupe.app` and its ad-hoc signature passed
   strict verification. The app was not launched.
 - The source fingerprint is
   `sha256-96cfbabf05f58cc0f671a22fc9edfbb2e890e187f71dff3f65a46c412818332b`,
@@ -30,11 +30,12 @@ behavior on the real game, or performance.
 
 - One commit on `main`: the 2026-10-10 import of the working tree. Earlier
   history was not carried over.
-- Remote: private GitHub repository `xinding33/artifact-lens`. No pull requests,
-  issues, or CI.
+- Remote: `xinding33/loupe`, renamed from `artifact-lens` and made public for
+  the first release in October 2026. CI runs lint, tests and an ad hoc bundle
+  build on every pull request.
 - 36 Swift source files in two targets, 20 test files, no external packages.
 - Inventory and diagnostics live outside the repository under
-  `~/Library/Application Support/ArtifactLens/`. A new Mac starts with no saved
+  `~/Library/Application Support/Loupe/`. A new Mac starts with no saved
   inventory; move it with the app's export and import.
 
 ## Implemented
@@ -56,7 +57,7 @@ behavior on the real game, or performance.
 - Manual profiles and pasted card text for cases outside reviewed coverage.
 - Auto-press, ported from Mash on 2026-10-22: repeats one key while the chosen
   app is in front, with a toggle shortcut, banner and auto-off timer. Needs
-  Accessibility. Settings and timer logic are covered by ArtifactCore tests;
+  Accessibility. Settings and timer logic are covered by LoupeCore tests;
   key posting and the toggle have not been checked live.
 
 ## Live checks so far
@@ -125,9 +126,10 @@ Historical, kept for the reasoning behind decisions:
 
 ## Known gaps in tooling
 
-- No CI. The synthetic Vision tests need macOS Vision services and normal
-  execution outside a restricted process sandbox.
+- The synthetic Vision tests need macOS Vision services and normal execution
+  outside a restricted process sandbox.
 - `make app` signs with this Mac's Developer ID when it has one, otherwise ad
-  hoc. There is no notarized distribution.
+  hoc. Tagged releases are signed, notarized and published by
+  `.github/workflows/release.yml`.
 - Live capture and window tracking require macOS 15.2 or later. The package
   still targets macOS 14 for manual entry.

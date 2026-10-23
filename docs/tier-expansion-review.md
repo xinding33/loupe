@@ -253,8 +253,8 @@ median is B and ceiling A, but its A-or-better probability is exactly 0.25.
 Before runtime edits, the tier suites failed with 22 missing-grade issues,
 including nil grade summaries for the new boundary and forecast fixtures.
 No temporary production mutation was used. After adding the approved cells,
-all 94 ArtifactCore tests in six suites passed on 2026-09-27, including the
+all 94 LoupeCore tests in six suites passed on 2026-09-27, including the
 unchanged legacy boundary tests. Swift scratch/cache paths were isolated and
-`ARTIFACT_LENS_FIXTURES` was unset. Scoped strict Swift formatting and
+`LOUPE_FIXTURES` was unset. Scoped strict Swift formatting and
 ASCII/whitespace checks passed. No app, desktop, live OCR, private inventory,
 recordings, or reports were accessed.

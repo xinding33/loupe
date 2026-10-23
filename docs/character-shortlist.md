@@ -80,5 +80,5 @@ the role dataset, not the browsing policy.
 Synthetic tests cover selection beyond five, duplicate identities, input-order
 independence, score and grade independence, main-only EM fit, fixed mains,
 unactivated stats, manual profiles, and pending/stale clearing. Optional
-`ARTIFACT_LENS_UI_PROOF` renders use synthetic data only. No live game, private
+`LOUPE_UI_PROOF` renders use synthetic data only. No live game, private
 inventory, recording, diagnostic report, or packaged app is required.

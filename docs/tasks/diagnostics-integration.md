@@ -7,10 +7,10 @@ the user's authorized overlay work. Read the parent plan and both handoff docs.
 
 ## Ownership and limits
 
-Work in `/Users/xinding/.t3/worktrees/gi-artifacts/t3code-492a9a6a` only.
+Work in `~/.t3/worktrees/gi-artifacts/t3code-492a9a6a` only.
 You now own the necessary integration edits in Capture.swift, LiveCardOCR.swift,
 Model.swift, Views.swift, App.swift, and OverlayPlacement.swift, plus diagnostic
-files and dedicated integration tests. Do not change ArtifactCore, shortcut or
+files and dedicated integration tests. Do not change LoupeCore, shortcut or
 capture-runtime implementations, Package.swift, Makefile, README, or this plan.
 The parent owns README and final validation. No other agent is writing code.
 
@@ -65,8 +65,8 @@ existing recorded Enhance regressions through the normal approved Vision path.
 The user previously authorized these saved local fixtures; do not upload or
 include their pixels in source control:
 
-- `/Users/xinding/Library/Application Support/ArtifactLens/Diagnostics/0EE0602D-0194-41BB-BDF0-79984F8F2200`
-- `/Users/xinding/Library/Application Support/ArtifactLens/Diagnostics/43BA464C-192C-4BE6-81DF-9C78711ECC1C`
+- `~/Library/Application Support/Loupe/Diagnostics/0EE0602D-0194-41BB-BDF0-79984F8F2200`
+- `~/Library/Application Support/Loupe/Diagnostics/43BA464C-192C-4BE6-81DF-9C78711ECC1C`
 
 Each contains expected.txt and PNG frames. Preserve the >=95% reading, identity,
 and no-post-acquisition-clearing assertions. Add integration checks for disable

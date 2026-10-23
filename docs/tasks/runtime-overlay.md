@@ -5,8 +5,8 @@ Read that plan in full before editing. The user authorized these child threads.
 
 ## Checkout and coordination
 
-Work only in `/Users/xinding/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
-T3 may start you in `/Users/xinding/src/xinding33/gi-artifacts`, which is empty.
+Work only in `~/.t3/worktrees/gi-artifacts/t3code-492a9a6a`.
+T3 may start you in `~/src/xinding33/gi-artifacts`, which is empty.
 Set command workdirs explicitly. The app is uncommitted in the first path;
 do not create a clean worktree, copy to the project root, reset, or commit it.
 Use normal approval flows if the shared path is outside your writable roots.
@@ -19,9 +19,9 @@ Keep prose ASCII. Do not add dependencies or speculative abstractions.
 
 ## Ownership
 
-You own existing `Sources/ArtifactLens/App.swift`, `Model.swift`, `Views.swift`,
+You own existing `Sources/Loupe/App.swift`, `Model.swift`, `Views.swift`,
 and `Capture.swift`. New runtime/overlay files and dedicated tests are allowed.
-Do not edit ArtifactCore, FrameRecording.swift, existing test files, Package.swift,
+Do not edit LoupeCore, FrameRecording.swift, existing test files, Package.swift,
 Makefile, README, or the parent plan. Coordinate an unavoidable shared edit first.
 
 ## Deliverable

@@ -2,7 +2,7 @@
 
 `convert_draft.py` turns a community draft of per-character artifact preferences
 (`characters.js` from [fallumina/Genshin-Artifact-Rater](https://github.com/fallumina/Genshin-Artifact-Rater))
-into first-pass role-weight records for Artifact Lens, plus a review report.
+into first-pass role-weight records for Loupe, plus a review report.
 
 ## Output is local-only
 
