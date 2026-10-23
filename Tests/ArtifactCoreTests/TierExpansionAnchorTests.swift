@@ -25,19 +25,24 @@ import Testing
     #expect(result.chanceToBeatBest == nil)
   }
 
+  /// The hand-reviewed anchors sit exactly on their former cutoffs. Rarity-derived cutoffs land
+  /// within a third of a roll of them for B, A, and S, so each anchor stays within one tier.
   private func assertFinalGrade(
-    _ piece: Artifact, character: String, cellID: String, expected: ArtifactTier
+    _ piece: Artifact, character: String, handTier: ArtifactTier
   ) throws {
     let match = try #require(
       CharacterAssessment.evaluate(piece).first { $0.characterID == character })
     let grades = try #require(match.grades)
-    #expect(grades.calibrationID == cellID)
+    let current = try #require(grades.current)
+    let tiers = ArtifactTier.allCases
+    #expect(grades.calibrationID.hasPrefix(RarityTier.version))
     #expect(grades.experimental)
-    #expect(grades.current == expected)
-    #expect(grades.p50 == expected)
-    #expect(grades.p90 == expected)
-    #expect(grades.bestPossible == expected)
-    #expect(grades.chanceOfAOrBetter == (expected == .a || expected == .s ? 1 : 0))
+    #expect(abs(tiers.firstIndex(of: current)! - tiers.firstIndex(of: handTier)!) <= 1)
+    #expect(grades.p50 == current)
+    #expect(grades.p90 == current)
+    #expect(grades.bestPossible == current)
+    #expect(grades.chanceOfAOrBetter == (current == .a || current == .s ? 1 : 0))
+    #expect(grades.rarityShare != nil)
   }
 
   @Test(arguments: [
@@ -65,9 +70,7 @@ import Testing
         let piece = try artifact(slot, main, stats)
         try assertFinalScore(
           piece, profile: profile(character), expected: expected)
-        try assertFinalGrade(
-          piece, character: character,
-          cellID: character + (slot == .flower ? ".hp-flower" : ".atk-plume"), expected: tier)
+        try assertFinalGrade(piece, character: character, handTier: tier)
       }
     }
   }
@@ -86,29 +89,23 @@ import Testing
     hp: Double, defPercent: Double, cr: Double, otherCD: Double, otherCR: Double,
     atkPercent: Double, def: Double, er: Double, expected: Int, tier: ArtifactTier
   ) throws {
-    let cells: [(String, Slot, Stat, Stat, Double, Stat, Double, String)] = [
-      ("furina", .sands, .hpPercent, .critRate, cr, .critDamage, otherCD, "furina.hp-sands"),
-      ("furina", .goblet, .hpPercent, .critRate, cr, .critDamage, otherCD, "furina.hp-goblet"),
-      ("itto", .sands, .defPercent, .critRate, cr, .critDamage, otherCD, "itto.def-sands"),
-      ("furina", .circlet, .critRate, .hpPercent, hp, .critDamage, otherCD, "furina.cr-circlet"),
-      ("furina", .circlet, .critDamage, .hpPercent, hp, .critRate, otherCR, "furina.cd-circlet"),
-      (
-        "itto", .circlet, .critRate, .defPercent, defPercent, .critDamage, otherCD,
-        "itto.cr-circlet"
-      ),
-      (
-        "itto", .circlet, .critDamage, .defPercent, defPercent, .critRate, otherCR,
-        "itto.cd-circlet"
-      ),
+    let cells: [(String, Slot, Stat, Stat, Double, Stat, Double)] = [
+      ("furina", .sands, .hpPercent, .critRate, cr, .critDamage, otherCD),
+      ("furina", .goblet, .hpPercent, .critRate, cr, .critDamage, otherCD),
+      ("itto", .sands, .defPercent, .critRate, cr, .critDamage, otherCD),
+      ("furina", .circlet, .critRate, .hpPercent, hp, .critDamage, otherCD),
+      ("furina", .circlet, .critDamage, .hpPercent, hp, .critRate, otherCR),
+      ("itto", .circlet, .critRate, .defPercent, defPercent, .critDamage, otherCD),
+      ("itto", .circlet, .critDamage, .defPercent, defPercent, .critRate, otherCR),
     ]
-    for (character, slot, main, first, value, second, other, cellID) in cells {
+    for (character, slot, main, first, value, second, other) in cells {
       let stats = [
         Substat(first, value), Substat(second, other), Substat(.atkPercent, atkPercent),
         Substat(.def, def), Substat(.energyRecharge, er),
       ].filter { $0.value > 0 }
       let piece = try artifact(slot, main, stats)
       try assertFinalScore(piece, profile: profile(character), expected: expected)
-      try assertFinalGrade(piece, character: character, cellID: cellID, expected: tier)
+      try assertFinalGrade(piece, character: character, handTier: tier)
     }
   }
 

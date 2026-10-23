@@ -26,6 +26,32 @@ func score(_ value: Double, digits: Int = 1) -> String {
   value.formatted(.number.precision(.fractionLength(digits)))
 }
 
+/// Rarity of the headline score among new drops of the same slot and main stat, and the expected
+/// on-set domain drops before a better one. Unfinished pieces describe their median projection.
+func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: Bool = false)
+  -> String?
+{
+  guard let share = grades?.rarityShare else { return nil }
+  let kind = "new \(artifact.main.label) \(artifact.slot.label.lowercased())s"
+  let standing = share <= 0.5 ? "top \(percent(share)) of \(kind)" : "bottom half of \(kind)"
+  let replacement =
+    grades?.replacementDrops.map {
+      compact ? "~\(roughCount($0)) drops to beat" : "about \(roughCount($0)) domain drops to beat"
+    } ?? "no new drop beats it"
+  let headline =
+    artifact.level == 20
+    ? standing.prefix(1).uppercased() + standing.dropFirst()
+    : "Median +20: " + standing
+  return headline + " · " + replacement
+}
+
+/// Two significant figures with grouping, for expected counts that are only estimates.
+func roughCount(_ value: Double) -> String {
+  guard value >= 100 else { return Int(value.rounded()).formatted() }
+  let scale = pow(10, floor(log10(value)) - 1)
+  return Int((value / scale).rounded() * scale).formatted()
+}
+
 /// Which grade the headline shows: the actual tier at +20, otherwise the median projection.
 struct GradeHeadline {
   enum Kind { case graded, ungraded, mainStatFit, specialRolls, needsReread, noMatch }

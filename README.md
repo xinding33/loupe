@@ -71,13 +71,19 @@ Before upgrading a candidate, save it and choose **Link upgrade** on its invento
 
 The dashboard and overlay show the same shortlist of up to five potential users. Ordering uses useful-stat presence, main-stat fit, and set fit, not cross-character damage or raw scores. Select a character in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible users** reveals the remaining reviewed candidates. This is partial coverage, not a complete roster search.
 
-Experimental S/A/B/C/D tiers cover 15 role/slot/main combinations:
+Experimental S/A/B/C/D tiers grade every reviewed role. A tier says how rare the piece's useful rolls are among every possible new five-star drop of the same slot and main stat, scored with that role's useful stats:
 
-- Furina: flowers, plumes, HP% sands, Hydro/HP% goblets, and Crit circlets.
-- Itto: flowers, plumes, DEF% sands, Geo goblets, and Crit circlets.
-- Kuki Shinobu: EM-focused flowers and plumes.
+| Tier | Share of new drops this good or better |
+| --- | --- |
+| S | 0.05% or less (about 1 in 2,000) |
+| A | 1% or less |
+| B | 15% or less |
+| C | 50% or less |
+| D | the rest |
 
-Other combinations say **Ungraded**, which does not mean bad. The ten newly added characters have matching and supported forecasts, but no letter grades yet. The headline shows the median projected +20 tier for unfinished pieces and the final tier at +20. Tier badges use gold S, purple A, blue B, green C, and gray D; a dashed badge means Ungraded or no scalar grade. A small **Best** tier beside an unfinished piece is its ceiling, not an earned grade. The compact overlay adds one account line that always names the comparison scope and saved count. Expanded details show P90, best possible, and the chance of reaching A or better for calibrated combinations. See the [original calibration](docs/character-pilot.md) and [expanded calibration](docs/tier-expansion-review.md) for boundaries and limitations.
+The odds are exact for domain drops: main-stat odds, a 20% chance of four starting lines, substat appearance weights, and the four roll tiers. These cutoffs were chosen to match the 15 combinations previously calibrated by hand; their B, A, and S cutoffs agree within a third of a roll. Rarity is not damage, and it ignores what you already own. Expanded details also show the share itself and the expected number of five-star domain drops, from either of the domain's two sets, before a better piece of the same set, slot, and main stat.
+
+A piece is **Ungraded**, which does not mean bad, when no useful substat can appear on it (an EM-main piece for an EM-only role) or when there is no final score or forecast. The headline shows the median projected +20 tier for unfinished pieces and the final tier at +20. Tier badges use gold S, purple A, blue B, green C, and gray D; a dashed badge means Ungraded or no scalar grade. A small **Best** tier beside an unfinished piece is its ceiling, not an earned grade. The compact overlay adds one account line that always names the comparison scope and saved count. Expanded details show P90, best possible, and the chance of reaching A or better. See the [grading approach](docs/grading-approach.md) for the method and its validation against the earlier [original](docs/character-pilot.md) and [expanded](docs/tier-expansion-review.md) hand calibrations.
 
 Choose **Manual profile** for other characters or stat combinations. The manual score remains available independently of character assessment.
 

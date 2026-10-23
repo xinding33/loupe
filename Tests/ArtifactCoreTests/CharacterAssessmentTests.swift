@@ -2,6 +2,13 @@ import ArtifactCore
 import Foundation
 import Testing
 
+/// Former hand-reviewed anchors sit exactly on their old cutoffs; rarity grades stay within one tier.
+private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool {
+  guard let actual else { return false }
+  let tiers = ArtifactTier.allCases
+  return abs(tiers.firstIndex(of: actual)! - tiers.firstIndex(of: hand)!) <= 1
+}
+
 @Suite struct CharacterAssessmentTests {
   private func artifact(
     _ slot: Slot, _ main: Stat, _ stats: [Substat], level: Int = 20,
@@ -78,7 +85,7 @@ import Testing
     #expect(CharacterRoles.noMatchDescription.contains("No reviewed match"))
   }
 
-  @Test func kokomiCritRollsDoNotIncreaseHealingScreenAndSupportMainStaysUngraded() throws {
+  @Test func kokomiCritRollsDoNotIncreaseHealingScreen() throws {
     let before = try artifact(
       .circlet, .healing,
       [
@@ -95,7 +102,8 @@ import Testing
     #expect(final.potential?.currentScore == 0)
     #expect(final.profile.weights[.critRate, default: 0] == 0)
     #expect(final.profile.weights[.critDamage, default: 0] == 0)
-    #expect(final.grades == nil)
+    #expect(final.grades?.current == .d)
+    #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
     #expect(final.reasons.contains { $0.contains("not a strong match") })
     #expect(final.conditions.contains { $0.explanation.contains("Crit Rate penalty") })
   }
@@ -170,10 +178,10 @@ import Testing
     ].filter { $0.value > 0 }
     let result = try match(artifact(.goblet, .hydroDamage, stats), "furina")
     #expect(result.potential?.currentScore == score)
-    #expect(result.grades?.current == tier)
-    #expect(result.grades?.p50 == tier)
-    #expect(result.grades?.p90 == tier)
-    #expect(result.grades?.bestPossible == tier)
+    #expect(nearHandTier(result.grades?.current, tier))
+    #expect(result.grades?.p50 == result.grades?.current)
+    #expect(result.grades?.p90 == result.grades?.current)
+    #expect(result.grades?.bestPossible == result.grades?.current)
     #expect(result.grades?.experimental == true)
   }
 
@@ -197,8 +205,8 @@ import Testing
     ].filter { $0.value > 0 }
     let result = try match(artifact(.goblet, .geoDamage, stats), "itto")
     #expect(result.potential?.currentScore == score)
-    #expect(result.grades?.current == tier)
-    #expect(result.grades?.p50 == tier)
+    #expect(nearHandTier(result.grades?.current, tier))
+    #expect(result.grades?.p50 == result.grades?.current)
   }
 
   @Test(arguments: [
@@ -221,10 +229,10 @@ import Testing
     ].filter { $0.value > 0 }
     let result = try match(artifact(.flower, .hp, stats), "kuki-shinobu")
     #expect(result.potential?.currentScore == score)
-    #expect(result.grades?.current == tier)
+    #expect(nearHandTier(result.grades?.current, tier))
     let plumeStats = stats.map { $0.key == .atk ? Substat(.hp, $0.value / 19.45 * 298.75) : $0 }
     let plume = try match(artifact(.plume, .atk, plumeStats), "kuki-shinobu")
-    #expect(plume.grades?.current == tier)
+    #expect(plume.grades?.current == result.grades?.current)
   }
 
   @Test func unfinishedCeilingDoesNotBecomeAnEarnedTierAndUsefulUpgradeIsMonotone() throws {
@@ -262,7 +270,8 @@ import Testing
     #expect(result.potential?.currentScore == 2.7)
     #expect(result.grades?.p50 == .b)
     #expect(result.grades?.bestPossible == .a)
-    #expect(result.grades?.chanceOfAOrBetter == 3.0 / 16)
+    // A starts at 3.6 EM rolls among new flowers: only a 9 or 10 tier EM roll reaches it.
+    #expect(result.grades?.chanceOfAOrBetter == 2.0 / 16)
   }
 
   @Test(arguments: [Slot.sands, .goblet, .circlet])
@@ -350,7 +359,7 @@ import Testing
     #expect(await task.value.isEmpty)
   }
 
-  @Test func reactionAndErMainAssumptionsStayVisibleWithoutAUniversalGrade() throws {
+  @Test func reactionAndErMainAssumptionsStayVisibleBesideTheRoleGrade() throws {
     let piece = try artifact(
       .sands, .energyRecharge,
       [
@@ -358,7 +367,7 @@ import Testing
         Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
       ])
     let result = try match(piece, "xiangling")
-    #expect(result.grades == nil)
+    #expect(result.grades?.calibrationID.hasPrefix(RarityTier.version) == true)
     #expect(result.conditions.contains { $0.kind == .team && $0.status == .unknown })
     #expect(result.conditions.contains { $0.kind == .mainStat && $0.status == .unknown })
     #expect(result.profile.weights[.elementalMastery] == 100)

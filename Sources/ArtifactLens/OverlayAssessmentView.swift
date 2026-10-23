@@ -158,12 +158,21 @@ struct OverlayView: View {
         Label(model.recommendation, systemImage: "arrow.up.forward.circle")
           .font(.caption.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(2)
       }
+      if let line = rarityLine(grades, artifact: artifact, compact: true) {
+        Text(line).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+      }
       AccountBlock(result: result, scope: model.scope, finished: finished, compact: true)
         .padding(8)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    } else if let reason = unavailableReason {
-      Text(reason).font(.caption).foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+    } else {
+      if let reason = unavailableReason {
+        Text(reason).font(.caption).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      // A finished special-rule piece has a grade but no ordinary forecast.
+      if let line = rarityLine(grades, artifact: artifact, compact: true) {
+        Text(line).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+      }
     }
     if model.assessmentMode == .characters { users(artifact) }
     stats(artifact)

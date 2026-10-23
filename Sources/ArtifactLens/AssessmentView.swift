@@ -72,9 +72,18 @@ struct AssessmentSummary: View {
         forecast(result)
         Divider().overlay(Theme.hairline)
         AccountBlock(result: result, scope: model.scope, finished: artifact.level == 20)
-      } else if let reason = unavailableReason {
-        Label(reason, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+      } else {
+        if let reason = unavailableReason {
+          Label(reason, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        // A finished special-rule piece has a grade but no ordinary forecast.
+        if let line = rarityLine(
+          model.assessmentMode == .characters ? model.selectedMatch?.grades : nil,
+          artifact: artifact)
+        {
+          Text(line).font(.caption).foregroundStyle(.secondary)
+        }
       }
     }
     .padding(16)
@@ -174,6 +183,9 @@ struct AssessmentSummary: View {
             .font(.caption).foregroundStyle(.secondary)
         }
       }
+    }
+    if let line = rarityLine(grades, artifact: artifact) {
+      Text(line).font(.caption).foregroundStyle(.secondary)
     }
   }
 }

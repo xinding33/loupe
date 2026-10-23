@@ -14,83 +14,61 @@ public struct CharacterGradeSummary: Sendable {
   public let p90: ArtifactTier?
   public let bestPossible: ArtifactTier?
   public let chanceOfAOrBetter: Double?
+  /// Share of new drops of this slot and main stat finishing at or above the final score at +20,
+  /// or the median projected score before +20.
+  public let rarityShare: Double?
+  /// Expected new drops before one of the same set, slot, and main stat beats that score.
+  public let replacementDrops: Double?
   public let calibrationID: String
   public let experimental: Bool
 }
 
 public enum TierCalibration {
-  public static let version = "experimental-reviewed-2026-09-27.1"
+  public static let version = RarityTier.version
 
-  private struct Cell {
-    let id: String
-    let c: Int
-    let b: Int
-    let a: Int
-    let s: Int
-
-    func grade(_ score: Int) -> ArtifactTier {
-      if score >= s { return .s }
-      if score >= a { return .a }
-      if score >= b { return .b }
-      if score >= c { return .c }
-      return .d
-    }
-
-    func grade(_ score: Double) -> ArtifactTier {
-      grade(Int((score * 1000).rounded()))
-    }
-  }
-
-  // Reviewed experimental anchors, not guide-derived damage or universal roll thresholds.
-  private static func cell(_ artifact: Artifact, roleID: String) -> Cell? {
-    switch (roleID, artifact.slot, artifact.main) {
-    case ("furina.off-field-hp", .goblet, .hydroDamage):
-      Cell(id: "furina.hydro-goblet", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("itto.on-field-def", .goblet, .geoDamage):
-      Cell(id: "itto.geo-goblet", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("kuki-shinobu.hyperbloom", .flower, .hp):
-      Cell(id: "kuki.em-flower", c: 700, b: 2100, a: 3500, s: 4900)
-    case ("kuki-shinobu.hyperbloom", .plume, .atk):
-      Cell(id: "kuki.em-plume", c: 700, b: 2100, a: 3500, s: 4900)
-    case ("furina.off-field-hp", .flower, .hp):
-      Cell(id: "furina.hp-flower", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("furina.off-field-hp", .plume, .atk):
-      Cell(id: "furina.atk-plume", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("itto.on-field-def", .flower, .hp):
-      Cell(id: "itto.hp-flower", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("itto.on-field-def", .plume, .atk):
-      Cell(id: "itto.atk-plume", c: 1400, b: 3500, a: 5600, s: 7000)
-    case ("furina.off-field-hp", .sands, .hpPercent):
-      Cell(id: "furina.hp-sands", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("furina.off-field-hp", .goblet, .hpPercent):
-      Cell(id: "furina.hp-goblet", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("itto.on-field-def", .sands, .defPercent):
-      Cell(id: "itto.def-sands", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("furina.off-field-hp", .circlet, .critRate):
-      Cell(id: "furina.cr-circlet", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("furina.off-field-hp", .circlet, .critDamage):
-      Cell(id: "furina.cd-circlet", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("itto.on-field-def", .circlet, .critRate):
-      Cell(id: "itto.cr-circlet", c: 1400, b: 2800, a: 4900, s: 6000)
-    case ("itto.on-field-def", .circlet, .critDamage):
-      Cell(id: "itto.cd-circlet", c: 1400, b: 2800, a: 4900, s: 6000)
-    default: nil
-    }
-  }
-
+  /// Tiers come from rarity among new drops of the same slot and main stat under the role's
+  /// profile; see `RarityTier`. A profile with no possible core substat on this piece is ungraded.
   static func evaluate(
     _ artifact: Artifact, role: CharacterRole, potential: Potential?
   ) -> CharacterGradeSummary? {
-    guard let cell = cell(artifact, roleID: role.roleID) else { return nil }
-    // Current tiers require the final main-stat magnitude; unfinished pieces use +20 projections.
+    guard let rarity = RarityCache.shared.rarity(artifact.slot, artifact.main, role.profile),
+      rarity.bestScore > 0
+    else { return nil }
+    func tier(_ score: Double) -> ArtifactTier {
+      RarityTier.tier(share: rarity.shareAtOrAbove(Int((score * 1000).rounded())))
+    }
+    let current = artifact.level == 20 ? role.profile.score(artifact.substats) : nil
+    // Without a final score or an ordinary forecast there is nothing to grade.
+    guard current != nil || potential != nil else { return nil }
+    let headline = current ?? potential.map { Int(($0.summary.p50Score * 1000).rounded()) }
+    let aShare = RarityTier.bounds.first { $0.tier == .a }!.share
     return CharacterGradeSummary(
-      current: artifact.level == 20 ? cell.grade(role.profile.score(artifact.substats)) : nil,
-      p50: potential.map { cell.grade($0.summary.p50Score) },
-      p90: potential.map { cell.grade($0.summary.p90Score) },
-      bestPossible: potential.map { cell.grade($0.summary.bestPossibleScore) },
+      current: current.map { RarityTier.tier(share: rarity.shareAtOrAbove($0)) },
+      p50: potential.map { tier($0.summary.p50Score) },
+      p90: potential.map { tier($0.summary.p90Score) },
+      bestPossible: potential.map { tier($0.summary.bestPossibleScore) },
       chanceOfAOrBetter: potential.map {
-        $0.distribution.reduce(0) { $0 + ($1.key >= cell.a ? $1.value : 0) }
+        $0.distribution.reduce(0) { $0 + (rarity.shareAtOrAbove($1.key) <= aShare ? $1.value : 0) }
       },
-      calibrationID: cell.id, experimental: true)
+      rarityShare: headline.map { rarity.shareAtOrAbove($0) },
+      replacementDrops: headline.flatMap { rarity.expectedDropsToBeat($0) },
+      calibrationID: "\(version):\(artifact.slot.rawValue).\(artifact.main.rawValue)",
+      experimental: true)
+  }
+}
+
+/// Rarity tables depend only on slot, main stat, and profile weights, so they are shared.
+final class RarityCache: @unchecked Sendable {
+  static let shared = RarityCache()
+  private let lock = NSLock()
+  private var tables: [String: DropRarity] = [:]
+
+  func rarity(_ slot: Slot, _ main: Stat, _ profile: Profile) -> DropRarity? {
+    let weights = Stat.substats.map { "\(profile.weights[$0, default: 0])" }.joined(separator: ",")
+    let key = "\(slot.rawValue)|\(main.rawValue)|\(weights)"
+    if let table = lock.withLock({ tables[key] }) { return table }
+    guard let table = try? DropRarity(slot: slot, main: main, profile: profile) else { return nil }
+    lock.withLock { tables[key] = table }
+    return table
   }
 }

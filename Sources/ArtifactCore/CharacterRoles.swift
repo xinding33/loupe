@@ -68,8 +68,8 @@ public enum CharacterRoles {
     "15-character local review: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, Kokomi, "
     + "Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun, Sucrose, Xiangling, Xingqiu, and Yelan. "
     + "One reviewed role each; includes unowned characters and off-pieces. Not roster-wide. "
-    + "Experimental grades cover 15 role/slot/main combinations for Furina, Itto, and Kuki. "
-    + "Other combinations remain ungraded."
+    + "Experimental grades rank each piece against every possible new drop of its slot and main "
+    + "stat, under the role's useful stats."
   public static let noMatchDescription =
     "No reviewed match in these 15 roles. Manual profiles remain available for other uses."
   public static let excludedCoverage =

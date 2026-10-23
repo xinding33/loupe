@@ -131,7 +131,8 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
   #expect(shortlist.selectedMatch?.characterID != "kuki-shinobu")
   #expect(shortlist.selectedMatch?.usefulStats.contains(.critRate) == true)
   #expect(shortlist.selectedMatch?.setFit == .preferred)
-  #expect(shortlist.selectedMatch?.grades == nil)
+  let selectedShare = try #require(shortlist.selectedMatch?.grades?.rarityShare)
+  #expect(selectedShare < (try #require(kuki.grades?.rarityShare)))
 }
 
 @MainActor

@@ -69,7 +69,7 @@ import Testing
       setName: "Test off-piece", slot: .sands, main: .defPercent, level: 0, substats: stats)
     let result = try match(eligible, id)
     #expect(result.setFit == .offPiece)
-    #expect(result.grades == nil)
+    #expect(result.grades?.current == nil)
     #expect(!CharacterAssessment.evaluate(wrong).contains { $0.characterID == id })
   }
 
@@ -86,8 +86,8 @@ import Testing
     #expect(on.setFit == .preferred)
     #expect(off.setFit == .offPiece)
     #expect(on.potential?.distribution == off.potential?.distribution)
-    #expect(on.grades == nil)
-    #expect(off.grades == nil)
+    #expect(on.grades?.current != nil)
+    #expect(on.grades?.current == off.grades?.current)
     #expect(on.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
     #expect(off.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
   }
@@ -158,7 +158,7 @@ import Testing
     #expect(final.potential?.currentScore == 1)
     #expect(final.profile.weights[.critRate, default: 0] == 0)
     #expect(final.profile.weights[.critDamage, default: 0] == 0)
-    #expect(final.grades == nil)
+    #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
   }
 
   @Test func bennettArtifactAttackCannotImproveTheBuffScreen() throws {
@@ -181,7 +181,7 @@ import Testing
     #expect(final.profile.weights[.atkPercent, default: 0] == 0)
     #expect(final.profile.weights[.atk, default: 0] == 0)
     #expect(final.profile.weights[.critRate, default: 0] == 0)
-    #expect(final.grades == nil)
+    #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
     #expect(final.conditions.contains { $0.explanation.contains("base ATK") })
   }
 
@@ -199,7 +199,8 @@ import Testing
     #expect(result.potential?.rankChances.isEmpty == true)
     #expect(result.potential?.chanceToBeatBest == nil)
     #expect(result.potentialUnavailableReason == nil)
-    #expect(result.grades == nil)
+    #expect(result.grades?.current == .d)
+    #expect(result.grades?.rarityShare == 1)
   }
 
   @Test func conditionsDoNotTurnReactionOrErAssumptionsIntoKnownBuildFacts() throws {
@@ -265,7 +266,8 @@ import Testing
     #expect(forecast.potential?.summary.p50Score == 2.7)
     #expect(forecast.potential?.summary.p90Score == 3.6)
     #expect(forecast.potential?.summary.bestPossibleScore == 3.7)
-    #expect(forecast.grades == nil)
+    #expect(forecast.grades?.current == nil)
+    #expect(forecast.grades?.p50 != nil)
   }
 
   @Test(arguments: ["neuvillette", "yelan", "xingqiu"])
