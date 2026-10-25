@@ -112,6 +112,9 @@ public enum CardParser {
           card.substats.append(stat)
         }
         card.used.append(index)
+      } else if line.contains(where: \.isNumber) {
+        // Only substats carry numbers here; skipping one would read a four-stat card as three.
+        throw ArtifactError("Cannot read a substat line. Correct the card text.")
       } else if line.hasSuffix(":"), !card.substats.isEmpty {
         card.setName = String(line.dropLast())
         card.used.append(index)

@@ -62,6 +62,14 @@ private let starredCard = """
   #expect(artifact.substats.count == 4)
 }
 
+@Test func aSubstatRowMissingItsPlusRejectsTheCard() {
+  // Skipping the row would read a four-stat card as a three-stat starter at full confidence.
+  let text = starredCard.replacingOccurrences(of: "• CRIT DMG+21.0%", with: "• CRIT DMG 21.0%")
+  #expect(text != starredCard)
+  #expect(CardParser.parsedLines(text) == nil)
+  #expect(throws: ArtifactError.self) { try CardParser.parse(text, fiveStarsConfirmed: true) }
+}
+
 @Test func cyrillicLookalikesReadAsLatin() throws {
   // Vision returned the main stat "HР" with a Cyrillic Р on four live cards.
   let text = starredCard.replacingOccurrences(of: "\nHP\n", with: "\nH\u{0420}\n")
@@ -276,6 +284,40 @@ private let starredCard = """
   #expect(result.upgradesRemaining == 4)
   #expect(throws: ArtifactError.self) {
     try CardParser.parseEnhancement(screen, previous: previous, pieceName: "Another Circlet")
+  }
+}
+
+@Test func enhancementRejectsLabelsReadInSwappedRows() throws {
+  let previous = try CardParser.parse(
+    """
+    Plume of Death
+    ATK
+    311
+    +0
+    ATK+4.1%
+    HP+4.1%
+    CRIT Rate+2.7%
+    CRIT DMG+5.4%
+    Gladiator's Finale:
+    """, fiveStarsConfirmed: true)
+  func screen(_ first: String, _ second: String) -> String {
+    """
+    Plume of Death / Gladiator's Destiny
+    +4
+    ATK+1,000
+    \(first)
+    \(second)
+    CRIT Rate+2.7%
+    CRIT DMG+5.4%
+    """
+  }
+  let upgraded = try CardParser.parseEnhancement(
+    screen("ATK+8.2%", "HP+4.1%"), previous: previous, pieceName: "Gladiator's Destiny")
+  #expect(upgraded.substats[0] == Substat(.atkPercent, 8.2))
+  // Equal starting values make either allocation a legal roll; only the row order tells them apart.
+  #expect(throws: ArtifactError.self) {
+    try CardParser.parseEnhancement(
+      screen("HP+8.2%", "ATK+4.1%"), previous: previous, pieceName: "Gladiator's Destiny")
   }
 }
 
