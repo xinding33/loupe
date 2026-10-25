@@ -31,6 +31,48 @@ private let card = """
   #expect(result.rankChances.isEmpty)
 }
 
+// Vision output from a live GeForce NOW frame: the rarity stars read as "XXХ" at 0.30 confidence.
+private let starredCard = """
+  Foundryman's Conjecture
+  Flower of Life
+  HP
+  4,780
+  XXХ
+  +20
+  • ATK+19
+  • CRIT Rate+8.9%
+  • ATK+11.1%
+  • CRIT DMG+21.0%
+  Heart of the Furnace:
+  02-Piece Set: ATK +18%.
+  • 4-Piece Set: Increases the
+  """
+
+@Test func confidenceIsJudgedOnlyOnTheLinesTheParserReads() throws {
+  let lines = starredCard.components(separatedBy: .newlines)
+  let used = try #require(CardParser.parsedLines(starredCard)).map { lines[$0] }
+  #expect(
+    Set(used) == [
+      "Flower of Life", "HP", "4,780", "+20", "• ATK+19", "• CRIT Rate+8.9%", "• ATK+11.1%",
+      "• CRIT DMG+21.0%", "Heart of the Furnace:",
+    ])
+  #expect(CardParser.parsedLines("Loading...") == nil)
+  let artifact = try CardParser.parse(starredCard, fiveStarsConfirmed: true)
+  #expect(artifact.setName == "Heart of the Furnace")
+  #expect(artifact.substats.count == 4)
+}
+
+@Test func cyrillicLookalikesReadAsLatin() throws {
+  // Vision returned the main stat "HР" with a Cyrillic Р on four live cards.
+  let text = starredCard.replacingOccurrences(of: "\nHP\n", with: "\nH\u{0420}\n")
+    .replacingOccurrences(of: "Flower", with: "Fl\u{043E}wer")
+  #expect(text != starredCard)
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.slot == .flower)
+  #expect(artifact.main == .hp)
+  #expect(CardParser.latinized("\u{0425}\u{0410}\u{0397}\u{03BF}") == "XAHo")
+}
+
 @Test func aFourLineStarterGetsFiveRandomUpgrades() throws {
   let artifact = try flower(level: 0, crit: 3.9)
   let potential = try Potential.evaluate(

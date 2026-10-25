@@ -7,16 +7,60 @@ public enum CardParser {
     guard fiveStarsConfirmed else {
       throw ArtifactError("Confirm a five-star artifact. Other rarities are not supported.")
     }
+    let card = try layout(text)
+    let special = ["sanctifying", "guaranteed", "reshap", "defined affix"].contains {
+      text.localizedCaseInsensitiveContains($0)
+    }
+    return try Artifact(
+      setName: card.setName, slot: card.slot, main: card.main, level: card.level,
+      substats: card.substats, unactivated: card.unactivated, rule: special ? .special : rule)
+  }
+
+  /// Indices of the newline-separated lines that `parse` reads, or nil when it cannot place them.
+  /// Only these lines should decide OCR confidence: Vision reads decorations such as the
+  /// rarity stars as low-confidence text.
+  public static func parsedLines(_ text: String) -> [Int]? { try? layout(text).used }
+
+  /// Replaces Cyrillic and Greek capitals and lowercase letters that Vision returns for their
+  /// Latin look-alikes, such as the Cyrillic Р in "HР".
+  public static func latinized(_ text: String) -> String {
+    String(String.UnicodeScalarView(text.unicodeScalars.map { lookalikes[$0] ?? $0 }))
+  }
+
+  private static let lookalikes: [Unicode.Scalar: Unicode.Scalar] = {
+    let pairs: [(String, String)] = [
+      ("АВЕКМНОРСТХУІЅЈ", "ABEKMHOPCTXYISJ"), ("аеорсухіјѕ", "aeopcyxijs"),
+      ("ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ", "ABEZHIKMNOPTYX"), ("ο", "o"),
+    ]
+    var map: [Unicode.Scalar: Unicode.Scalar] = [:]
+    for (from, to) in pairs {
+      for (a, b) in zip(from.unicodeScalars, to.unicodeScalars) { map[a] = b }
+    }
+    return map
+  }()
+
+  private struct Layout {
+    var slot: Slot
+    var level: Int
+    var main: Stat
+    var substats: [Substat] = []
+    var unactivated: Substat?
+    var setName = ""
+    var used: [Int]
+  }
+
+  private static func layout(_ text: String) throws -> Layout {
     let lines = text.components(separatedBy: .newlines).map {
-      $0.trimmingCharacters(in: .whitespacesAndNewlines)
-    }.filter { !$0.isEmpty }
+      latinized($0).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    let filled = lines.indices.filter { !lines[$0].isEmpty }
     let slots: [(String, Slot)] = [
       ("Flower of Life", .flower), ("Plume of Death", .plume), ("Sands of Eon", .sands),
       ("Goblet of Eonothem", .goblet), ("Circlet of Logos", .circlet),
     ]
     guard
-      let slotLine = lines.firstIndex(where: { line in
-        slots.contains { line.localizedCaseInsensitiveContains($0.0) }
+      let slotLine = filled.first(where: { line in
+        slots.contains { lines[line].localizedCaseInsensitiveContains($0.0) }
       }),
       let slot = slots.first(where: { lines[slotLine].localizedCaseInsensitiveContains($0.0) })?.1
     else {
@@ -24,23 +68,26 @@ public enum CardParser {
         "No artifact card found. Open a piece in Inventory, or paste its card text.")
     }
     guard
-      let levelLine = lines.indices.first(where: {
+      let levelLine = filled.first(where: {
         $0 > slotLine && lines[$0].range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
       }),
       let level = Int(lines[levelLine].filter(\.isNumber))
     else {
       throw ArtifactError("Cannot read the artifact level. Keep the full card visible.")
     }
-    let header = lines[(slotLine + 1)..<levelLine]
-    guard let mainLine = header.first(where: { identifyStat($0, hasPercent: false) != nil }),
-      let main = identifyStat(mainLine, hasPercent: header.contains { $0.contains("%") })
+    let header = filled.filter { $0 > slotLine && $0 < levelLine }
+    guard let mainLine = header.first(where: { identifyStat(lines[$0], hasPercent: false) != nil }),
+      let main = identifyStat(
+        lines[mainLine], hasPercent: header.contains { lines[$0].contains("%") })
     else {
       throw ArtifactError("Cannot read the main stat.")
     }
-    var substats: [Substat] = []
-    var unactivated: Substat?
-    var setName: String?
-    for line in lines.dropFirst(levelLine + 1) {
+    var card = Layout(
+      slot: slot, level: level, main: main,
+      used: [slotLine, mainLine] + header.filter { lines[$0].contains(where: \.isNumber) }
+        + [levelLine])
+    for index in filled where index > levelLine {
+      let line = lines[index]
       if line.localizedCaseInsensitiveContains("2-Piece")
         || line.localizedCaseInsensitiveContains("2 Piece")
       {
@@ -57,27 +104,21 @@ public enum CardParser {
         }
         let stat = Substat(key, value)
         if line.localizedCaseInsensitiveContains("unactivated") {
-          guard unactivated == nil else {
+          guard card.unactivated == nil else {
             throw ArtifactError("Multiple unactivated lines. Read one card at a time.")
           }
-          unactivated = stat
+          card.unactivated = stat
         } else {
-          substats.append(stat)
+          card.substats.append(stat)
         }
-      } else if line.hasSuffix(":"), !substats.isEmpty {
-        setName = String(line.dropLast())
-        break
+        card.used.append(index)
+      } else if line.hasSuffix(":"), !card.substats.isEmpty {
+        card.setName = String(line.dropLast())
+        card.used.append(index)
+        return card
       }
     }
-    guard let setName else {
-      throw ArtifactError("Cannot read the set name. Include the line above the set bonuses.")
-    }
-    let special = ["sanctifying", "guaranteed", "reshap", "defined affix"].contains {
-      text.localizedCaseInsensitiveContains($0)
-    }
-    return try Artifact(
-      setName: setName, slot: slot, main: main, level: level, substats: substats,
-      unactivated: unactivated, rule: special ? .special : rule)
+    throw ArtifactError("Cannot read the set name. Include the line above the set bonuses.")
   }
 
   static func identifyStat(_ text: String, hasPercent: Bool) -> Stat? {

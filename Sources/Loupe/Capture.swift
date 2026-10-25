@@ -69,18 +69,23 @@ enum CardOCR {
     request.minimumTextHeight = 0.01
     try VNImageRequestHandler(cgImage: image).perform([request])
     let observations = request.results ?? []
+    func text(_ observation: VNRecognizedTextObservation) -> String? {
+      observation.topCandidates(1).first.map {
+        CardParser.latinized($0.string).replacingOccurrences(of: "\n", with: " ")
+      }
+    }
     let slots = [
       "flower of life", "plume of death", "sands of eon", "goblet of eonothem", "circlet of logos",
     ]
     let anchors = observations.filter { obs in
-      guard let text = obs.topCandidates(1).first?.string.lowercased() else { return false }
+      guard let text = text(obs)?.lowercased() else { return false }
       return slots.contains { text.contains($0) }
     }
     guard anchors.count == 1, let anchor = anchors.first else {
       throw ArtifactError(
         "Open one artifact card in Inventory. Comparison screens are not supported yet.")
     }
-    if anchor.topCandidates(1).first?.string.contains("/") == true {
+    if text(anchor)?.contains("/") == true {
       throw ArtifactError("Waiting for a readable Enhance title and stat table.")
     }
     let left = max(0, anchor.boundingBox.minX - 0.025)
@@ -90,28 +95,29 @@ enum CardOCR {
         && $0.boundingBox.minY <= anchor.boundingBox.maxY + 0.08
     }.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
     if let diagnostics { recordInventoryCrop(image, card: card, trace: diagnostics) }
-    let candidates = card.compactMap { $0.topCandidates(1).first }
+    let lines = card.compactMap { observation in
+      text(observation).map { (observation, $0, observation.topCandidates(1)[0].confidence) }
+    }
     guard
-      let level = card.first(where: {
-        $0.topCandidates(1).first?.string.range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression)
-          != nil
-      }),
-      let mainValue = card.last(where: {
-        $0.boundingBox.minY > level.boundingBox.maxY
-          && $0.topCandidates(1).first?.string.range(
-            of: #"^\d[\d,.]*%?$"#, options: .regularExpression) != nil
-      })
+      let level = lines.first(where: {
+        $0.1.range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
+      })?.0,
+      let mainValue = lines.last(where: {
+        $0.0.boundingBox.minY > level.boundingBox.maxY
+          && $0.1.range(of: #"^\d[\d,.]*%?$"#, options: .regularExpression) != nil
+      })?.0
     else { throw ArtifactError("Waiting for a clear level and main-stat value.") }
     let band = CGRect(
       x: left, y: level.boundingBox.maxY, width: right - left,
       height: max(0, mainValue.boundingBox.minY - level.boundingBox.maxY))
     let fiveStars = countStars(in: image, band: band) == 5
-    let relevant = zip(card, candidates).filter {
-      $0.0.boundingBox.minY >= level.boundingBox.minY - 0.23
-    }
+    let text = lines.map(\.1).joined(separator: "\n")
+    // Judge only the lines the parser reads; Vision often reads the rarity stars as junk text.
+    let judged =
+      CardParser.parsedLines(text).map { $0.map { lines[$0] } }
+      ?? lines.filter { $0.0.boundingBox.minY >= level.boundingBox.minY - 0.23 }
     return CardReading(
-      text: candidates.map(\.string).joined(separator: "\n"), fiveStars: fiveStars,
-      confidence: relevant.map { $0.1.confidence }.min() ?? 0)
+      text: text, fiveStars: fiveStars, confidence: judged.map(\.2).min() ?? 0)
   }
 
   private static func recognize(
