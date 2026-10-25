@@ -196,9 +196,8 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
   public func upgraded(to next: Artifact) throws -> Artifact {
     let before = substats + (unactivated.map { [$0] } ?? [])
     let after = next.substats + (next.unactivated.map { [$0] } ?? [])
-    // The game keeps substat order, so labels read in swapped rows cannot pass as an upgrade.
     guard setKey == next.setKey, slot == next.slot, main == next.main, rule == next.rule,
-      next.level >= level, before.map(\.key) == after.map(\.key),
+      next.level >= level, Set(before.map(\.key)) == Set(after.map(\.key)),
       next.level >= 4 || next.unactivated == unactivated
     else {
       throw ArtifactError(

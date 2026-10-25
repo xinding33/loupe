@@ -321,6 +321,20 @@ private let starredCard = """
   }
 }
 
+@Test func savedRecordsInAnotherOrderStillUpdate() throws {
+  // GOOD imports keep their own substat order; a screen reading lists the card's order.
+  let imported = try Artifact(
+    setName: "Silken Moon's Serenade", slot: .circlet, main: .critDamage, level: 0,
+    substats: [Substat(.energyRecharge, 5.2), Substat(.hpPercent, 4.1), Substat(.atk, 18)],
+    unactivated: Substat(.defPercent, 5.1))
+  let reread = try CardParser.parse(card, fiveStarsConfirmed: true)
+  #expect(try imported.upgraded(to: reread).signature == reread.signature)
+  let activated = try Artifact(
+    setName: reread.setName, slot: .circlet, main: .critDamage, level: 4,
+    substats: reread.substats + [Substat(.defPercent, 5.1)])
+  #expect(try imported.upgraded(to: activated).level == 4)
+}
+
 @Test func enhancementRejectsAnExtraRollAtActivationAndUnchangedStatsAfterARoll() throws {
   let previous = try CardParser.parse(card, fiveStarsConfirmed: true)
   let extra = try Artifact(
