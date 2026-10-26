@@ -56,6 +56,6 @@ struct LiveCardOCR {
   ) throws -> CardReading {
     let result = try confirmation.observe(snapshot.regions, heading: snapshot.heading, at: time)
     return CardReading(
-      text: result.text, fiveStars: false, confidence: result.confidence, isEnhancement: true)
+      text: result.text, stars: 0, confidence: result.confidence, isEnhancement: true)
   }
 }

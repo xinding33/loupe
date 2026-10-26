@@ -24,14 +24,18 @@ public struct Verdict: Sendable, Equatable {
   public let reason: String
 
   init(kind: VerdictKind, targetLevel: Int? = nil, role: RoleContext? = nil, reason: String) {
+    self.init(kind: kind, targetLevel: targetLevel, match: role?.match, reason: reason)
+  }
+
+  init(kind: VerdictKind, targetLevel: Int? = nil, match: CharacterMatch?, reason: String) {
     self.kind = kind
     self.targetLevel = targetLevel
-    self.grade = role?.grade
-    self.chanceOfAOrBetter = role?.match.grades?.chanceOfAOrBetter
-    self.characterID = role?.match.characterID
-    self.roleID = role?.match.roleID
-    self.roleName = role?.match.roleName
-    self.characterName = role?.match.characterName
+    self.grade = match?.grades?.grade
+    self.chanceOfAOrBetter = match?.grades?.chanceOfAOrBetter
+    self.characterID = match?.characterID
+    self.roleID = match?.roleID
+    self.roleName = match?.roleName
+    self.characterName = match?.characterName
     self.reason = reason
   }
 
@@ -54,6 +58,9 @@ public struct Verdict: Sendable, Equatable {
 public struct VerdictPolicy: Sendable {
   /// Most saved pieces one stat-profile group can use at once.
   public var maxBackups = 3
+  /// Four-star pieces of one set, slot and main stat worth saving: one or two sets of a support
+  /// set such as Instructor cover an account.
+  public var fourStarCopies = 2
 
   public init() {}
   public static let standard = VerdictPolicy()
@@ -78,6 +85,11 @@ public enum VerdictEngine {
     _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact],
     excluding: UUID? = nil, policy: VerdictPolicy = .standard
   ) -> Verdict {
+    if artifact.rarity == 4 {
+      return fourStar(
+        artifact, matches: matches, inventory: inventory, excluding: excluding,
+        policy: policy)
+    }
     let kind = "\(artifact.main.label) \(artifact.slot.plural)"
     guard !matches.isEmpty else {
       return Verdict(kind: .fodder, reason: "No character role uses \(kind)")
@@ -219,6 +231,54 @@ public enum VerdictEngine {
       }
       return fodder
     }
+  }
+}
+
+extension VerdictEngine {
+  /// Four-star pieces are judged by set and main stat: guides pick them for a support set such as
+  /// Instructor or The Exile, and their substats rarely decide the choice. Matches already require
+  /// a character whose build lists the set.
+  static func fourStar(
+    _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact], excluding: UUID?,
+    policy: VerdictPolicy
+  ) -> Verdict {
+    let kind = "\(artifact.setName) \(artifact.main.label) \(artifact.slot.plural)"
+    guard
+      let lead = matches.max(by: {
+        ($0.setFit == .preferred ? 1 : 0, $0.role.isReviewed ? 1 : 0)
+          < ($1.setFit == .preferred ? 1 : 0, $1.role.isReviewed ? 1 : 0)
+      })
+    else {
+      let used = CharacterRoles.all.contains { role in
+        role.sets.contains { Artifact.normalizeSet($0.name) == artifact.setKey }
+      }
+      return Verdict(
+        kind: .fodder, match: nil,
+        reason: used
+          ? "Four-star; no \(artifact.setName) user takes \(artifact.main.label) \(artifact.slot.plural)"
+          : "Four-star \(artifact.setName) is an early-game set")
+    }
+    let saved = inventory.filter {
+      $0.rarity == 4 && $0.id != (excluding ?? artifact.id) && $0.setKey == artifact.setKey
+        && $0.slot == artifact.slot && $0.main == artifact.main
+    }
+    if saved.count < policy.fourStarCopies {
+      let reason = "Four-star \(artifact.setName) · \(saved.count) saved like it"
+      return artifact.isFinished
+        ? Verdict(kind: .keep, match: lead, reason: reason)
+        : Verdict(kind: .level, targetLevel: artifact.maxLevel, match: lead, reason: reason)
+    }
+    // Enough copies: only more useful lines than a saved copy make it worth a look.
+    let useful = Set(lead.usefulStats + lead.secondaryStats)
+    func lines(_ piece: Artifact) -> Int {
+      (piece.substats + (piece.unactivated.map { [$0] } ?? [])).filter { useful.contains($0.key) }
+        .count
+    }
+    if let weakest = saved.map(lines).min(), lines(artifact) > weakest {
+      return Verdict(
+        kind: .review, match: lead, reason: "More useful lines than a saved \(kind) piece")
+    }
+    return Verdict(kind: .fodder, match: lead, reason: "Enough saved \(kind)")
   }
 }
 

@@ -1,8 +1,8 @@
 /// Every playable character's archetypes, goblet and four-piece sets, as listed in
 /// docs/archetypes.md. Reviewed characters keep their reviewed role for the archetype it matches.
 public enum Roster {
-  public static let version = "archetypes-2026-10-25.1"
-  static let assignedOn = "2026-10-25"
+  public static let version = "archetypes-2026-10-26.1"
+  static let assignedOn = "2026-10-26"
 
   public static let characters: [RosterCharacter] = [
     // Reviewed characters: their reviewed role covers the first archetype.
@@ -10,7 +10,7 @@ public enum Roster {
       "alhaitham", "Alhaitham", .dendroDamage, [.emCrit], ["Gilded Dreams", "Deepwood Memories"]),
     RosterCharacter(
       "bennett", "Bennett", .pyroDamage, [.hpSupport],
-      ["Noblesse Oblige", "Scroll of the Hero of Cinder City"]),
+      ["Noblesse Oblige", "Scroll of the Hero of Cinder City", "Instructor", "The Exile"]),
     RosterCharacter(
       "fischl", "Fischl", .electroDamage, [.atkEMCrit], ["Golden Troupe", "Gilded Dreams"]),
     RosterCharacter(
@@ -22,9 +22,10 @@ public enum Roster {
       ["Ocean-Hued Clam", "Tenacity of the Millelith"]),
     RosterCharacter(
       "kuki-shinobu", "Kuki Shinobu", .electroDamage, [.em],
-      ["Flower of Paradise Lost", "Gilded Dreams"]),
+      ["Flower of Paradise Lost", "Gilded Dreams", "Instructor"]),
     RosterCharacter(
-      "nahida", "Nahida", .dendroDamage, [.emCrit], ["Deepwood Memories", "Gilded Dreams"]),
+      "nahida", "Nahida", .dendroDamage, [.emCrit],
+      ["Deepwood Memories", "Gilded Dreams", "Instructor"]),
     RosterCharacter(
       "neuvillette", "Neuvillette", .hydroDamage, [.hpCrit],
       ["Marechaussee Hunter", "Heart of Depth"]),
@@ -61,7 +62,7 @@ public enum Roster {
       "traveler-anemo", "Traveler (Anemo)", .anemoDamage, [.em], ["Viridescent Venerer"]),
     RosterCharacter(
       "faruzan", "Faruzan", .anemoDamage, [.erSupport],
-      ["Tenacity of the Millelith", "Noblesse Oblige"]),
+      ["Tenacity of the Millelith", "Noblesse Oblige", "The Exile"]),
     RosterCharacter(
       "jean", "Jean", .anemoDamage, [.atkSupport], ["Viridescent Venerer", "Ocean-Hued Clam"],
       heals: true),
@@ -145,10 +146,11 @@ public enum Roster {
     RosterCharacter(
       "nefer", "Nefer", .dendroDamage, [.emCrit], ["Night of the Sky's Unveiling", "Gilded Dreams"]),
     RosterCharacter(
-      "traveler-dendro", "Traveler (Dendro)", .dendroDamage, [.atkEMCrit], ["Deepwood Memories"]),
+      "traveler-dendro", "Traveler (Dendro)", .dendroDamage, [.atkEMCrit],
+      ["Deepwood Memories", "Instructor"]),
     RosterCharacter(
-      "baizhu", "Baizhu", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"],
-      heals: true),
+      "baizhu", "Baizhu", .dendroDamage, [.hpSupport],
+      ["Deepwood Memories", "Ocean-Hued Clam", "Instructor"], heals: true),
     RosterCharacter("collei", "Collei", .dendroDamage, [.atkEMCrit], ["Deepwood Memories"]),
     RosterCharacter(
       "emilie", "Emilie", .dendroDamage, [.atkCrit], ["Unfinished Reverie", "Deepwood Memories"]),
@@ -156,12 +158,12 @@ public enum Roster {
       "kaveh", "Kaveh", .dendroDamage, [.em], ["Flower of Paradise Lost", "Deepwood Memories"]),
     RosterCharacter(
       "kirara", "Kirara", .dendroDamage, [.hpSupport],
-      ["Tenacity of the Millelith", "Deepwood Memories"]),
+      ["Tenacity of the Millelith", "Deepwood Memories", "Instructor"]),
     RosterCharacter(
       "tighnari", "Tighnari", .dendroDamage, [.atkEMCrit], ["Wanderer's Troupe", "Gilded Dreams"]),
     RosterCharacter(
-      "yaoyao", "Yaoyao", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"],
-      heals: true),
+      "yaoyao", "Yaoyao", .dendroDamage, [.hpSupport],
+      ["Deepwood Memories", "Ocean-Hued Clam", "Instructor", "The Exile"], heals: true),
 
     // Electro
     RosterCharacter(
@@ -218,7 +220,7 @@ public enum Roster {
       ["Husk of Opulent Dreams", "Aubade of Morningstar and Moon"]),
     RosterCharacter(
       "xilonen", "Xilonen", .geoDamage, [.defSupport],
-      ["Scroll of the Hero of Cinder City", "Archaic Petra"], heals: true),
+      ["Scroll of the Hero of Cinder City", "Archaic Petra", "Instructor"], heals: true),
     RosterCharacter(
       "zibai", "Zibai", .defPercent, [.defCrit],
       ["Night of the Sky's Unveiling", "Husk of Opulent Dreams"]),
@@ -230,7 +232,8 @@ public enum Roster {
     RosterCharacter(
       "chiori", "Chiori", .geoDamage, [.defCrit], ["Golden Troupe", "Husk of Opulent Dreams"]),
     RosterCharacter(
-      "gorou", "Gorou", .geoDamage, [.defSupport], ["Noblesse Oblige", "Husk of Opulent Dreams"]),
+      "gorou", "Gorou", .geoDamage, [.defSupport],
+      ["Noblesse Oblige", "Husk of Opulent Dreams", "The Exile"]),
     RosterCharacter(
       "navia", "Navia", .geoDamage, [.atkCrit],
       ["Nighttime Whispers in the Echoing Woods", "Gladiator's Finale"]),
@@ -243,7 +246,7 @@ public enum Roster {
       ["Husk of Opulent Dreams", "Noblesse Oblige"]),
     RosterCharacter(
       "zhongli", "Zhongli", .geoDamage, [.hpSupport],
-      ["Tenacity of the Millelith", "Archaic Petra"]),
+      ["Tenacity of the Millelith", "Archaic Petra", "Instructor"]),
 
     // Hydro
     RosterCharacter(

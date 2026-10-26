@@ -2,7 +2,7 @@
 
 A macOS overlay that tells you which Genshin Impact artifacts to keep, level or feed, while you play through GeForce NOW.
 
-Loupe reads the game window you share with it, recognizes five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
+Loupe reads the game window you share with it, recognizes four- and five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
 
 Loupe is a fan-made tool. It isn't affiliated with or endorsed by HoYoverse or NVIDIA.
 
@@ -145,6 +145,8 @@ A missed reading keeps the last verified result visible for up to three seconds,
 Enhance reading can still fail when particles overlap text. Rechecking changes a small status label rather than replacing the recommendation heading. The diagnostic recorder below captures failures for local regression testing.
 
 A **Fodder** verdict covers the archetypes each character is assigned. A piece may still have set value or a use in a build no archetype describes.
+
+**Four-star pieces** stop at +16, roll 80% as high, and are judged by set and main stat only, without odds or a grade. Guides still give Instructor and The Exile to some supports, such as Bennett, Kuki Shinobu in Quicken, and Dendro supports in Aggravate (see [archetypes](docs/archetypes.md)). A four-star piece of a set and main stat such a character uses levels to +16 and is kept until two like it are saved; after that, only one with more of the character's useful lines than a saved copy goes to Review. Every other four-star is Fodder. Rarity comes from counting the gold stars on the card.
 
 ## Data and privacy
 

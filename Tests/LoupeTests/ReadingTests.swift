@@ -17,7 +17,7 @@ import Testing
     CRIT DMG+6.2%
     CRIT Rate+3.1% (unactivated)
     """
-  let reading = CardReading(text: text, fiveStars: false, confidence: 0.5, isEnhancement: true)
+  let reading = CardReading(text: text, stars: 0, confidence: 0.5, isEnhancement: true)
   let actual = try reading.resolveEnhancement(
     previous: previous, pieceName: "Feather of Indelible Sin")
   #expect(actual.signature == previous.signature)
@@ -25,20 +25,20 @@ import Testing
   let upgraded = text.replacingOccurrences(of: "+0\n", with: "+4\n")
     .replacingOccurrences(of: " (unactivated)", with: "")
   let uncertainChange = CardReading(
-    text: upgraded, fiveStars: false, confidence: 0.5, isEnhancement: true)
+    text: upgraded, stars: 0, confidence: 0.5, isEnhancement: true)
   #expect(throws: ArtifactError.self) {
     try uncertainChange.resolveEnhancement(
       previous: previous, pieceName: "Feather of Indelible Sin")
   }
   let confidentChange = CardReading(
-    text: upgraded, fiveStars: false, confidence: 1, isEnhancement: true)
+    text: upgraded, stars: 0, confidence: 1, isEnhancement: true)
   let changed = try confidentChange.resolveEnhancement(
     previous: previous, pieceName: "Feather of Indelible Sin")
   #expect(changed.level == 4)
   #expect(changed.substats.count == 4)
   #expect(changed.unactivated == nil)
 
-  let unreadable = CardReading(text: text, fiveStars: false, confidence: 0.49, isEnhancement: true)
+  let unreadable = CardReading(text: text, stars: 0, confidence: 0.49, isEnhancement: true)
   #expect(throws: ArtifactError.self) {
     try unreadable.resolveEnhancement(previous: previous, pieceName: "Feather of Indelible Sin")
   }
@@ -46,13 +46,13 @@ import Testing
     try reading.resolveEnhancement(previous: previous, pieceName: "Another artifact")
   }
   let wrong = CardReading(
-    text: text.replacingOccurrences(of: "DEF+21", with: "DEF+23"), fiveStars: false, confidence: 1,
+    text: text.replacingOccurrences(of: "DEF+21", with: "DEF+23"), stars: 0, confidence: 1,
     isEnhancement: true)
   #expect(throws: ArtifactError.self) {
     try wrong.resolveEnhancement(previous: previous, pieceName: "Feather of Indelible Sin")
   }
   let missingInactive = CardReading(
-    text: text.replacingOccurrences(of: " (unactivated)", with: ""), fiveStars: false,
+    text: text.replacingOccurrences(of: " (unactivated)", with: ""), stars: 0,
     confidence: 1, isEnhancement: true)
   #expect(throws: ArtifactError.self) {
     try missingInactive.resolveEnhancement(

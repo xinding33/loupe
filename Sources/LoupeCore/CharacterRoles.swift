@@ -70,7 +70,7 @@ public struct CharacterRole: Sendable, Identifiable {
 }
 
 public enum CharacterRoles {
-  public static let reviewedVersion = "reviewed-2026-09-27.1"
+  public static let reviewedVersion = "reviewed-2026-10-26.1"
   public static let datasetVersion = "\(reviewedVersion)+\(Roster.version)"
   public static let coverageDescription =
     "Every character in the archetype table, including unowned ones and off-pieces. "
@@ -201,6 +201,10 @@ public enum CharacterRoles {
         RoleSet(
           "Gilded Dreams", .alternative,
           "Requires reactions; the EM bonus depends on team elements."),
+        RoleSet(
+          "Instructor", .alternative,
+          "Four-star. For Quicken teams; Shinobu must trigger a reaction on-field. Flower of "
+            + "Paradise Lost is better for Hyperbloom."),
       ],
       conditions: [
         RoleCondition(

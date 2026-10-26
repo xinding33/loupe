@@ -49,14 +49,17 @@ behavior on the real game, or performance.
 - Saved inventory with collection, upgrade linking, GOOD and backup import,
   undo, and coverage by slot and main stat.
 - Character assessment for every playable character through 12 shared
-  [archetypes](archetypes.md), dataset `archetypes-2026-10-25.1` (2026-10-25),
-  plus the 15 reviewed roles of `reviewed-2026-09-27.1`, which keep their
-  advice. A five-candidate shortlist is shared by the dashboard and overlay.
+  [archetypes](archetypes.md), dataset `archetypes-2026-10-26.1` (2026-10-26),
+  plus the 15 reviewed roles of `reviewed-2026-10-26.1`, which keep their
+  advice; the 2026-10-26 versions add four-star alternative sets. A five-candidate shortlist is shared by the dashboard and overlay.
 - Experimental S/A/B/C/D roll grades for every role, calibration
   `roll-2026-10-26.1`: example starts from the user's rules of thumb, a
   rarity limit, and weighted rolls (crit over the scaling stat).
 - Opt-in diagnostic buffer, report preview and export, and a headless
   [replay command](diagnostic-replay.md).
+- Four-star pieces (2026-10-26): read, saved and imported with their rarity, judged by set and
+  main stat for characters whose builds list Instructor or The Exile. Star counting on a
+  four-star card has not been checked live.
 - Manual profiles and pasted card text for cases outside reviewed coverage.
 - Auto-press, ported from Mash on 2026-10-22: repeats one key while the chosen
   app is in front, with a toggle shortcut, banner and auto-off timer. Needs

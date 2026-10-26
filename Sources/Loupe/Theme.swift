@@ -57,13 +57,17 @@ func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: B
 /// Which grade the headline shows: the roll grade, from the expected +20 score before +20 and
 /// the final score at +20.
 struct GradeHeadline {
-  enum Kind { case graded, ungraded, mainStatFit, specialRolls, needsReread, noMatch }
+  enum Kind { case graded, ungraded, mainStatFit, specialRolls, needsReread, noMatch, fourStar }
   let kind: Kind
   let tier: ArtifactTier?
   let finished: Bool
 
   init(match: CharacterMatch?, artifact: Artifact) {
-    finished = artifact.level == 20
+    finished = artifact.isFinished
+    guard artifact.rarity == 5 else {
+      (kind, tier) = (.fourStar, nil)
+      return
+    }
     guard let match else {
       (kind, tier) = (.noMatch, nil)
       return
@@ -92,6 +96,7 @@ struct GradeHeadline {
     case .specialRolls: "Special rolls"
     case .needsReread: "Needs full read"
     case .noMatch: "No match"
+    case .fourStar: "Four-star"
     }
   }
 
@@ -103,6 +108,7 @@ struct GradeHeadline {
     case .specialRolls: "Special rolls · no ordinary odds"
     case .needsReread: "Forecast needs a full read"
     case .noMatch: "No character match"
+    case .fourStar: "Four-star · set and main stat only"
     }
   }
 }

@@ -1,6 +1,7 @@
 # Character archetypes
 
-Date: 2026-10-25. Dataset `archetypes-2026-10-25.1`, game version 7.1.
+Date: 2026-10-25, four-star sets added 2026-10-26. Dataset `archetypes-2026-10-26.1`, game
+version 7.1.
 
 Loupe grades a piece by how rare it is among new drops of its slot and main stat, under a
 character's scored stats. That answer is the same for every character with the same scored stats,
@@ -68,10 +69,10 @@ Choices worth knowing:
 | Amber | ATK reaction | Pyro DMG | Crimson Witch of Flames |
 | Arataki Itto | DEF crit (first is the reviewed role) | Geo DMG | Husk of Opulent Dreams |
 | Arlecchino | ATK crit | Pyro DMG | Fragment of Harmonic Whimsy; Gladiator's Finale |
-| Baizhu | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam |
+| Baizhu | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam; Instructor |
 | Barbara | HP support; heals | — | Ocean-Hued Clam; Maiden Beloved |
 | Beidou | ATK crit | Electro DMG | Emblem of Severed Fate |
-| Bennett | HP support (first is the reviewed role) | — | Noblesse Oblige; Scroll of the Hero of Cinder City |
+| Bennett | HP support (first is the reviewed role) | — | Noblesse Oblige; Scroll of the Hero of Cinder City; Instructor; The Exile |
 | Candace | HP support | — | Noblesse Oblige; Tenacity of the Millelith |
 | Charlotte | ATK support; heals | — | Song of Days Past; Ocean-Hued Clam |
 | Chasca | ATK crit | ATK% | Obsidian Codex; Marechaussee Hunter |
@@ -92,14 +93,14 @@ Choices worth knowing:
 | Emilie | ATK crit | Dendro DMG | Unfinished Reverie; Deepwood Memories |
 | Escoffier | ATK crit | Cryo DMG | Golden Troupe; Blizzard Strayer |
 | Eula | ATK crit | Physical DMG | Pale Flame |
-| Faruzan | Energy support | Anemo DMG | Tenacity of the Millelith; Noblesse Oblige |
+| Faruzan | Energy support | Anemo DMG | Tenacity of the Millelith; Noblesse Oblige; The Exile |
 | Fischl | ATK reaction (first is the reviewed role) | Electro DMG | Golden Troupe; Gilded Dreams |
 | Flins | ATK reaction | ATK% | Night of the Sky's Unveiling; Marechaussee Hunter |
 | Freminet | ATK crit | Physical DMG | Pale Flame; Blizzard Strayer |
 | Furina | HP crit (first is the reviewed role) | Hydro DMG | Golden Troupe; Tenacity of the Millelith |
 | Gaming | ATK reaction | Pyro DMG | Marechaussee Hunter; Crimson Witch of Flames |
 | Ganyu | ATK crit | Cryo DMG | Blizzard Strayer; Wanderer's Troupe |
-| Gorou | DEF support | — | Noblesse Oblige; Husk of Opulent Dreams |
+| Gorou | DEF support | — | Noblesse Oblige; Husk of Opulent Dreams; The Exile |
 | Hu Tao | HP reaction | Pyro DMG | Crimson Witch of Flames; Shimenawa's Reminiscence |
 | Iansan | ATK support; heals | — | Scroll of the Hero of Cinder City; Noblesse Oblige |
 | Ifa | EM reaction support, ATK crit | Anemo DMG | Viridescent Venerer; Obsidian Codex |
@@ -115,10 +116,10 @@ Choices worth knowing:
 | Kaveh | EM reaction support | — | Flower of Paradise Lost; Deepwood Memories |
 | Keqing | ATK reaction | Electro DMG | Thundering Fury; Gilded Dreams |
 | Kinich | ATK crit | Dendro DMG | Obsidian Codex; Unfinished Reverie |
-| Kirara | HP support | — | Tenacity of the Millelith; Deepwood Memories |
+| Kirara | HP support | — | Tenacity of the Millelith; Deepwood Memories; Instructor |
 | Klee | ATK reaction | Pyro DMG | Crimson Witch of Flames |
 | Kujou Sara | Energy support | Electro DMG | Noblesse Oblige; Emblem of Severed Fate |
-| Kuki Shinobu | EM reaction support (first is the reviewed role) | — | Flower of Paradise Lost; Gilded Dreams |
+| Kuki Shinobu | EM reaction support (first is the reviewed role) | — | Flower of Paradise Lost; Gilded Dreams; Instructor |
 | Lan Yan | ATK support, EM reaction support | — | Viridescent Venerer; Scroll of the Hero of Cinder City |
 | Lauma | EM reaction support | — | Silken Moon's Serenade; Deepwood Memories |
 | Layla | HP support | — | Tenacity of the Millelith; Noblesse Oblige |
@@ -131,7 +132,7 @@ Choices worth knowing:
 | Mika | HP support; heals | — | Noblesse Oblige; Ocean-Hued Clam |
 | Mona | Energy-scaling Burst | Hydro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Mualani | HP reaction | Hydro DMG | Obsidian Codex; Heart of Depth |
-| Nahida | EM crit (first is the reviewed role) | Dendro DMG | Deepwood Memories; Gilded Dreams |
+| Nahida | EM crit (first is the reviewed role) | Dendro DMG | Deepwood Memories; Gilded Dreams; Instructor |
 | Navia | ATK crit | Geo DMG | Nighttime Whispers in the Echoing Woods; Gladiator's Finale |
 | Nefer | EM crit | Dendro DMG | Night of the Sky's Unveiling; Gilded Dreams |
 | Neuvillette | HP crit (first is the reviewed role) | Hydro DMG | Marechaussee Hunter; Heart of Depth |
@@ -159,7 +160,7 @@ Choices worth knowing:
 | Thoma | HP support, EM reaction support | — | Tenacity of the Millelith; Flower of Paradise Lost |
 | Tighnari | ATK reaction | Dendro DMG | Wanderer's Troupe; Gilded Dreams |
 | Traveler (Anemo) | EM reaction support | — | Viridescent Venerer |
-| Traveler (Dendro) | ATK reaction | Dendro DMG | Deepwood Memories |
+| Traveler (Dendro) | ATK reaction | Dendro DMG | Deepwood Memories; Instructor |
 | Traveler (Electro) | Energy support | Electro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Traveler (Geo) | ATK crit | Geo DMG | Nighttime Whispers in the Echoing Woods |
 | Traveler (Hydro) | HP crit | Hydro DMG | Heart of Depth |
@@ -174,17 +175,17 @@ Choices worth knowing:
 | Xiangling | ATK reaction (first is the reviewed role) | Pyro DMG | Emblem of Severed Fate; Crimson Witch of Flames |
 | Xianyun | ATK support; heals | — | Song of Days Past; Viridescent Venerer |
 | Xiao | ATK crit | Anemo DMG | Vermillion Hereafter; Desert Pavilion Chronicle |
-| Xilonen | DEF support; heals | — | Scroll of the Hero of Cinder City; Archaic Petra |
+| Xilonen | DEF support; heals | — | Scroll of the Hero of Cinder City; Archaic Petra; Instructor |
 | Xingqiu | ATK crit (first is the reviewed role) | Hydro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Xinyan | ATK crit | Physical DMG | Pale Flame; Noblesse Oblige |
 | Yae Miko | ATK reaction | Electro DMG | Golden Troupe; Gilded Dreams |
 | Yanfei | ATK reaction | Pyro DMG | Crimson Witch of Flames; Wanderer's Troupe |
-| Yaoyao | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam |
+| Yaoyao | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam; Instructor; The Exile |
 | Yelan | HP crit (first is the reviewed role) | Hydro DMG | Emblem of Severed Fate; Nymph's Dream |
 | Yoimiya | ATK reaction | Pyro DMG | Shimenawa's Reminiscence; Echoes of an Offering |
 | Yumemizuki Mizuki | EM reaction support | — | Viridescent Venerer; Gilded Dreams |
 | Yun Jin | DEF support | — | Husk of Opulent Dreams; Noblesse Oblige |
-| Zhongli | HP support | — | Tenacity of the Millelith; Archaic Petra |
+| Zhongli | HP support | — | Tenacity of the Millelith; Archaic Petra; Instructor |
 | Zibai | DEF crit | DEF% | Night of the Sky's Unveiling; Husk of Opulent Dreams |
 
 Sets belong to the character and apply to each of its archetype roles; a reviewed role keeps its
@@ -203,6 +204,17 @@ characters from 5.0 onward, builds were checked on 2026-10-25 against KQM quick 
 Icy Veins as second sources. Confidence was lower where sources disagree or there was only one:
 Lan Yan, Yumemizuki Mizuki, Iansan, Ifa, Escoffier, Ineffa, Aino, Durin, Jahoda, Columbina, Lohen,
 Linnea, Vesna, Odette, Alyosha and Prune.
+
+Four-star sets were checked on 2026-10-26. Instructor (4pc: +120 EM to the team after a reaction)
+is listed as an alternative where a current KQM guide names it: Bennett in EM reaction teams or
+when another character holds Noblesse Oblige ([Bennett](https://keqingmains.com/q/bennett-quickguide/),
+5.7; [Kazuha](https://keqingmains.com/q/kazuha-quickguide/), 7.1), Kuki Shinobu in Quicken
+([Shinobu](https://keqingmains.com/q/shinobu-quickguide/), 5.4), Kirara and other Dendro supports
+in Aggravate, Baizhu, Yaoyao, the Dendro Traveler, Nahida, Xilonen and Zhongli. The Exile is
+listed for Faruzan, Gorou, Yaoyao and Bennett, as an Energy option KQM calls useful for newer
+players. Guides rank both below the characters' five-star sets, and give Viridescent Venerer, not
+Instructor, to Kazuha and Sucrose. Other four-star sets (Scholar, Berserker, Gambler, Martial
+Artist, Defender's Will, Brave Heart, Resolution of Sojourner, Tiny Miracle) are early-game only.
 
 Character names, elements and set names come from Genshin Optimizer (MIT) at commit `7d1fcb7`.
 No data from unlicensed community drafts is used; one was compared locally only to flag
