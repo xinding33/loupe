@@ -16,13 +16,10 @@ public struct TextRegion: Sendable {
 public enum EnhancementLayout {
   public static func normalized(_ observations: [TextRegion]) -> [TextRegion] {
     let statNames = Set(Stat.allCases.map { $0.label.replacingOccurrences(of: "%", with: "") })
-    return observations.compactMap { observation in
-      let text = observation.text.folding(
-        options: .diacriticInsensitive, locale: Locale(identifier: "en_US")
-      )
-      .replacingOccurrences(of: "\u{041D}", with: "H")
-      .replacingOccurrences(of: "\u{0420}", with: "P")
-      .replacingOccurrences(of: "\u{0410}", with: "A")
+    return joinedWrappedLabels(observations, statNames: statNames).compactMap { observation in
+      let text = CardParser.latinized(
+        observation.text.folding(
+          options: .diacriticInsensitive, locale: Locale(identifier: "en_US")))
       let clean: String
       if let level = cleanNumber(text, level: true), observation.bounds.minX > 0.5 {
         clean = level
@@ -47,6 +44,41 @@ public enum EnhancementLayout {
       }
       return TextRegion(text: clean, bounds: observation.bounds, confidence: observation.confidence)
     }
+  }
+
+  /// The Enhance panel wraps a long main-stat label such as "Elemental Mastery" onto two lines,
+  /// which Vision returns as separate observations.
+  private static func joinedWrappedLabels(_ observations: [TextRegion], statNames: Set<String>)
+    -> [TextRegion]
+  {
+    func words(_ region: TextRegion) -> String {
+      CardParser.latinized(region.text).components(separatedBy: CharacterSet.letters.inverted)
+        .filter { !$0.isEmpty }.joined(separator: " ")
+    }
+    func isLabel(_ region: TextRegion) -> Bool {
+      region.bounds.minX > 0.5 && region.bounds.minX < 0.8
+        && !region.text.contains(where: \.isNumber) && !words(region).isEmpty
+    }
+    var result = observations
+    for upper in observations where isLabel(upper) {
+      guard
+        let lower = observations.first(where: { lower in
+          isLabel(lower) && lower.bounds != upper.bounds
+            && abs(lower.bounds.minX - upper.bounds.minX) < 0.02
+            && upper.bounds.minY - lower.bounds.maxY > -0.005
+            && upper.bounds.minY - lower.bounds.maxY < max(upper.bounds.height, lower.bounds.height)
+            && statNames.contains(words(upper) + " " + words(lower))
+        }),
+        result.contains(where: { $0.bounds == upper.bounds }),
+        result.contains(where: { $0.bounds == lower.bounds })
+      else { continue }
+      result.removeAll { $0.bounds == upper.bounds || $0.bounds == lower.bounds }
+      result.append(
+        TextRegion(
+          text: words(upper) + " " + words(lower), bounds: upper.bounds.union(lower.bounds),
+          confidence: min(upper.confidence, lower.confidence)))
+    }
+    return result
   }
 
   public static func assemble(_ observations: [TextRegion], heading: TextRegion) throws -> (
@@ -112,7 +144,8 @@ public enum EnhancementLayout {
             && label.region.bounds.midY - notice.bounds.midY < 0.045
         }
       rows.append(label.name + "+" + value.text + (inactive ? " (unactivated)" : ""))
-      confidence = min(confidence, label.region.confidence, value.confidence)
+      // Labels must name a stat and match the verified card's stats, so only values count here.
+      confidence = min(confidence, value.confidence)
     }
     return (([heading.text, levelText] + rows).joined(separator: "\n"), confidence)
   }

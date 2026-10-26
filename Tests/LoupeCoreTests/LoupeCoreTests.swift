@@ -31,6 +31,159 @@ private let card = """
   #expect(result.rankChances.isEmpty)
 }
 
+// Vision output from a live GeForce NOW frame: the rarity stars read as "XXХ" at 0.30 confidence.
+private let starredCard = """
+  Foundryman's Conjecture
+  Flower of Life
+  HP
+  4,780
+  XXХ
+  +20
+  • ATK+19
+  • CRIT Rate+8.9%
+  • ATK+11.1%
+  • CRIT DMG+21.0%
+  Heart of the Furnace:
+  02-Piece Set: ATK +18%.
+  • 4-Piece Set: Increases the
+  """
+
+@Test func confidenceIsJudgedOnlyOnTheLinesTheParserReads() throws {
+  let lines = starredCard.components(separatedBy: .newlines)
+  let used = try #require(CardParser.parsedLines(starredCard)).map { lines[$0] }
+  #expect(
+    Set(used) == [
+      "Flower of Life", "HP", "4,780", "+20", "• ATK+19", "• CRIT Rate+8.9%", "• ATK+11.1%",
+      "• CRIT DMG+21.0%", "Heart of the Furnace:",
+    ])
+  #expect(CardParser.parsedLines("Loading...") == nil)
+  let artifact = try CardParser.parse(starredCard, fiveStarsConfirmed: true)
+  #expect(artifact.setName == "Heart of the Furnace")
+  #expect(artifact.substats.count == 4)
+}
+
+@Test func aSubstatRowMissingItsPlusRejectsTheCard() {
+  // Skipping the row would read a four-stat card as a three-stat starter at full confidence.
+  let text = starredCard.replacingOccurrences(of: "• CRIT DMG+21.0%", with: "• CRIT DMG 21.0%")
+  #expect(text != starredCard)
+  #expect(CardParser.parsedLines(text) == nil)
+  #expect(throws: ArtifactError.self) { try CardParser.parse(text, fiveStarsConfirmed: true) }
+}
+
+@Test func cyrillicLookalikesReadAsLatin() throws {
+  // Vision returned the main stat "HР" with a Cyrillic Р on four live cards.
+  let text = starredCard.replacingOccurrences(of: "\nHP\n", with: "\nH\u{0420}\n")
+    .replacingOccurrences(of: "Flower", with: "Fl\u{043E}wer")
+  #expect(text != starredCard)
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.slot == .flower)
+  #expect(artifact.main == .hp)
+  #expect(CardParser.latinized("\u{0425}\u{0410}\u{0397}\u{03BF}") == "XAHo")
+}
+
+@Test func theCharacterScreenCardReads() throws {
+  // OCR of a live character-screen card: the main stat shares a row with its value, a sparkle
+  // reads as a dot, the narrower card wraps "(unactivated)", and the set line ends in a count.
+  let text = """
+    Crystal Tear of the
+    Wanderer
+    Flower of Life
+    717
+    .HP
+    +0
+    • CRIT DMG+7.0%
+    • CRIT Rate+2.7%
+    • HP+5.3%
+    *Elemental Mästery+23
+    (unactivated)
+    Silken Moon's Serenade: (4)
+    02-Piece Set: Energy Recharge
+    """
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.slot == .flower)
+  #expect(artifact.main == .hp)
+  #expect(artifact.setName == "Silken Moon's Serenade")
+  #expect(artifact.substats.map(\.key) == [.critDamage, .critRate, .hpPercent])
+  #expect(artifact.unactivated == Substat(.elementalMastery, 23))
+  #expect(CardParser.parsedLines(text) == [2, 4, 3, 5, 6, 7, 8, 9, 10, 11])
+  #expect(CardParser.pieceName(text) == "Crystal Tear of the Wanderer")
+  // Enhance titles the piece in full, so the wrapped name must still match.
+  let enhance = """
+    Flower of Life / Crystal Tear of the Wanderer
+    +0
+    HP+717
+    CRIT DMG+7.0%
+    CRIT Rate+2.7%
+    HP+5.3%
+    Elemental Mastery+23 (unactivated)
+    """
+  let read = try CardParser.parseEnhancement(
+    enhance, previous: artifact, pieceName: CardParser.pieceName(text))
+  #expect(read.signature == artifact.signature)
+}
+
+@Test func strayMarksAndMisreadLettersStillRead() throws {
+  // Live character-screen slips: a lost main-stat label, punctuation inside labels, a misread
+  // "(unactivated)" and stray marks at line ends.
+  let text = """
+    Crystal Tear of the
+    Wanderer
+    Flower of Life-
+    •717.
+    +0
+    • CRIT. DMG+7.0%
+    • CRIT, Rate+2.7% .
+    *• HP+5.3%
+    • Elemental-Mastery+23
+    (unagtivated)
+    Silkén Moon's Serenade:(4) *
+    """
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.main == .hp)
+  #expect(artifact.setName == "Silken Moon's Serenade")
+  #expect(artifact.substats.map(\.key) == [.critDamage, .critRate, .hpPercent])
+  #expect(artifact.unactivated == Substat(.elementalMastery, 23))
+  #expect(CardParser.tidied("•15.2%") == "15.2%")
+  #expect(CardParser.tidied("+4") == "+4")
+}
+
+@Test(arguments: ["DEF+5.1% unactivated)", "DEF+5.1% (unagtivated)", "DEF+5.1% unactlvated"])
+func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
+  let text = card.replacingOccurrences(of: "DEF+5.1% (unactivated)", with: row)
+  #expect(text != card)
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.substats.count == 3)
+  #expect(artifact.unactivated == Substat(.defPercent, 5.1))
+}
+
+@Test func enhanceNamesTolerateOCRNoiseButNotAnotherPiece() {
+  let name = "Gladiator's Nostalgia"
+  #expect(CardParser.namesMatch("Recommendations Gladiator's Nostalgia", name))
+  #expect(
+    CardParser.namesMatch(
+      "Crystal Tear of the \u{1EA0}\u{1ECA}Wanderer", "Crystal Tear of the Wanderer"))
+  #expect(
+    CardParser.namesMatch("Viridescent Venerer's Di\u{0105}dem", "Viridescent Venerer's Diadem"))
+  #expect(!CardParser.namesMatch("Gladiator's Longing", name))
+  #expect(!CardParser.namesMatch("Gladiator's", name))
+  #expect(!CardParser.namesMatch("Witch's Heart Flames", "Witch's Flower of Blaze"))
+}
+
+@Test func onlyFlowersAndPlumesInferAMissingMainStat() {
+  let sands = """
+    A Moment Congealed
+    Sands of Eon
+    60
+    +4
+    HP+4.1%
+    ATK+18
+    DEF+6.6%
+    Energy Recharge+4.5%
+    Flower of Paradise Lost:
+    """
+  #expect(throws: ArtifactError.self) { try CardParser.parse(sands, fiveStarsConfirmed: true) }
+}
+
 @Test func aFourLineStarterGetsFiveRandomUpgrades() throws {
   let artifact = try flower(level: 0, crit: 3.9)
   let potential = try Potential.evaluate(
@@ -235,6 +388,54 @@ private let card = """
   #expect(throws: ArtifactError.self) {
     try CardParser.parseEnhancement(screen, previous: previous, pieceName: "Another Circlet")
   }
+}
+
+@Test func enhancementRejectsLabelsReadInSwappedRows() throws {
+  let previous = try CardParser.parse(
+    """
+    Plume of Death
+    ATK
+    311
+    +0
+    ATK+4.1%
+    HP+4.1%
+    CRIT Rate+2.7%
+    CRIT DMG+5.4%
+    Gladiator's Finale:
+    """, fiveStarsConfirmed: true)
+  func screen(_ first: String, _ second: String) -> String {
+    """
+    Plume of Death / Gladiator's Destiny
+    +4
+    ATK+1,000
+    \(first)
+    \(second)
+    CRIT Rate+2.7%
+    CRIT DMG+5.4%
+    """
+  }
+  let upgraded = try CardParser.parseEnhancement(
+    screen("ATK+8.2%", "HP+4.1%"), previous: previous, pieceName: "Gladiator's Destiny")
+  #expect(upgraded.substats[0] == Substat(.atkPercent, 8.2))
+  // Equal starting values make either allocation a legal roll; only the row order tells them apart.
+  #expect(throws: ArtifactError.self) {
+    try CardParser.parseEnhancement(
+      screen("HP+8.2%", "ATK+4.1%"), previous: previous, pieceName: "Gladiator's Destiny")
+  }
+}
+
+@Test func savedRecordsInAnotherOrderStillUpdate() throws {
+  // GOOD imports keep their own substat order; a screen reading lists the card's order.
+  let imported = try Artifact(
+    setName: "Silken Moon's Serenade", slot: .circlet, main: .critDamage, level: 0,
+    substats: [Substat(.energyRecharge, 5.2), Substat(.hpPercent, 4.1), Substat(.atk, 18)],
+    unactivated: Substat(.defPercent, 5.1))
+  let reread = try CardParser.parse(card, fiveStarsConfirmed: true)
+  #expect(try imported.upgraded(to: reread).signature == reread.signature)
+  let activated = try Artifact(
+    setName: reread.setName, slot: .circlet, main: .critDamage, level: 4,
+    substats: reread.substats + [Substat(.defPercent, 5.1)])
+  #expect(try imported.upgraded(to: activated).level == 4)
 }
 
 @Test func enhancementRejectsAnExtraRollAtActivationAndUnchangedStatsAfterARoll() throws {

@@ -65,6 +65,32 @@ func ambiguousNumbersAreNotRepaired(_ value: String) {
   #expect(throws: ArtifactError.self) { try EnhancementLayout.assemble(observed, heading: heading) }
 }
 
+@Test func aMainStatLabelWrappedOntoTwoLinesIsJoined() throws {
+  // Live Enhance frames split "Elemental Mastery" into two observations beside one value.
+  let observed =
+    regions.map {
+      $0.text == "✦ ATK" ? region("✦ Elemental", 0.6, 0.745) : $0
+    } + [region("Mastery", 0.6, 0.728)]
+  let text = try EnhancementLayout.assemble(observed, heading: heading).text
+  #expect(text.contains("Elemental Mastery+47"))
+  #expect(throws: ArtifactError.self) {
+    try EnhancementLayout.assemble(
+      observed.filter { $0.text != "Mastery" } + [region("Recharge", 0.6, 0.728)],
+      heading: heading)
+  }
+}
+
+@Test func aLowConfidenceLabelDoesNotLowerTheReading() throws {
+  let observed = regions.map {
+    $0.text == "HP" ? TextRegion(text: "H\u{0420}", bounds: $0.bounds, confidence: 0.5) : $0
+  }
+  #expect(try EnhancementLayout.assemble(observed, heading: heading).confidence == 1)
+  let value = regions.map {
+    $0.text == "4.1%" ? TextRegion(text: "4.1%", bounds: $0.bounds, confidence: 0.5) : $0
+  }
+  #expect(try EnhancementLayout.assemble(value, heading: heading).confidence == 0.5)
+}
+
 private let heading = region("Plume of Death / Feather of Indelible Sin", 0.07, 0.90)
 private let regions = [
   region("+0", 0.6, 0.81),

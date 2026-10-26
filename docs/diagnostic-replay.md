@@ -21,7 +21,9 @@ repairs, replaces, or migrates a report.
 
 Create the context file from an independently verified five-star Inventory card
 that precedes the retained Enhance sequence. Confirm its piece name, set, slot,
-main stat, level, substats, and any unactivated fourth stat. Do not manufacture
+main stat, level, substats, and any unactivated fourth stat. List the substats
+in the card's top-to-bottom order: Enhance rejects a reading whose stats appear
+in a different order, so labels read in swapped rows cannot pass. Do not manufacture
 context from the report's unverified saved OCR, parsed result, or correction.
 
 This synthetic example demonstrates the JSON format; it is not a substitute
