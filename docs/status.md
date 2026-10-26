@@ -67,7 +67,36 @@ behavior on the real game, or performance.
 The user ran basic checks on 2026-09-27 against the preceding build:
 game-monitor placement, expanded readability, both physical shortcuts, +0
 Inventory and Enhance readings, a +20 Inventory reading, and disable followed
-by re-enable. Nothing has been checked live since.
+by re-enable.
+
+On 2026-10-25 the user clicked through Inventory and Enhance in v0.1.0 while
+348 frames of the GeForce NOW window were recorded and replayed offline. The
+frames stay on that Mac; they show the account UID. Findings, all fixed:
+
+- 46% of Inventory frames were rejected as low confidence because Vision read
+  the rarity stars as junk text at 0.30, even on an unchanged card. Confidence
+  now comes only from the lines the parser reads.
+- Vision returned the HP main stat as "HР" with a Cyrillic Р on four cards.
+  Cyrillic and Greek look-alikes now map to Latin in both readers.
+- Enhance split the "Elemental Mastery" main-stat label over two lines and
+  rejected the panel; the halves are now joined. A short "HP" label at 0.50
+  confidence no longer blocks changed stats, since labels are already checked
+  against stat names and the verified card.
+
+After the fixes, 313 of 314 Inventory card frames parse (the other is
+mid-transition) and all four Enhance frames read.
+
+A second recording and a user video the same day added the character
+Artifacts screen, where the card is narrower, the main stat shares a row with
+its value, and the set line ends in an equipped count ("Set: (4)"). Fixes:
+"(unactivated)" on its own line, Vision splitting one row into two
+observations, punctuation inside labels, stray marks at line ends, a missed
+level tag (read again from an enlarged crop), and a lost flower or plume
+main-stat label. Afterwards 155 of 162 card frames in the recording, 52 of 53
+in the video and 313 of 314 in the first recording parse, with no wrong
+readings among them. The failures are single frames that two-frame
+verification skips. Enhance read 3 of 4 video frames; Enhance upgrades past
++0 are still unrecorded.
 
 ## Open work
 

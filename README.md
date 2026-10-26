@@ -26,7 +26,7 @@ Artifact Lens, Loupe's earlier name, kept its data elsewhere. On first launch Lo
 
 1. Click **Choose game window**.
 2. Select **Genshin Impact on GeForce NOW** in the macOS sharing picker.
-3. Open Inventory and select one five-star artifact.
+3. Select one five-star artifact in Inventory or on a character's Artifacts screen.
 4. Wait for **Live card verified across two frames**.
 
 The overlay starts compact near the top-right of the shared window's display. It follows that window between monitors. Drag the control strip to adjust its position; its reset arrow restores the corner. The strip also has expand/collapse, **Report**, and disable controls; hover for labels. The result surface passes clicks through to the game.
@@ -130,7 +130,7 @@ Current five-star cards preview the fourth substat. If that line is missing, rea
 
 Crafted artifacts with guaranteed rolls and Dust reshaping need a different probability model. Mark **Crafted / guaranteed rolls** before reading those cards. Visible special-rule text also disables ordinary odds, but the app cannot reliably infer provenance from every card. Unfinished GOOD imports are conservatively marked special because the import does not establish their roll rules. Their finished +20 stats can still serve as benchmarks.
 
-The live reader targets one full Inventory card and the Enhance stat panel. Enhance omits set and rarity, so it requires a previously verified Inventory card in the same capture session. Item name, slot, main stat, substats, and upgrade-event count must agree. Enhance OCR reads separate title and stat-table crops at a fixed resolution. Language correction applies to the title only, not numbers.
+The live reader targets one full artifact card, in Inventory or on a character's Artifacts screen, and the Enhance stat panel. Enhance omits set and rarity, so it requires a previously verified card in the same capture session. Item name, slot, main stat, substats, and upgrade-event count must agree. Enhance OCR reads separate title and stat-table crops at a fixed resolution. Language correction applies to the title only, not numbers.
 
 Each Enhance field needs two matching observations within the last two seconds, using at most five frames. A missed field can use that recent evidence while other fields remain readable. A changed field blocks a new result until confirmed. A changed level resets the evidence, so the old inactive row cannot carry into an upgrade. Window-size changes and leaving Enhance also reset it. The parser removes decorative punctuation but does not infer digits or repair ambiguous decimals. Lower-confidence text can confirm an exact previously verified card, but cannot establish changed stats.
 
