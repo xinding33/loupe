@@ -147,6 +147,28 @@ struct VerdictTests {
     #expect(Self.verdict(oneCrit, [Self.crit, twin]).kind == .fodder)
   }
 
+  @Test func anyThinCRoleRescuesAFinishedPiece() throws {
+    // C for an HP healer, nothing for an ATK crit role: one weaker saved circlet leaves room.
+    let circlet = try Artifact(
+      setName: "Test", slot: .circlet, main: .healing, level: 20,
+      substats: [
+        Substat(.hpPercent, 9.33), Substat(.critRate, 3.89), Substat(.critDamage, 38.85),
+        Substat(.def, 23.15),
+      ])
+    let weaker = try Artifact(
+      setName: "Test", slot: .circlet, main: .healing, level: 20,
+      substats: [
+        Substat(.def, 138.9), Substat(.atk, 19.45), Substat(.hp, 298.75),
+        Substat(.energyRecharge, 6.48),
+      ])
+    let healers = CharacterRoles.all.filter { $0.mains[.circlet]?.contains(.healing) == true }
+    let matches = CharacterAssessment.evaluate(circlet, roles: healers)
+    #expect(matches.contains { $0.grades?.grade == .c && $0.usefulStats == [.hpPercent] })
+    let verdict = VerdictEngine.evaluate(circlet, matches: matches, inventory: [weaker])
+    #expect(verdict.kind == .review)
+    #expect(verdict.reason == "C · only 1 saved Healing Bonus circlets")
+  }
+
   @Test func savedPiecesBeyondTheBestOutcomeMakeItFodder() throws {
     let starter = try Artifact(
       setName: "Test", slot: .plume, main: .atk, level: 0,

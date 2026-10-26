@@ -144,10 +144,14 @@ public enum VerdictEngine {
     let gap = open.filter { $0.grade == nil && $0.saved.count < $0.backups }.max {
       $0.setRank < $1.setRank
     }
-    // An empty pool usually means the bag was not scanned, so it does not make a C piece worth it.
-    let thin = leading.flatMap {
-      $0.grade == .c && !$0.saved.isEmpty && $0.saved.count < $0.backups ? $0 : nil
-    }
+    // Any C role whose saved pool is thin can rescue the piece; supports only once it is
+    // finished, since their grade levels only at S. An empty pool usually means the bag was not
+    // scanned, so it does not make a C piece worth it.
+    let thin = strongest(
+      open.filter {
+        $0.grade == .c && !$0.saved.isEmpty && $0.saved.count < $0.backups
+          && (outcomes == nil || !$0.isSupport)
+      })
     let mainFit = { (role: RoleContext) in
       "Main stat fills a gap: \(role.saved.count) saved \(kind)"
     }
