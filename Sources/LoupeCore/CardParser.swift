@@ -143,9 +143,11 @@ public enum CardParser {
     throw ArtifactError("Cannot read the set name. Include the line above the set bonuses.")
   }
 
-  /// Vision can misread letters inside the marker, as in "(unagtivated)".
+  /// Vision can drop the parenthesis or misread letters inside the marker, as in "(unagtivated)".
   private static func marksUnactivated(_ line: String) -> Bool {
-    line.range(of: #"\(\s*un\w{4,}"#, options: [.regularExpression, .caseInsensitive]) != nil
+    line.range(
+      of: #"\(\s*un\w{4,}|un\w*vated|activated"#, options: [.regularExpression, .caseInsensitive])
+      != nil
   }
 
   static func identifyStat(_ text: String, hasPercent: Bool) -> Stat? {

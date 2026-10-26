@@ -133,6 +133,15 @@ private let starredCard = """
   #expect(CardParser.tidied("+4") == "+4")
 }
 
+@Test(arguments: ["DEF+5.1% unactivated)", "DEF+5.1% (unagtivated)", "DEF+5.1% unactlvated"])
+func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
+  let text = card.replacingOccurrences(of: "DEF+5.1% (unactivated)", with: row)
+  #expect(text != card)
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.substats.count == 3)
+  #expect(artifact.unactivated == Substat(.defPercent, 5.1))
+}
+
 @Test func onlyFlowersAndPlumesInferAMissingMainStat() {
   let sands = """
     A Moment Congealed
