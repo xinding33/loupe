@@ -177,7 +177,12 @@ struct VerdictBanner: View {
       Spacer(minLength: 0)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(verdict.title). \(verdict.summary)")
+    .accessibilityLabel(
+      "\(verdict.title). "
+        + Self.text(
+          verdict, lines: 2, displayedCharacterID: displayedCharacterID,
+          displayedRoleID: displayedRoleID)
+    )
     .help("Advice only. Rules and defaults: docs/grading-approach.md")
   }
 

@@ -64,7 +64,9 @@ struct AssessmentSummary: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       if model.assessmentMode == .characters, let verdict = model.verdict {
-        VerdictBanner(verdict: verdict)
+        VerdictBanner(
+          verdict: verdict, displayedCharacterID: model.selectedMatch?.characterID,
+          displayedRoleID: model.selectedMatch?.roleID)
       }
       if model.assessmentMode == .characters {
         characterHero

@@ -112,4 +112,9 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
     verdict, lines: 1, displayedCharacterID: character, displayedRoleID: "\(character).other")
   #expect(other.contains(try #require(verdict.roleName)))
   #expect(other.hasSuffix(verdict.reason))
+  // Two lines, as the dashboard and the accessibility label use, still name the role.
+  #expect(
+    VerdictBanner.text(
+      verdict, lines: 2, displayedCharacterID: character, displayedRoleID: "\(character).other")
+      == other)
 }
