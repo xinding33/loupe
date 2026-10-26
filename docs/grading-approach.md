@@ -1,7 +1,7 @@
 # Artifact grading: approach
 
-Date: 2026-10-22
-Status: direction agreed with the user. Steps 1 to 3 are implemented; the rest is planned.
+Date: 2026-10-22, grades and verdicts revised 2026-10-26
+Status: direction agreed with the user. Steps 1 to 4 are implemented; the rest is planned.
 
 This page records the research behind the grading direction, the decisions the
 user made, and the work order. It supersedes the "no keep/discard threshold"
@@ -28,6 +28,19 @@ verdicts are advice.
 - Community draft weights may be used locally as a starting point. They are
   unlicensed: generated data stays in the gitignored `local/` directory and is
   never committed or distributed.
+
+## Decisions (2026-10-26)
+
+The user found a top-1.3% plume shown as B and described how they judge a
+start: two crit lines are worth rolling; a fourth line is better because it is
+one more chance at crit; double crit with a useful third line is better still.
+A means "definitely worth rolling" and S "could be one of your best pieces",
+such as a four-line start whose lines are the build's four best. Agreed:
+
+- One letter, the roll grade, set by example starts rather than percentages.
+  Median, P90 and best possible show numbers and their rarity, not letters.
+- Crit counts more than the scaling stat in damage roles.
+- Verdicts follow the letter.
 
 ## Research summary
 
@@ -94,12 +107,11 @@ seeded simulation of the actual drop process agrees within half a percentage
 point. A table takes under 1 ms and is cached per slot, main stat, and weights.
 
 A piece's share is the fraction of new drops finishing at or above its score.
-Tiers come from the share; every reviewed role is graded. A piece is ungraded
-only when no core substat can appear on it or when it has no final score or
-forecast.
+The overlay shows it for the median, P90 and best outcomes. From 2026-10-22 to
+2026-10-26 the letters were cut from this share; step 2b replaced them.
 
-The cutoffs were fitted to the 15 cells reviewed by hand. Those hand cutoffs
-correspond to consistent shares across very different cells:
+The 2026-10-22 cutoffs were fitted to the 15 cells reviewed by hand. Those hand
+cutoffs correspond to consistent shares across very different cells:
 
 | Hand cutoff | Share of new drops reaching it | Chosen bound |
 | --- | --- | --- |
@@ -110,9 +122,8 @@ correspond to consistent shares across very different cells:
 
 With these bounds, the derived B, A, and S cutoffs fall within 0.3 rolls of the
 hand cutoffs in every cell; C differs by up to half a roll, stricter on flowers
-and plumes and looser on sands and HP% goblets. The original proposal of S top
-1% and A top 5% would have been far more lenient than the reviewed anchors.
-Tests keep every hand anchor within one tier of its hand label.
+and plumes and looser on sands and HP% goblets. Those hand cutoffs were strict:
+a plume whose median finish was in the top 1.3% of new drops was a B.
 
 `expectedDropsToBeat` gives the expected five-star domain drops, counting both
 of the domain's sets, before a piece of the same set, slot, and main stat
@@ -121,8 +132,54 @@ and the share above. An EM goblet of the wanted set alone is 1 in 400 domain
 drops. The dashboard and overlay show the share and this estimate.
 
 Rarity is not value. A rare piece for an unwanted role is still unused; the
-account checks below cover that. Rarity is comparable across characters, so
-it can order the shortlist in step 3.
+account checks below cover that.
+
+### 2b. Roll grades — implemented (2026-10-26)
+
+**Weights** (`RollWeights`). Damage roles, those with both crit stats, count a
+crit roll as 100. Their scaling stat counts 75 for ATK%, EM and ER and 85 for
+HP% and DEF%. For a built ATK damage dealer, one ATK% roll adds about as much
+damage as a crit roll with no ATK buffer and about two thirds with a big
+flat-ATK buffer such as Bennett. Sands, goblets and sets already supply the
+scaling stat, and HP and DEF have fewer buffers. Supports count their core
+stats at 100. Every role's secondary stats count 25, which ranks a damage
+dealer's ER fourth line above a useless one. Flat stats stay unweighted unless
+a role lists them.
+
+**Example starts** (`RollGrade.examples`). Rank the role's possible lines on
+this main stat by weight. Each letter's example is a start in its weakest
+form, every line at its lowest roll and every other line useless, scored by
+its expected +20 score:
+
+| Grade | Example | ATK crit plume |
+| --- | --- | --- |
+| S | four lines, the four best | CR, CD, ATK%, ER: 5.29 |
+| A | three lines with the two best | CR, CD: 3.10 |
+| B | three lines with the best and third best | CR, ATK%: 2.71 |
+| C | three lines with the best | CR: 1.55 |
+
+**Rarity limit.** On their own, the examples were too lenient for narrow
+builds. Any EM flower with a second minor line was A for an EM-only support,
+and a finished flower with three EM rolls was S, because its examples are easy
+to beat once rolls land. Each example therefore also sets a share of finished
+ATK crit plumes: about 1.0% finish at or above S, 20% at or above A, 27% at or
+above B and 58% at or above C. In any other role and slot, a letter also needs
+a score above every finished score that is more common than that share. For
+ATK crit plumes the examples decide. Elsewhere the stricter of the two rules
+applies:
+- For a single-stat support, the rarity rule decides, so no new EM flower is S.
+- For Alhaitham's EM sands, where only crit can roll, the example decides, so
+  one crit with ER stays B. Taking the rarity rule alone made it A.
+
+A piece is graded by its expected +20 score, counting the rolls it already
+has. A finished piece is graded by its score. The same piece keeps its meaning
+as it levels: a double-crit start whose rolls go to a useless line slides.
+
+Checked against the user's examples: their plume (CR 3.9, ATK% 5.3, CD 7.8,
+HP at +4) is A, expected 5.01, with a 99.6% chance of finishing A or better. A
+four-line CR, CD, ATK%, ER start at its lowest rolls is exactly S. Double crit
+on three lines at its lowest rolls is A. CR with ATK% on three lines is B, and
+on four lines at its lowest rolls just short of A. One crit is C.
 
 ### 3. Account value: margin over saved pieces
 
@@ -141,6 +198,39 @@ matches; the overlay and dashboard show it first, and that character leads
 the shortlist unless the user picked another. Defaults live in
 `VerdictPolicy` and are starting points, not reviewed thresholds.
 
+Since 2026-10-26 verdicts follow the best roll grade among the piece's roles.
+Ties go to the preferred set, then the alternative set, then the rarer result:
+more drops to replace a finished piece, or a likelier A for an unfinished one.
+A role is set aside when its saved +20 pieces of this slot and main stat
+already include as many as its group can use (see below) that beat the
+piece's best outcome.
+
+| Grade | Unfinished | Finished |
+| --- | --- | --- |
+| S | Level to +20 | Keep |
+| A | Level to the next checkpoint | Keep |
+| B | Level to the next checkpoint | Keep while it ranks among the saved pieces the group can use; Review with none saved |
+| C | Fodder, or level to the next checkpoint with one or two saved pieces of its kind | Fodder, or Review with one or two saved |
+| D | Fodder | Fodder |
+
+A main-stat-only fit, a role whose core stats cannot appear as substats, levels
+or keeps the piece while its saved pool has room; it ranks below A and above B.
+An empty pool does not rescue a C piece, since it usually means an unscanned
+bag.
+
+**Many roles, one piece.** A grade is per role, about 1 in 5 pieces A or
+better, but there is no ownership filter and a flower suits all of them.
+Granting S and A a straight Level to +20 for any role would have sent 43% of
+new flowers to +20. A first draft that let supports' A and B count leveled 96%
+of flowers to at least +4. So:
+
+- A and B level one checkpoint at a time, where the grade is read again.
+- Supports, roles without both crit stats, level a piece only at S. A finished
+  support A or B follows the B rule.
+
+The 2026-10-22 keeper rules below are kept for reference; the replacement
+estimate still appears in Keep reasons.
+
 A finished piece is a **keeper** for a role when either holds:
 
 - **Hard to replace:** a better piece of the same slot and main stat would take
@@ -154,6 +244,8 @@ A finished piece is a **keeper** for a role when either holds:
 - A role that fits by main stat only (no core substat can appear) keeps the
   piece while fewer saved pieces of that slot and main stat exist than the
   group can use.
+
+Superseded 2026-10-26:
 
 | Verdict | Finished piece | Unfinished piece |
 | --- | --- | --- |
@@ -179,6 +271,18 @@ main stat; that falls as coverage grows. With every archetype role (2026-10-25)
 and no saved inventory, +0 pieces level at 28% / 59% / 59% / 58% and +20 pieces
 end 5 / 94 / 0% (flower) and 32 / 43 / 23% (goblet); see
 [archetypes](archetypes.md).
+
+Measured with the 2026-10-26 rules, every archetype role and 1,500 random
+domain drops per row:
+
+| Saved inventory | +0 leveled: flower / sands / goblet / circlet | +20 Keep / Review / Fodder: flower; goblet |
+| --- | --- | --- |
+| None | 53% / 60% / 46% / 34% | 48 / 40 / 10%; 37 / 14 / 48% |
+| 30 random +20 per slot | 56% / 39% / 41% / 21% | 56 / 0 / 43%; 36 / 6 / 56% |
+
+About 1% of new flowers level straight to +20; everything else levels a
+checkpoint at a time. Keep stays high on flowers because each damage
+archetype's S and A count. An ownership filter would bring both down.
 
 Not implemented: role-free dominance, reshape candidates, chance against the
 equipped piece, and an off-piece margin over the best on-set piece. The
@@ -218,6 +322,8 @@ review report. The output is local-only.
    [archetypes](archetypes.md) rather than one reviewed build each.
    Damage-derived weights for close calls remain open.
 
-Open questions: verdict defaults tuned on a real scanned inventory;
+Open questions: an ownership filter, perhaps from the characters in a GOOD
+import, so verdicts count only the user's roles; verdict defaults tuned on a
+real scanned inventory;
 whether the inventory card's equipped-by line can be read reliably; how to
 model reshaped and Transmuter pieces, which the ordinary model excludes.

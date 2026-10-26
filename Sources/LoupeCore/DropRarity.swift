@@ -146,6 +146,12 @@ public struct DropRarity: Sendable {
     return index.map { tail[$0] } ?? 0
   }
 
+  /// Index into `scores` of the lowest score reached by at most `share` of new drops, or of the
+  /// best score when even that is more common.
+  func firstIndex(withShareAtMost share: Double) -> Int {
+    tail.firstIndex { $0 <= share + 1e-12 } ?? scores.count - 1
+  }
+
   /// Fraction of new drops finishing strictly above `score`.
   public func shareAbove(_ score: Int) -> Double {
     score == .max ? 0 : shareAtOrAbove(score + 1)
@@ -157,18 +163,5 @@ public struct DropRarity: Sendable {
   public func expectedDropsToBeat(_ score: Int, setChance: Double = 0.5) -> Double? {
     let chance = setChance / 5 * (slot.mainStatOdds[main] ?? 0) * shareAbove(score)
     return chance > 0 ? 1 / chance : nil
-  }
-}
-
-/// Tiers from rarity among new drops of the same slot and main stat, under one role's profile.
-public enum RarityTier {
-  public static let version = "rarity-2026-10-22.1"
-  /// Largest share of new drops at or above a piece that still earns each tier.
-  public static let bounds: [(tier: ArtifactTier, share: Double)] = [
-    (.s, 0.0005), (.a, 0.01), (.b, 0.15), (.c, 0.50),
-  ]
-
-  public static func tier(share: Double) -> ArtifactTier {
-    bounds.first { share <= $0.share }?.tier ?? .d
   }
 }

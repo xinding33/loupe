@@ -9,14 +9,17 @@ public enum ArtifactTier: String, CaseIterable, Sendable {
 }
 
 public struct CharacterGradeSummary: Sendable {
-  public let current: ArtifactTier?
-  public let p50: ArtifactTier?
-  public let p90: ArtifactTier?
-  public let bestPossible: ArtifactTier?
+  /// How worth rolling the piece is for the role; see `RollGrade`. Before +20 it grades the
+  /// expected +20 score, at +20 the final score.
+  public let grade: ArtifactTier
+  /// Chance an unfinished piece finishes at or above the A cutoff.
   public let chanceOfAOrBetter: Double?
   /// Share of new drops of this slot and main stat finishing at or above the final score at +20,
   /// or the median projected score before +20.
   public let rarityShare: Double?
+  /// The same share for the P90 and best possible +20 outcomes, before +20.
+  public let p90Share: Double?
+  public let bestShare: Double?
   /// Expected new drops before one of the same set, slot, and main stat beats that score.
   public let replacementDrops: Double?
   public let calibrationID: String
@@ -24,33 +27,34 @@ public struct CharacterGradeSummary: Sendable {
 }
 
 public enum TierCalibration {
-  public static let version = RarityTier.version
+  public static let version = RollGrade.version
 
-  /// Tiers come from rarity among new drops of the same slot and main stat under the role's
-  /// profile; see `RarityTier`. A profile with no possible core substat on this piece is ungraded.
+  /// Letters come from the role's example starts (`RollGrade`); rarity among new drops of the
+  /// same slot and main stat describes the outcomes. A role whose core stats cannot appear as a
+  /// substat on this piece fits by main stat only and is ungraded.
   static func evaluate(
     _ artifact: Artifact, role: CharacterRole, potential: Potential?
   ) -> CharacterGradeSummary? {
-    guard let rarity = RarityCache.shared.rarity(artifact.slot, artifact.main, role.profile),
-      rarity.bestScore > 0
+    guard role.usefulStats.contains(where: { $0 != artifact.main }),
+      let rarity = RarityCache.shared.rarity(artifact.slot, artifact.main, role.profile)
     else { return nil }
-    func tier(_ score: Double) -> ArtifactTier {
-      RarityTier.tier(share: rarity.shareAtOrAbove(Int((score * 1000).rounded())))
-    }
-    let current = artifact.level == 20 ? role.profile.score(artifact.substats) : nil
+    let finished = artifact.level == 20 ? role.profile.score(artifact.substats) : nil
     // Without a final score or an ordinary forecast there is nothing to grade.
-    guard current != nil || potential != nil else { return nil }
-    let headline = current ?? potential.map { Int(($0.summary.p50Score * 1000).rounded()) }
-    let aShare = RarityTier.bounds.first { $0.tier == .a }!.share
+    guard let score = finished.map(Double.init) ?? potential.map({ $0.expectedScore * 1000 })
+    else { return nil }
+    let cutoffs = RollGrade.cutoffs(rarity, profile: role.profile)
+    let aCutoff = cutoffs.first { $0.tier == .a }!.minimum - 1e-6
+    func share(_ score: Double) -> Double { rarity.shareAtOrAbove(Int((score * 1000).rounded())) }
+    let headline = finished ?? potential.map { Int(($0.summary.p50Score * 1000).rounded()) }
+    let unfinished = finished == nil ? potential : nil
     return CharacterGradeSummary(
-      current: current.map { RarityTier.tier(share: rarity.shareAtOrAbove($0)) },
-      p50: potential.map { tier($0.summary.p50Score) },
-      p90: potential.map { tier($0.summary.p90Score) },
-      bestPossible: potential.map { tier($0.summary.bestPossibleScore) },
-      chanceOfAOrBetter: potential.map {
-        $0.distribution.reduce(0) { $0 + (rarity.shareAtOrAbove($1.key) <= aShare ? $1.value : 0) }
+      grade: RollGrade.tier(score, cutoffs: cutoffs),
+      chanceOfAOrBetter: unfinished.map {
+        $0.distribution.reduce(0) { $0 + (Double($1.key) >= aCutoff ? $1.value : 0) }
       },
       rarityShare: headline.map { rarity.shareAtOrAbove($0) },
+      p90Share: unfinished.map { share($0.summary.p90Score) },
+      bestShare: unfinished.map { share($0.summary.bestPossibleScore) },
       replacementDrops: headline.flatMap { rarity.expectedDropsToBeat($0) },
       calibrationID: "\(version):\(artifact.slot.rawValue).\(artifact.main.rawValue)",
       experimental: true)

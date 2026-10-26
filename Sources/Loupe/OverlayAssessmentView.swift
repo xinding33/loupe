@@ -88,13 +88,6 @@ struct OverlayView: View {
           }
         }
         Spacer(minLength: 0)
-        if let ceiling = headline.ceiling {
-          VStack(spacing: 2) {
-            Text("BEST").font(.system(size: 8, weight: .semibold)).foregroundStyle(.secondary)
-            TierChip(tier: ceiling)
-          }
-          .help("Best possible grade: a ceiling, not an earned grade.")
-        }
       }
     } else {
       HStack(spacing: 10) {
@@ -182,7 +175,7 @@ struct OverlayView: View {
     }
     if model.assessmentMode == .characters { users(artifact) }
     stats(artifact)
-    Text("Useful-roll screen, not damage. ER needs and Crit caps are unknown.")
+    Text("Weighted-roll screen, not damage. ER needs and Crit caps are unknown.")
       .font(.system(size: 9.5)).foregroundStyle(.tertiary)
       .fixedSize(horizontal: false, vertical: true)
   }
@@ -219,7 +212,7 @@ struct OverlayView: View {
       )
       .font(.system(size: 9)).foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
-      Text("Tiers experimental").font(.system(size: 9)).foregroundStyle(.tertiary)
+      Text("Grades experimental").font(.system(size: 9)).foregroundStyle(.tertiary)
     }
   }
 

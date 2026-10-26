@@ -32,7 +32,7 @@ public enum CharacterAssessment {
     // One enumeration serves every role; a failure is reported per role below.
     let outcomes = try? RollOutcomes(artifact)
     // Characters sharing an archetype share a forecast, so compute each profile once.
-    var forecasts: [[Stat]: Result<Potential, Error>] = [:]
+    var forecasts: [[Stat: Int]: Result<Potential, Error>] = [:]
     return roles.filter {
       $0.mains[artifact.slot, default: []].contains(artifact.main)
     }
@@ -73,8 +73,8 @@ public enum CharacterAssessment {
           ? "No active core substats. Main-stat compatibility alone is not a strong match."
           : "Active core stats: " + active.map { $0.key.label }.joined(separator: ", ") + ".")
       reasons.append(
-        "Binary useful-roll screening, not damage coefficients. Secondary utility is not numerically weighted."
-      )
+        "Weighted useful-roll screening, not damage coefficients: " + role.profile.explanation
+          + ".")
       if role.usefulStats == [.elementalMastery] && artifact.main == .elementalMastery {
         reasons.append(
           "EM main is useful for this role. An EM substat is impossible here; main-stat fit remains eligible without a core substat score."
@@ -85,9 +85,9 @@ public enum CharacterAssessment {
       if !role.usefulStats.contains(where: { $0 != artifact.main }) {
         potential = nil
         unavailable =
-          "\(artifact.main.label) main is useful, but this profile has no eligible core substats to compare. Secondary utility is not graded."
+          "\(artifact.main.label) main is useful, but this profile has no eligible core substats to compare. Secondary stats alone are not graded."
       } else {
-        let key = role.usefulStats.sorted { $0.rawValue < $1.rawValue }
+        let key = role.profile.weights
         let forecast =
           forecasts[key]
           ?? Result {

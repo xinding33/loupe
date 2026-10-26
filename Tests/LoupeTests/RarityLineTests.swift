@@ -5,8 +5,8 @@ import Testing
 
 private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
   CharacterGradeSummary(
-    current: nil, p50: nil, p90: nil, bestPossible: nil, chanceOfAOrBetter: nil,
-    rarityShare: share, replacementDrops: drops, calibrationID: "test", experimental: true)
+    grade: .b, chanceOfAOrBetter: nil, rarityShare: share, p90Share: nil, bestShare: nil,
+    replacementDrops: drops, calibrationID: "test", experimental: true)
 }
 
 @Test func rarityLineNamesTheComparisonPoolAndRoundsTheReplacementEstimate() throws {
@@ -58,7 +58,7 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
   let kuki = try #require(
     CharacterAssessment.evaluate(flower).first { $0.characterID == "kuki-shinobu" })
   #expect(kuki.potential == nil)
-  #expect(kuki.grades?.current == .s)
+  #expect(kuki.grades?.grade == .s)
   #expect(
     rarityLine(kuki.grades, artifact: flower)?.hasPrefix("Top <0.1% of new HP flowers") == true)
 }

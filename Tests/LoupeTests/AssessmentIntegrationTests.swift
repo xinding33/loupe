@@ -32,19 +32,21 @@ private let assessmentFlower = """
   #expect(ids.contains("kuki-shinobu"))
   let roles = model.characterMatches.map(\.roleID)
   #expect(Set(roles).count == roles.count)
-  // The verdict's character leads by default: five EM rolls are rarest for an EM-only role.
+  // The verdict's character leads by default: many roles grade it S, and Gilded Dreams is
+  // Alhaitham's preferred set.
   #expect(model.verdict?.kind == .keep)
-  #expect(model.verdict?.characterID == "kuki-shinobu")
+  #expect(model.verdict?.grade == .s)
+  #expect(model.verdict?.characterID == "alhaitham")
   #expect(model.selectedMatch?.characterID == model.verdict?.characterID)
-  #expect(model.characterShortlist.visibleMatches.first?.characterID == "kuki-shinobu")
+  #expect(model.characterShortlist.visibleMatches.first?.characterID == "alhaitham")
   #expect(model.characterShortlist.visibleMatches.count <= 5)
-  model.selectedCharacterID = "alhaitham"
-  #expect(model.selectedMatch?.characterID == "alhaitham")
-  #expect(model.characterShortlist.visibleMatches.contains { $0.characterID == "alhaitham" })
   model.selectedCharacterID = "kuki-shinobu"
+  #expect(model.selectedMatch?.characterID == "kuki-shinobu")
+  #expect(model.characterShortlist.visibleMatches.contains { $0.characterID == "kuki-shinobu" })
+  // Five EM rolls and a quarter-weight HP% roll.
   let result = try #require(model.displayedPotential)
-  #expect(result.currentScore == 5)
-  #expect(model.selectedMatch?.grades?.current == .s)
+  #expect(result.currentScore == 5.25)
+  #expect(model.selectedMatch?.grades?.grade == .s)
   #expect(model.assessmentDescription.contains("Kuki Shinobu"))
   #expect(model.assessmentDescription.contains("experimental"))
   #expect(model.profileName == "Crit")
@@ -52,7 +54,7 @@ private let assessmentFlower = """
   #expect(model.displayedPotential?.currentScore == 2)
   #expect(model.assessmentDescription.contains("Crit"))
   model.assessmentMode = .characters
-  #expect(model.displayedPotential?.currentScore == 5)
+  #expect(model.displayedPotential?.currentScore == 5.25)
   #expect(model.inventory.artifacts.isEmpty)
 }
 
@@ -94,7 +96,7 @@ private let assessmentFlower = """
   #expect(model.current != nil)
   #expect(model.selectedMatch != nil)
   #expect(model.displayedPotential == nil)
-  #expect(model.selectedMatch?.grades?.p50 == nil)
+  #expect(model.selectedMatch?.grades?.grade == nil)
   #expect(model.evaluationIssue != nil)
   #expect(model.issue == nil)
 }
@@ -107,9 +109,10 @@ private let assessmentFlower = """
   let evidence = DiagnosticRecommendation.evaluated(
     artifact, result: result, profile: match.profile, pool: [], scope: .offPiece,
     excluded: nil, match: match)
-  #expect(evidence.weights == ["eleMas": 100])
-  #expect(evidence.metrics["currentScore"] == 5)
-  #expect(evidence.metrics["chanceOfAOrBetter"] == 1)
+  #expect(evidence.weights == ["eleMas": 100, "enerRech_": 25, "hp_": 25])
+  #expect(evidence.metrics["currentScore"] == 5.25)
+  // A finished piece has a grade, not a chance of one.
+  #expect(evidence.metrics["chanceOfAOrBetter"] == nil)
   #expect(evidence.dataVersion == CharacterAssessment.datasetVersion)
   #expect(evidence.scoringVersion.contains(CharacterAssessment.calibrationVersion))
   #expect(evidence.explanation.contains("experimental"))

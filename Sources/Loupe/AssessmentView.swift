@@ -36,9 +36,9 @@ extension CharacterMatch {
   }
 
   func headline(level: Int) -> String {
-    let grade = level == 20 ? grades?.current : grades?.p50
-    let label = level == 20 ? "Final" : "Median +20"
-    return grade.map { "\(label): \($0.rawValue) (experimental)" } ?? "Ungraded / main-stat fit"
+    let label = level == 20 ? "Final grade" : "Roll grade"
+    return grades.map { "\(label): \($0.grade.rawValue) (experimental)" }
+      ?? "Ungraded / main-stat fit"
   }
 }
 
@@ -123,15 +123,6 @@ struct AssessmentSummary: View {
         }
       }
       Spacer(minLength: 0)
-      if let ceiling = headline.ceiling {
-        VStack(spacing: 4) {
-          Text("BEST POSSIBLE").font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(.secondary)
-          GradeBadge(tier: ceiling, size: 30)
-          Text("ceiling").font(.caption2).foregroundStyle(.tertiary)
-        }
-        .help("Best possible grade: a ceiling, not an earned grade.")
-      }
     }
   }
 
@@ -163,9 +154,6 @@ struct AssessmentSummary: View {
       VStack(alignment: .leading, spacing: 8) {
         HStack {
           Text("+20 OUTCOMES").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
-          if grades != nil {
-            Text("tiers experimental").font(.caption2).foregroundStyle(.tertiary)
-          }
           Spacer()
           Text(
             "Now \(score(result.currentScore, digits: 2)) · \(result.upgradesRemaining) random upgrades left"
@@ -281,7 +269,7 @@ private struct RoleDetail: View {
       Text("\(match.characterName) · \(match.roleName)").font(.headline)
       FlowStats(title: "Scored core", stats: match.usefulStats, tint: Theme.accent)
       if !match.secondaryStats.isEmpty {
-        FlowStats(title: "Utility, not scored", stats: match.secondaryStats, tint: .secondary)
+        FlowStats(title: "Utility, quarter weight", stats: match.secondaryStats, tint: .secondary)
       }
       VStack(alignment: .leading, spacing: 4) {
         ForEach(match.reasons, id: \.self) { reason in

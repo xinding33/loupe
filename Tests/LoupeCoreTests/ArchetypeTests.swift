@@ -103,8 +103,8 @@ private func flower(_ substats: [Substat], set: String = "Test off-piece") throw
       #expect(same.setFit == match.setFit)
       #expect(same.potential?.currentScore == match.potential?.currentScore)
       #expect(same.potential?.expectedScore == match.potential?.expectedScore)
-      #expect(same.grades?.current == match.grades?.current)
-      #expect(same.grades?.p50 == match.grades?.p50)
+      #expect(same.grades?.grade == match.grades?.grade)
+      #expect(same.grades?.grade == match.grades?.grade)
       #expect(same.conditions.map(\.explanation) == match.conditions.map(\.explanation))
     }
   }
@@ -122,7 +122,7 @@ private func flower(_ substats: [Substat], set: String = "Test off-piece") throw
   let first = try #require(matches.first?.potential)
   for match in matches {
     #expect(match.potential?.expectedScore == first.expectedScore)
-    #expect(match.grades?.p50 == matches[0].grades?.p50)
+    #expect(match.grades?.grade == matches[0].grades?.grade)
   }
 }
 

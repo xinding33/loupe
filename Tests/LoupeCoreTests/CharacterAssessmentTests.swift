@@ -2,13 +2,6 @@ import Foundation
 import LoupeCore
 import Testing
 
-/// Former hand-reviewed anchors sit exactly on their old cutoffs; rarity grades stay within one tier.
-private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool {
-  guard let actual else { return false }
-  let tiers = ArtifactTier.allCases
-  return abs(tiers.firstIndex(of: actual)! - tiers.firstIndex(of: hand)!) <= 1
-}
-
 @Suite struct CharacterAssessmentTests {
   private func artifact(
     _ slot: Slot, _ main: Stat, _ stats: [Substat], level: Int = 20,
@@ -30,11 +23,12 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
     let on = try match(artifact(.goblet, .hydroDamage, stats, set: "Golden Troupe"), "furina")
     #expect(off.setFit == .offPiece)
     #expect(on.setFit == .preferred)
-    #expect(off.potential?.currentScore == 8)
+    // HP% counts 0.85 and ER 0.25 of a crit roll for Furina.
+    #expect(off.potential?.currentScore == 7.8)
     #expect(on.potential?.currentScore == off.potential?.currentScore)
     #expect(on.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
     #expect(off.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
-    #expect(on.grades?.current == off.grades?.current)
+    #expect(on.grades?.grade == off.grades?.grade)
   }
 
   @Test func alternativeSetRetainsItsTeamCondition() throws {
@@ -69,7 +63,7 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
       }
       .map(\.characterID) == ["furina", "itto", "kokomi", "kuki-shinobu", "xiangling"])
     #expect(Set(results.map(\.id)).count == results.count)
-    #expect(try match(piece, "kuki-shinobu").potential?.currentScore == 6)
+    #expect(try match(piece, "kuki-shinobu").potential?.currentScore == 6.25)
     #expect(CharacterAssessment.coverageDescription.contains("15 roles were reviewed one by one"))
   }
 
@@ -112,7 +106,7 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
     #expect(final.potential?.currentScore == 0)
     #expect(final.profile.weights[.critRate, default: 0] == 0)
     #expect(final.profile.weights[.critDamage, default: 0] == 0)
-    #expect(final.grades?.current == .d)
+    #expect(final.grades?.grade == .d)
     #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
     #expect(final.reasons.contains { $0.contains("not a strong match") })
     #expect(final.conditions.contains { $0.explanation.contains("Crit Rate penalty") })
@@ -126,11 +120,12 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
         Substat(.def, 23),
       ])
     let result = try match(piece, "furina")
-    #expect(result.potential?.currentScore == 1)
+    // Six ER rolls count a quarter each, below one HP% roll and a half.
+    #expect(result.potential?.currentScore == 2.35)
     #expect(result.secondaryStats.contains(.energyRecharge))
     #expect(result.conditions.contains { $0.kind == .energy && $0.status == .unknown })
     #expect(result.conditions.contains { $0.kind == .critBalance && $0.status == .unknown })
-    #expect(result.profile.weights[.energyRecharge, default: 0] == 0)
+    #expect(result.profile.weights[.energyRecharge] == RollWeights.secondary)
   }
 
   @Test func specialRollRulesRetainRoleExplanationsWithoutInventedOdds() throws {
@@ -164,88 +159,11 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
     #expect(populated.potential?.chanceToBeatBest == 0)
     #expect(populated.potential?.rankChances.first?.probability == 1)
     #expect(populated.potential?.distribution == empty.potential?.distribution)
-    #expect(populated.grades?.current == empty.grades?.current)
+    #expect(populated.grades?.grade == empty.grades?.grade)
     #expect(empty.potential?.chanceToBeatBest == nil)
   }
 
-  @Test(arguments: [
-    (5.83, 0.0, 0.0, 97.25, 46.30, 6.48, 1.0, ArtifactTier.d),
-    (8.16, 0.0, 0.0, 77.80, 46.30, 6.48, 1.4, .c),
-    (19.81, 0.0, 0.0, 58.35, 23.15, 6.48, 3.4, .c),
-    (20.40, 0.0, 0.0, 38.90, 23.15, 6.48, 3.5, .b),
-    (23.32, 5.83, 0.0, 0.0, 46.30, 6.48, 5.5, .b),
-    (23.32, 6.22, 0.0, 0.0, 46.30, 6.48, 5.6, .a),
-    (17.49, 7.78, 14.76, 38.90, 0.0, 0.0, 6.9, .a),
-    (17.49, 7.78, 15.54, 38.90, 0.0, 0.0, 7.0, .s),
-  ])
-  func furinaLegalAnchorsOnBothSidesOfEveryBoundary(
-    hp: Double, cr: Double, cd: Double, atk: Double, def: Double, er: Double,
-    score: Double, tier: ArtifactTier
-  ) throws {
-    let stats = [
-      Substat(.hpPercent, hp), Substat(.critRate, cr), Substat(.critDamage, cd),
-      Substat(.atk, atk), Substat(.def, def), Substat(.energyRecharge, er),
-    ].filter { $0.value > 0 }
-    let result = try match(artifact(.goblet, .hydroDamage, stats), "furina")
-    #expect(result.potential?.currentScore == score)
-    #expect(nearHandTier(result.grades?.current, tier))
-    #expect(result.grades?.p50 == result.grades?.current)
-    #expect(result.grades?.p90 == result.grades?.current)
-    #expect(result.grades?.bestPossible == result.grades?.current)
-    #expect(result.grades?.experimental == true)
-  }
-
-  @Test(arguments: [
-    (7.29, 0.0, 0.0, 97.25, 597.50, 6.48, 1.0, ArtifactTier.d),
-    (10.20, 0.0, 0.0, 77.80, 597.50, 6.48, 1.4, .c),
-    (24.78, 0.0, 0.0, 58.35, 298.75, 6.48, 3.4, .c),
-    (25.50, 0.0, 0.0, 38.90, 298.75, 6.48, 3.5, .b),
-    (29.16, 5.83, 0.0, 0.0, 597.50, 6.48, 5.5, .b),
-    (29.16, 6.22, 0.0, 0.0, 597.50, 6.48, 5.6, .a),
-    (21.87, 7.78, 14.76, 38.90, 0.0, 0.0, 6.9, .a),
-    (21.87, 7.78, 15.54, 38.90, 0.0, 0.0, 7.0, .s),
-  ])
-  func ittoLegalAnchorsOnBothSidesOfEveryBoundary(
-    def: Double, cr: Double, cd: Double, atk: Double, hp: Double, er: Double,
-    score: Double, tier: ArtifactTier
-  ) throws {
-    let stats = [
-      Substat(.defPercent, def), Substat(.critRate, cr), Substat(.critDamage, cd),
-      Substat(.atk, atk), Substat(.hp, hp), Substat(.energyRecharge, er),
-    ].filter { $0.value > 0 }
-    let result = try match(artifact(.goblet, .geoDamage, stats), "itto")
-    #expect(result.potential?.currentScore == score)
-    #expect(nearHandTier(result.grades?.current, tier))
-    #expect(result.grades?.p50 == result.grades?.current)
-  }
-
-  @Test(arguments: [
-    (0.0, 97.25, 46.30, 5.83, 6.48, 0.0, ArtifactTier.d),
-    (16.32, 97.25, 46.30, 5.83, 0.0, 0.7, .c),
-    (46.62, 97.25, 23.15, 5.83, 0.0, 2.0, .c),
-    (48.96, 77.80, 23.15, 5.83, 0.0, 2.1, .b),
-    (79.26, 58.35, 23.15, 5.83, 0.0, 3.4, .b),
-    (81.60, 38.90, 23.15, 5.83, 0.0, 3.5, .a),
-    (111.89, 38.90, 23.15, 5.83, 0.0, 4.8, .a),
-    (114.22, 38.90, 23.15, 5.83, 0.0, 4.9, .s),
-  ])
-  func kukiFlowerLegalAnchorsOnBothSidesOfEveryBoundary(
-    em: Double, atk: Double, def: Double, hp: Double, er: Double,
-    score: Double, tier: ArtifactTier
-  ) throws {
-    let stats = [
-      Substat(.elementalMastery, em), Substat(.atk, atk), Substat(.def, def),
-      Substat(.hpPercent, hp), Substat(.energyRecharge, er),
-    ].filter { $0.value > 0 }
-    let result = try match(artifact(.flower, .hp, stats), "kuki-shinobu")
-    #expect(result.potential?.currentScore == score)
-    #expect(nearHandTier(result.grades?.current, tier))
-    let plumeStats = stats.map { $0.key == .atk ? Substat(.hp, $0.value / 19.45 * 298.75) : $0 }
-    let plume = try match(artifact(.plume, .atk, plumeStats), "kuki-shinobu")
-    #expect(plume.grades?.current == result.grades?.current)
-  }
-
-  @Test func unfinishedCeilingDoesNotBecomeAnEarnedTierAndUsefulUpgradeIsMonotone() throws {
+  @Test func unfinishedGradeUsesTheExpectedScoreAndUsefulUpgradeIsMonotone() throws {
     let before = try artifact(
       .flower, .hp,
       [
@@ -259,12 +177,9 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
         Substat(.hpPercent, 5.83),
       ])
     let initial = try match(before, "kuki-shinobu")
-    #expect(initial.grades?.current == nil)
-    #expect(initial.grades?.p50 == .a)
-    #expect(initial.grades?.p90 == .s)
-    #expect(initial.grades?.bestPossible == .s)
+    #expect(initial.grades?.grade == .s)
     #expect(initial.grades?.chanceOfAOrBetter == 1)
-    #expect(try match(final, "kuki-shinobu").grades?.current == .s)
+    #expect(try match(final, "kuki-shinobu").grades?.grade == .s)
     let upgraded = try before.upgraded(to: final)
     #expect(upgraded.substats == final.substats)
   }
@@ -273,14 +188,13 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
     let piece = try artifact(
       .flower, .hp,
       [
-        Substat(.elementalMastery, 62.95), Substat(.atk, 58.35), Substat(.def, 23.15),
+        Substat(.elementalMastery, 23.31), Substat(.atk, 58.35), Substat(.def, 69.45),
         Substat(.hpPercent, 5.83),
       ], level: 16)
     let result = try match(piece, "kuki-shinobu")
-    #expect(result.potential?.currentScore == 2.7)
-    #expect(result.grades?.p50 == .b)
-    #expect(result.grades?.bestPossible == .a)
-    // A starts at 3.6 EM rolls among new flowers: only a 9 or 10 tier EM roll reaches it.
+    #expect(result.potential?.currentScore == 1.25)
+    #expect(result.grades?.grade == .d)
+    // A needs more than 2.05: only an EM roll of tier 9 or 10 gets there.
     #expect(result.grades?.chanceOfAOrBetter == 2.0 / 16)
   }
 
@@ -322,11 +236,12 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
       CharacterAssessment.evaluate(
         piece, inventory: [piece.withID(UUID())]
       ).first { $0.characterID == "kuki-shinobu" })
-    #expect(result.potential?.distribution == [0: 1])
+    // HP% and ER count a quarter roll each for Kuki; no EM line means D.
+    #expect(result.potential?.distribution == [500: 1])
     #expect(result.potential?.comparisonCount == 1)
     #expect(result.potential?.rankChances.first?.probability == 1)
     #expect(result.potentialUnavailableReason == nil)
-    #expect(result.grades?.current == .d)
+    #expect(result.grades?.grade == .d)
   }
 
   @Test func hpMainAlsoRemovesKokomisOnlyCoreSubstat() throws {
@@ -350,8 +265,8 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
     let result = try match(piece, "furina")
     #expect(result.potential == nil)
     #expect(result.potentialUnavailableReason != nil)
-    #expect(result.grades?.current == nil)
-    #expect(result.grades?.p50 == nil)
+    #expect(result.grades?.grade == nil)
+    #expect(result.grades?.grade == nil)
     #expect(result.grades?.chanceOfAOrBetter == nil)
   }
 
@@ -377,10 +292,10 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
         Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
       ])
     let result = try match(piece, "xiangling")
-    #expect(result.grades?.calibrationID.hasPrefix(RarityTier.version) == true)
+    #expect(result.grades?.calibrationID.hasPrefix(RollGrade.version) == true)
     #expect(result.conditions.contains { $0.kind == .team && $0.status == .unknown })
     #expect(result.conditions.contains { $0.kind == .mainStat && $0.status == .unknown })
-    #expect(result.profile.weights[.elementalMastery] == 100)
+    #expect(result.profile.weights[.elementalMastery] == RollWeights.atkLike)
     #expect(!CharacterAssessment.evaluate(piece).contains { $0.characterID == "kuki-shinobu" })
   }
 
@@ -407,7 +322,11 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
         Substat(scaling, value), Substat(.critRate, cr), Substat(.critDamage, cd),
         Substat(.atk, 38.90),
       ])
-    #expect(try match(base, id).grades?.current == .a)
-    #expect(try match(improved, id).grades?.current == .s)
+    let tiers = ArtifactTier.allCases
+    let before = try #require(try match(base, id).grades?.grade)
+    let after = try #require(try match(improved, id).grades?.grade)
+    #expect(tiers.firstIndex(of: after)! <= tiers.firstIndex(of: before)!)
+    #expect(
+      try match(improved, id).potential!.currentScore > match(base, id).potential!.currentScore)
   }
 }

@@ -14,7 +14,7 @@ import Testing
     try #require(CharacterAssessment.evaluate(piece).first { $0.characterID == character })
   }
 
-  @Test func unfinishedCurrentIsAbsentAndMedianIsNotTheCeiling() throws {
+  @Test func unfinishedGradeUsesTheExpectedScoreNotTheMedianOrCeiling() throws {
     let piece = try artifact(
       .sands, .hpPercent,
       [
@@ -23,13 +23,14 @@ import Testing
       ], level: 16)
     let result = try match(piece, character: "furina")
     let grades = try #require(result.grades)
-    #expect(grades.current == nil)
-    #expect(grades.p50 == .a)
-    #expect(grades.p90 == .s)
-    #expect(grades.bestPossible == .s)
-    #expect(grades.chanceOfAOrBetter == 1)
-    #expect(result.potential?.summary.p50Score == 5)
-    #expect(result.potential?.summary.bestPossibleScore == 6)
+    let potential = try #require(result.potential)
+    // Four CR rolls, one CD and two quarter-weight ER rolls, with one upgrade left.
+    #expect(potential.currentScore == 5.5)
+    #expect(potential.summary.p50Score == 5.75)
+    #expect(potential.summary.bestPossibleScore == 6.5)
+    let rarity = try DropRarity(slot: .sands, main: .hpPercent, profile: result.profile)
+    let cutoffs = RollGrade.cutoffs(rarity, profile: result.profile)
+    #expect(grades.grade == RollGrade.tier(potential.expectedScore * 1000, cutoffs: cutoffs))
   }
 
   @Test func aOrBetterUsesExactMassRatherThanMedianOrCeiling() throws {
@@ -41,17 +42,19 @@ import Testing
       ], level: 16)
     let result = try match(piece, character: "furina")
     let grades = try #require(result.grades)
+    let distribution = try #require(result.potential?.distribution)
     #expect(
-      result.potential?.distribution == [
-        4000: 0.5, 4700: 0.125, 4800: 0.125,
-        4900: 0.125, 5000: 0.125,
+      distribution == [
+        4500: 0.25, 4675: 0.0625, 4700: 0.0625, 4725: 0.0625, 4750: 0.0625,
+        5200: 0.125, 5300: 0.125, 5400: 0.125, 5500: 0.125,
       ])
-    #expect(grades.current == nil)
-    #expect(grades.p50 == .b)
-    #expect(grades.p90 == .a)
-    #expect(grades.bestPossible == .a)
-    // A starts at 4.7 useful rolls among new HP% sands, so four of the eight outcomes reach it.
-    #expect(grades.chanceOfAOrBetter == 0.5)
+    let rarity = try DropRarity(slot: .sands, main: .hpPercent, profile: result.profile)
+    let a = try #require(
+      RollGrade.cutoffs(rarity, profile: result.profile).first { $0.tier == .a }
+    ).minimum
+    #expect(
+      grades.chanceOfAOrBetter
+        == distribution.filter { Double($0.key) >= a }.values.reduce(0, +))
   }
 
   @Test func identicalCoreWeightsShareOneRarityGrade() throws {
@@ -63,11 +66,11 @@ import Testing
       ])
     let results = CharacterAssessment.evaluate(piece)
     let furina = try #require(results.first { $0.characterID == "furina" })
-    let neuvillette = try #require(results.first { $0.characterID == "neuvillette" })
-    #expect(furina.profile.weights == neuvillette.profile.weights)
-    #expect(furina.grades?.current == .s)
-    #expect(neuvillette.grades?.current == furina.grades?.current)
-    #expect(neuvillette.grades?.rarityShare == furina.grades?.rarityShare)
+    let yelan = try #require(results.first { $0.characterID == "yelan" })
+    #expect(furina.profile.weights == yelan.profile.weights)
+    #expect(furina.grades?.grade == .s)
+    #expect(yelan.grades?.grade == furina.grades?.grade)
+    #expect(yelan.grades?.rarityShare == furina.grades?.rarityShare)
   }
 
   @Test func neighboringEligibleMainsRemainUngradedAndExcludedMainsDoNotMatch() throws {
@@ -78,9 +81,8 @@ import Testing
         Substat(.def, 23.15),
       ])
     let furina = try match(erSands, character: "furina")
-    #expect(furina.potential?.currentScore == 8)
-    // Eight core rolls is the most any new ER sands can reach for this profile.
-    #expect(furina.grades?.current == .s)
+    #expect(furina.potential?.currentScore == 7.1)
+    #expect(furina.grades?.grade == .s)
     let hpCirclet = try artifact(
       .circlet, .hpPercent,
       [
@@ -139,13 +141,13 @@ import Testing
     #expect(itto.potential?.leaders.first?.id == defHeavy.id)
     #expect(furina.potential?.comparisonCount == 2)
     #expect(itto.potential?.comparisonCount == 2)
-    #expect(furina.potential?.currentScore == 7)
-    #expect(itto.potential?.currentScore == 4)
+    #expect(furina.potential?.currentScore == 6.4)
+    #expect(itto.potential?.currentScore == 3.85)
     #expect(furina.potential?.rankChances.first?.probability == 1)
     #expect(itto.potential?.rankChances.first?.probability == 0)
-    #expect(furina.grades?.current == .s)
-    #expect(itto.grades?.current == .b)
-    #expect(furina.grades?.current == (try match(candidate, character: "furina")).grades?.current)
-    #expect(itto.grades?.current == (try match(candidate, character: "itto")).grades?.current)
+    #expect(furina.grades?.grade == .s)
+    #expect(itto.grades?.grade == .a)
+    #expect(furina.grades?.grade == (try match(candidate, character: "furina")).grades?.grade)
+    #expect(itto.grades?.grade == (try match(candidate, character: "itto")).grades?.grade)
   }
 }
