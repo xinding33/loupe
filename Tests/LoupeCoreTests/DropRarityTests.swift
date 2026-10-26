@@ -95,22 +95,6 @@ struct DropRarityTests {
       rarity.shareAtOrAbove($0)
     }
     #expect(zip(shares, shares.dropFirst()).allSatisfy { $0 >= $1 })
-    let tiers = shares.map { RarityTier.tier(share: $0) }
-    let order = ArtifactTier.allCases
-    #expect(
-      zip(tiers, tiers.dropFirst()).allSatisfy {
-        order.firstIndex(of: $0)! >= order.firstIndex(of: $1)!
-      })
-  }
-
-  @Test func tierBoundsAreInclusive() {
-    #expect(RarityTier.tier(share: 0.0005) == .s)
-    #expect(RarityTier.tier(share: 0.0006) == .a)
-    #expect(RarityTier.tier(share: 0.01) == .a)
-    #expect(RarityTier.tier(share: 0.15) == .b)
-    #expect(RarityTier.tier(share: 0.5) == .c)
-    #expect(RarityTier.tier(share: 0.51) == .d)
-    #expect(RarityTier.tier(share: 1) == .d)
   }
 
   @Test func replacementDropsUseSetSlotMainAndSubstatOdds() throws {
@@ -136,37 +120,5 @@ struct DropRarityTests {
     #expect(throws: ArtifactError.self) {
       try DropRarity(slot: .sands, main: .critRate, profile: Self.furina)
     }
-  }
-
-  /// The 15 cells reviewed by hand on 2026-09-27, with their C, B, A, and S cutoffs in score units.
-  @Test(arguments: [
-    (Slot.goblet, Stat.hydroDamage, "furina", [1400, 3500, 5600, 7000]),
-    (.goblet, .geoDamage, "itto", [1400, 3500, 5600, 7000]),
-    (.flower, .hp, "em", [700, 2100, 3500, 4900]),
-    (.plume, .atk, "em", [700, 2100, 3500, 4900]),
-    (.flower, .hp, "furina", [1400, 3500, 5600, 7000]),
-    (.plume, .atk, "furina", [1400, 3500, 5600, 7000]),
-    (.flower, .hp, "itto", [1400, 3500, 5600, 7000]),
-    (.plume, .atk, "itto", [1400, 3500, 5600, 7000]),
-    (.sands, .hpPercent, "furina", [1400, 2800, 4900, 6000]),
-    (.goblet, .hpPercent, "furina", [1400, 2800, 4900, 6000]),
-    (.sands, .defPercent, "itto", [1400, 2800, 4900, 6000]),
-    (.circlet, .critRate, "furina", [1400, 2800, 4900, 6000]),
-    (.circlet, .critDamage, "furina", [1400, 2800, 4900, 6000]),
-    (.circlet, .critRate, "itto", [1400, 2800, 4900, 6000]),
-    (.circlet, .critDamage, "itto", [1400, 2800, 4900, 6000]),
-  ])
-  func rarityCutoffsAgreeWithTheHandReviewedCells(
-    slot: Slot, main: Stat, profileID: String, hand: [Int]
-  ) throws {
-    let profile = [Self.furina, Self.itto, Self.em].first { $0.id == profileID }!
-    let rarity = try DropRarity(slot: slot, main: main, profile: profile)
-    let cutoffs = [ArtifactTier.c, .b, .a, .s].map { tier in
-      let bound = RarityTier.bounds.first { $0.tier == tier }!.share
-      return rarity.scores.first { rarity.shareAtOrAbove($0) <= bound }!
-    }
-    // B, A, and S land within a third of a roll; C, the loosest label, within about half a roll.
-    #expect(abs(cutoffs[0] - hand[0]) <= 550)
-    for index in 1...3 { #expect(abs(cutoffs[index] - hand[index]) <= 300) }
   }
 }

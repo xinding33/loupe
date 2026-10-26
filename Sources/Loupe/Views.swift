@@ -173,7 +173,7 @@ private struct Sidebar: View {
         if model.assessmentMode == .profile { profileControls }
         DisclosureGroup("How scores work") {
           Text(
-            "One maximum-sized useful roll = 1 point. Equal CRIT Rate and CRIT DMG roll weights already account for their 1:2 stat amounts. Scores are a screen, not damage. Median and P90 are the scores reached by 50% and 90% of ordinary upgrade outcomes; best possible is a ceiling. None of these are player percentiles."
+            "One maximum-sized roll of a full-weight stat = 1 point. Character roles count crit fully, a damage dealer's ATK%, EM or ER at 0.75 and HP% or DEF% at 0.85, and secondary stats such as ER at 0.25. Equal CRIT Rate and CRIT DMG weights already account for their 1:2 stat amounts. Scores are a screen, not damage. The letter is the roll grade: the expected +20 score, or the final score, against example starts. S is at least a four-line start with the build's four best lines, A two best lines such as double crit, B the best and third best, C one best line. Median and P90 are the scores reached by 50% and 90% of ordinary upgrade outcomes; best possible is a ceiling."
           )
           .font(.caption).foregroundStyle(.secondary).padding(.top, 4)
           .fixedSize(horizontal: false, vertical: true)

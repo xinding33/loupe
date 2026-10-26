@@ -59,8 +59,9 @@ public struct CharacterRole: Sendable, Identifiable {
   /// False for roles generated from the archetype table rather than reviewed one by one.
   public internal(set) var isReviewed = true
   public var id: String { roleID }
+  /// Weighted rolls; see `RollWeights`.
   public var profile: Profile {
-    Profile(roleID, weights: Dictionary(uniqueKeysWithValues: usefulStats.map { ($0, 100) }))
+    Profile(roleID, weights: RollWeights.weights(useful: usefulStats, secondary: secondaryStats))
   }
   /// The archetype with exactly these scored stats. Every reviewed role has one.
   public var archetype: ArchetypeID? {
@@ -112,7 +113,8 @@ public enum CharacterRoles {
   static let energy = RoleCondition(
     .energy,
     "ER requirement unknown: team, weapon, constellation, and rotation are not supplied. "
-      + "ER not scored; depends on build. A card cannot establish Burst readiness.")
+      + "ER counts only as a secondary stat unless the role scales on it. A card cannot "
+      + "establish Burst readiness.")
   static let crit = RoleCondition(
     .critBalance,
     "Effective Crit Rate and Crit balance are unknown. This fixed profile counts Crit rolls "

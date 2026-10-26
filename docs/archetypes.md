@@ -16,7 +16,9 @@ Code: `Sources/LoupeCore/Archetypes.swift` (definitions) and `Sources/LoupeCore/
 
 ## Archetypes
 
-Scored stats count toward the grade, one point per roll. Utility stats are shown but not scored.
+Scored stats count toward the grade. A crit roll is one point; a damage dealer's ATK%, EM or ER
+roll is 0.75 and HP% or DEF% roll 0.85; a support's scored stats are one point each. Utility
+stats count 0.25. See the [grading approach](grading-approach.md).
 "DMG" in the goblet column means the character's own DMG Bonus goblet (see the table below).
 \*Healing Bonus circlets fit only characters marked as healers in `Roster.swift`; CRIT Rate
 circlets are for supports on Favonius weapons.

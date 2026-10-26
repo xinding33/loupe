@@ -52,8 +52,9 @@ behavior on the real game, or performance.
   [archetypes](archetypes.md), dataset `archetypes-2026-10-25.1` (2026-10-25),
   plus the 15 reviewed roles of `reviewed-2026-09-27.1`, which keep their
   advice. A five-candidate shortlist is shared by the dashboard and overlay.
-- Experimental S/A/B/C/D tiers for 15 role/slot/main combinations, calibration
-  `experimental-reviewed-2026-09-27.1`: Furina 7, Itto 6, Kuki Shinobu 2.
+- Experimental S/A/B/C/D roll grades for every role, calibration
+  `roll-2026-10-26.1`: example starts from the user's rules of thumb, a
+  rarity limit, and weighted rolls (crit over the scaling stat).
 - Opt-in diagnostic buffer, report preview and export, and a headless
   [replay command](diagnostic-replay.md).
 - Manual profiles and pasted card text for cases outside reviewed coverage.
@@ -112,10 +113,10 @@ In suggested order. The first two need the game running.
 3. Recorded fixtures: no recorded Enhance sequence is available to the two
    skipped tests, so live-reader regressions are covered only by synthetic
    images.
-4. Grading: every role is graded by rarity among new drops, and verdicts are
-   shown. Next: a whole-bag scan. Verdict defaults still need tuning on a real
-   inventory, more so now that every archetype counts. See
-   [grading approach](grading-approach.md).
+4. Grading: every role has a roll grade, and verdicts follow it. Next: a
+   whole-bag scan, and an ownership filter so verdicts count only the user's
+   characters; without one, Keep stays high on flowers. Verdict defaults still
+   need tuning on a real inventory. See [grading approach](grading-approach.md).
 5. Character coverage: every character has archetype roles; 15 were reviewed
    one by one. Archetype assignments for characters from 5.0 onward rest on
    one or two guides each, and "Somnia" and the Cryo Traveler are unassigned.
@@ -126,7 +127,9 @@ Its first step, enumerating final substat outcomes once for every profile, is
 implemented as `RollOutcomes`. Its second step replaces the hand-calibrated
 tier cells with tiers from rarity among new drops (`DropRarity`), so every
 reviewed role is graded. Its third step adds Keep / Level / Review / Fodder
-verdicts (`VerdictEngine`) to the overlay and dashboard.
+verdicts (`VerdictEngine`) to the overlay and dashboard. On 2026-10-26 the
+letters became roll grades (`RollGrade`) with weighted rolls, and verdicts
+follow them.
 
 Deferred by decision: crafted and Dust probability models, full-build damage
 optimization, automatic character ownership syncing, cloud reports, and

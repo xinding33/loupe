@@ -9,8 +9,10 @@ import Testing
       setName: "Synthetic off-piece", slot: slot, main: main, level: level, substats: stats)
   }
 
+  /// Equal-weight screens matching the former hand-reviewed anchors; roles now weight rolls.
   private func profile(_ characterID: String) throws -> Profile {
-    try #require(CharacterRoles.pilot.first { $0.characterID == characterID }).profile
+    let name = characterID == "furina" ? "HP + crit" : "DEF + crit"
+    return try #require(Profile.presets.first { $0.id == name })
   }
 
   private func assertFinalScore(_ piece: Artifact, profile: Profile, expected: Int) throws {
@@ -25,39 +27,32 @@ import Testing
     #expect(result.chanceToBeatBest == nil)
   }
 
-  /// The hand-reviewed anchors sit exactly on their former cutoffs. Rarity-derived cutoffs land
-  /// within a third of a roll of them for B, A, and S, so each anchor stays within one tier.
-  private func assertFinalGrade(
-    _ piece: Artifact, character: String, handTier: ArtifactTier
-  ) throws {
+  /// A finished piece has one grade and no chance figure; its exact letter is tested in
+  /// `RollGradeTests` because the former hand cutoffs used equal weights.
+  private func assertFinalGrade(_ piece: Artifact, character: String) throws {
     let match = try #require(
       CharacterAssessment.evaluate(piece).first { $0.characterID == character })
     let grades = try #require(match.grades)
-    let current = try #require(grades.current)
-    let tiers = ArtifactTier.allCases
-    #expect(grades.calibrationID.hasPrefix(RarityTier.version))
+    #expect(grades.calibrationID.hasPrefix(RollGrade.version))
     #expect(grades.experimental)
-    #expect(abs(tiers.firstIndex(of: current)! - tiers.firstIndex(of: handTier)!) <= 1)
-    #expect(grades.p50 == current)
-    #expect(grades.p90 == current)
-    #expect(grades.bestPossible == current)
-    #expect(grades.chanceOfAOrBetter == (current == .a || current == .s ? 1 : 0))
+    #expect(grades.chanceOfAOrBetter == nil)
+    #expect(grades.p90Share == nil)
     #expect(grades.rarityShare != nil)
   }
 
   @Test(arguments: [
-    (5.83, 7.29, 0.0, 0.0, 29.15, 46.30, 6.48, 1000, ArtifactTier.d),
-    (8.16, 10.20, 0.0, 0.0, 23.32, 46.30, 6.48, 1400, .c),
-    (19.82, 24.78, 0.0, 0.0, 17.49, 23.15, 6.48, 3400, .c),
-    (20.40, 25.50, 0.0, 0.0, 11.66, 23.15, 6.48, 3500, .b),
-    (23.32, 29.16, 5.83, 0.0, 0.0, 46.30, 6.48, 5500, .b),
-    (23.32, 29.16, 6.22, 0.0, 0.0, 46.30, 6.48, 5600, .a),
-    (17.49, 21.87, 7.78, 14.76, 0.0, 0.0, 12.96, 6900, .a),
-    (17.49, 21.87, 7.78, 15.54, 0.0, 0.0, 12.96, 7000, .s),
+    (5.83, 7.29, 0.0, 0.0, 29.15, 46.30, 6.48, 1000),
+    (8.16, 10.20, 0.0, 0.0, 23.32, 46.30, 6.48, 1400),
+    (19.82, 24.78, 0.0, 0.0, 17.49, 23.15, 6.48, 3400),
+    (20.40, 25.50, 0.0, 0.0, 11.66, 23.15, 6.48, 3500),
+    (23.32, 29.16, 5.83, 0.0, 0.0, 46.30, 6.48, 5500),
+    (23.32, 29.16, 6.22, 0.0, 0.0, 46.30, 6.48, 5600),
+    (17.49, 21.87, 7.78, 14.76, 0.0, 0.0, 12.96, 6900),
+    (17.49, 21.87, 7.78, 15.54, 0.0, 0.0, 12.96, 7000),
   ])
   func threeCoreFlowerAndPlumeBoundaries(
     hp: Double, defPercent: Double, cr: Double, cd: Double, atkPercent: Double,
-    def: Double, er: Double, expected: Int, tier: ArtifactTier
+    def: Double, er: Double, expected: Int
   ) throws {
     for (character, scaling, value) in [
       ("furina", Stat.hpPercent, hp), ("itto", .defPercent, defPercent),
@@ -70,24 +65,24 @@ import Testing
         let piece = try artifact(slot, main, stats)
         try assertFinalScore(
           piece, profile: profile(character), expected: expected)
-        try assertFinalGrade(piece, character: character, handTier: tier)
+        try assertFinalGrade(piece, character: character)
       }
     }
   }
 
   @Test(arguments: [
-    (5.83, 7.29, 3.89, 0.0, 0.0, 29.15, 46.30, 6.48, 1000, ArtifactTier.d),
-    (8.16, 10.20, 5.44, 0.0, 0.0, 23.32, 46.30, 6.48, 1400, .c),
-    (15.75, 19.68, 10.50, 0.0, 0.0, 23.32, 23.15, 6.48, 2700, .c),
-    (16.33, 20.41, 10.89, 0.0, 0.0, 23.32, 23.15, 6.48, 2800, .b),
-    (23.32, 29.16, 15.56, 6.22, 3.11, 0.0, 46.30, 12.96, 4800, .b),
-    (23.32, 29.16, 15.56, 6.99, 3.50, 0.0, 46.30, 12.96, 4900, .a),
-    (23.32, 29.16, 15.56, 14.76, 7.39, 0.0, 23.15, 12.96, 5900, .a),
-    (23.32, 29.16, 15.56, 15.54, 7.78, 0.0, 23.15, 12.96, 6000, .s),
+    (5.83, 7.29, 3.89, 0.0, 0.0, 29.15, 46.30, 6.48, 1000),
+    (8.16, 10.20, 5.44, 0.0, 0.0, 23.32, 46.30, 6.48, 1400),
+    (15.75, 19.68, 10.50, 0.0, 0.0, 23.32, 23.15, 6.48, 2700),
+    (16.33, 20.41, 10.89, 0.0, 0.0, 23.32, 23.15, 6.48, 2800),
+    (23.32, 29.16, 15.56, 6.22, 3.11, 0.0, 46.30, 12.96, 4800),
+    (23.32, 29.16, 15.56, 6.99, 3.50, 0.0, 46.30, 12.96, 4900),
+    (23.32, 29.16, 15.56, 14.76, 7.39, 0.0, 23.15, 12.96, 5900),
+    (23.32, 29.16, 15.56, 15.54, 7.78, 0.0, 23.15, 12.96, 6000),
   ])
   func twoCoreScalingMainsAndCritCircletBoundaries(
     hp: Double, defPercent: Double, cr: Double, otherCD: Double, otherCR: Double,
-    atkPercent: Double, def: Double, er: Double, expected: Int, tier: ArtifactTier
+    atkPercent: Double, def: Double, er: Double, expected: Int
   ) throws {
     let cells: [(String, Slot, Stat, Stat, Double, Stat, Double)] = [
       ("furina", .sands, .hpPercent, .critRate, cr, .critDamage, otherCD),
@@ -105,7 +100,7 @@ import Testing
       ].filter { $0.value > 0 }
       let piece = try artifact(slot, main, stats)
       try assertFinalScore(piece, profile: profile(character), expected: expected)
-      try assertFinalGrade(piece, character: character, handTier: tier)
+      try assertFinalGrade(piece, character: character)
     }
   }
 

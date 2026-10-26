@@ -37,7 +37,15 @@ import Testing
       ])
     for result in results {
       #expect(!result.profile.weights.isEmpty)
-      #expect(result.profile.weights.values.allSatisfy { $0 == 100 })
+      // Core stats weigh a full or discounted roll; secondary stats a quarter.
+      #expect(
+        result.profile.weights.values.allSatisfy {
+          [RollWeights.secondary, RollWeights.atkLike, RollWeights.hpLike, 100].contains($0)
+        })
+      #expect(
+        result.secondaryStats.allSatisfy {
+          result.profile.weights[$0] == RollWeights.secondary
+        })
       #expect(Set(result.usefulStats).isDisjoint(with: result.secondaryStats))
       #expect(result.conditions.allSatisfy { $0.status == .unknown })
       #expect(result.role.source.url.hasPrefix("https://"))
@@ -69,7 +77,8 @@ import Testing
       setName: "Test off-piece", slot: .sands, main: .defPercent, level: 0, substats: stats)
     let result = try match(eligible, id)
     #expect(result.setFit == .offPiece)
-    #expect(result.grades?.current == nil)
+    // Graded unless the role's core stats cannot appear as substats on this main.
+    #expect((result.grades == nil) == !result.usefulStats.contains { $0 != main })
     #expect(!CharacterAssessment.evaluate(wrong).contains { $0.characterID == id })
   }
 
@@ -86,8 +95,8 @@ import Testing
     #expect(on.setFit == .preferred)
     #expect(off.setFit == .offPiece)
     #expect(on.potential?.distribution == off.potential?.distribution)
-    #expect(on.grades?.current != nil)
-    #expect(on.grades?.current == off.grades?.current)
+    #expect(on.grades?.grade != nil)
+    #expect(on.grades?.grade == off.grades?.grade)
     #expect(on.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
     #expect(off.conditions.contains { $0.kind == .setActivation && $0.status == .unknown })
   }
@@ -139,7 +148,7 @@ import Testing
   }
 
   @Test(arguments: ["kazuha", "raiden-shogun", "sucrose"])
-  func emOnlyRolesDoNotRewardCritRolls(id: String) throws {
+  func emOnlyRolesCountCritOnlyAsASecondaryStat(id: String) throws {
     let before = try Artifact(
       setName: "Test off-piece", slot: .flower, main: .hp, level: 16,
       substats: [
@@ -154,11 +163,12 @@ import Testing
       ])
     let initial = try match(before, id)
     let final = try match(after, id)
-    #expect(initial.potential?.currentScore == 1)
-    #expect(final.potential?.currentScore == 1)
-    #expect(final.profile.weights[.critRate, default: 0] == 0)
+    // Kazuha and Sucrose list CRIT Rate for Favonius: a quarter roll. Raiden's Hyperbloom does not.
+    let quarter = Double(final.profile.weights[.critRate, default: 0]) / 100
+    #expect(quarter <= Double(RollWeights.secondary) / 100)
+    #expect(initial.potential?.currentScore == 1 + 4 * quarter)
+    #expect(final.potential?.currentScore == 1 + 5 * quarter)
     #expect(final.profile.weights[.critDamage, default: 0] == 0)
-    #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
   }
 
   @Test func bennettArtifactAttackCannotImproveTheBuffScreen() throws {
@@ -176,11 +186,12 @@ import Testing
       ])
     let initial = try match(before, "bennett")
     let final = try match(after, "bennett")
-    #expect(initial.potential?.currentScore == 1)
-    #expect(final.potential?.currentScore == 1)
+    // One HP% roll and a quarter-weight CRIT Rate roll; ATK never counts.
+    #expect(initial.potential?.currentScore == 1.25)
+    #expect(final.potential?.currentScore == 1.25)
     #expect(final.profile.weights[.atkPercent, default: 0] == 0)
     #expect(final.profile.weights[.atk, default: 0] == 0)
-    #expect(final.profile.weights[.critRate, default: 0] == 0)
+    #expect(final.profile.weights[.critRate] == RollWeights.secondary)
     #expect(final.grades?.rarityShare == initial.grades?.rarityShare)
     #expect(final.conditions.contains { $0.explanation.contains("base ATK") })
   }
@@ -194,13 +205,14 @@ import Testing
         Substat(.energyRecharge, 6.48),
       ])
     let result = try match(piece, id)
-    #expect(result.potential?.distribution == [0: 1])
+    // Only secondary stats can score here.
+    #expect(result.potential?.distribution == [result.profile.score(piece.substats): 1])
+    #expect(result.profile.score(piece.substats) <= 500)
     #expect(result.potential?.comparisonCount == 0)
     #expect(result.potential?.rankChances.isEmpty == true)
     #expect(result.potential?.chanceToBeatBest == nil)
     #expect(result.potentialUnavailableReason == nil)
-    #expect(result.grades?.current == .d)
-    #expect(result.grades?.rarityShare == 1)
+    #expect(result.grades?.grade == .d)
   }
 
   @Test func conditionsDoNotTurnReactionOrErAssumptionsIntoKnownBuildFacts() throws {
@@ -208,7 +220,9 @@ import Testing
     let nahida = try match(piece, "nahida")
     let fischl = try match(piece, "fischl")
     let raiden = try match(piece, "raiden-shogun")
-    #expect(nahida.potential?.currentScore == 6)
+    #expect(
+      nahida.potential?.currentScore == 6 * Double(nahida.profile.weights[.elementalMastery]!) / 100
+    )
     #expect(nahida.conditions.contains { $0.explanation.contains("passive caps") })
     #expect(nahida.conditions.contains { $0.explanation.contains("not assumed to own Hyperbloom") })
     #expect(fischl.conditions.contains { $0.kind == .team && $0.explanation.contains("Aggravate") })
@@ -221,7 +235,8 @@ import Testing
         Substat(.critRate, 3.89),
       ])
     let kazuha = try match(er, "kazuha")
-    #expect(kazuha.potential?.currentScore == 6)
+    // Six EM rolls and a quarter-weight CRIT Rate roll.
+    #expect(kazuha.potential?.currentScore == 6.25)
     #expect(kazuha.conditions.contains { $0.kind == .mainStat && $0.status == .unknown })
     #expect(kazuha.conditions.contains { $0.explanation.contains("Favonius") })
     #expect(!CharacterAssessment.evaluate(er).contains { $0.characterID == "sucrose" })
@@ -272,8 +287,7 @@ import Testing
     #expect(forecast.potential?.summary.p50Score == 2.7)
     #expect(forecast.potential?.summary.p90Score == 3.6)
     #expect(forecast.potential?.summary.bestPossibleScore == 3.7)
-    #expect(forecast.grades?.current == nil)
-    #expect(forecast.grades?.p50 != nil)
+    #expect(forecast.grades?.grade != nil)
   }
 
   @Test(arguments: ["neuvillette", "yelan", "xingqiu"])
@@ -295,7 +309,7 @@ import Testing
   }
 
   @Test(arguments: [
-    ("furina", 1.0), ("itto", 0.0), ("kokomi", 1.0), ("kuki-shinobu", 6.0), ("xiangling", 6.0),
+    ("furina", 0.85), ("itto", 0.0), ("kokomi", 1.0), ("kuki-shinobu", 6.25), ("xiangling", 4.5),
   ])
   func originalFiveRetainTheirCoreScreensAndRoles(id: String, score: Double) throws {
     let result = try match(flower(), id)

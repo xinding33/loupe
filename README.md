@@ -78,10 +78,14 @@ Before upgrading a candidate, save it and choose **Link upgrade** on its invento
 
 **The verdict** comes first in the overlay and dashboard: **Keep**, **Level to +N**, **Review**, or **Fodder**, with one reason. It is advice only; nothing acts in the game.
 
-- **Keep** a finished piece when a better one would take at least 1,000 five-star domain drops for some character, or when it is B or better for a character and beats enough of your saved +20 pieces of that slot and main stat.
-- **Level to +N** an unfinished piece when its exact chance of becoming a keeper at +20 clears a bar that rises from 5% at +0 to 30% at +16, because the last levels cost the most.
-- **Fodder** when no character uses the slot and main stat, when it is in the bottom half of new drops for every one, when saved pieces already beat it for every one, or when its keeper chance is below the bar.
-- **Review** otherwise, including good pieces with no saved +20 pieces to compare. Save your +20 pieces first (see above) so the verdicts can use them.
+Verdicts follow the best grade (below) among the piece's characters:
+
+- **Level to +20** an unfinished S. **Level to +N**, the next checkpoint, for an A or B, so the grade is read again as rolls land. A piece whose main stat fills an empty saved slot for a character who can only use that main stat also levels a checkpoint at a time.
+- **Keep** a finished S or A. A finished B is kept while it ranks among the saved +20 pieces of that slot and main stat that its characters can use.
+- **Fodder** for C and D, when no character uses the slot and main stat, or when enough saved pieces already beat its best outcome for every character. A C piece is rescued when some character's saved pool of its kind is thin: not empty, since that usually means an unscanned bag, but smaller than the number of pieces that character's group can use. An unfinished one then levels to the next checkpoint; a finished one goes to Review.
+- **Review** a finished B with no saved +20 pieces to compare, a rescued finished C, and pieces without an ordinary forecast. Save your +20 pieces first (see above) so the verdicts can use them.
+
+Supports, roles without both crit stats, mostly need their main stat, and a flower suits nearly every support. Their grade levels a piece only at S; a finished support A or B is kept while it ranks among the saved pieces.
 
 The character behind the verdict leads the shortlist. Defaults and measurements are in the [grading approach](docs/grading-approach.md).
 
@@ -89,19 +93,21 @@ The character behind the verdict leads the shortlist. Defaults and measurements 
 
 The dashboard and overlay show the same shortlist of up to five potential users. The verdict's role comes first; the rest are ordered by useful-stat presence, set fit, main-stat fit, and the number of useful substats, not cross-character damage or raw scores. The five show one role per character and different archetypes before repeating one. Select a role in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible roles** reveals the rest, including a character's other roles.
 
-Experimental S/A/B/C/D tiers grade every role. A tier says how rare the piece's useful rolls are among every possible new five-star drop of the same slot and main stat, scored with that role's useful stats:
+Experimental S/A/B/C/D grades say how worth rolling a piece is for each role. Each letter has an example start, taken at its lowest rolls with every other line useless, ranking the role's lines by weight:
 
-| Tier | Share of new drops this good or better |
-| --- | --- |
-| S | 0.05% or less (about 1 in 2,000) |
-| A | 1% or less |
-| B | 15% or less |
-| C | 50% or less |
-| D | the rest |
+| Grade | Example start | In an ATK crit build | Meaning |
+| --- | --- | --- | --- |
+| S | four lines, the four best | CRIT Rate, CRIT DMG, ATK%, ER | could be one of your best pieces |
+| A | three lines with the two best | double crit | worth rolling |
+| B | three lines with the best and third best | one crit and ATK% | level to +4 and look again |
+| C | one line of the best stat | one crit | fodder |
+| D | less | | fodder |
 
-The odds are exact for domain drops: main-stat odds, a 20% chance of four starting lines, substat appearance weights, and the four roll tiers. These cutoffs were chosen to match the 15 combinations previously calibrated by hand; their B, A, and S cutoffs agree within a third of a roll. Rarity is not damage, and it ignores what you already own. Expanded details also show the share itself and the expected number of five-star domain drops, from either of the domain's two sets, before a better piece of the same set, slot, and main stat.
+A piece earns a letter when its expected +20 score, which counts the rolls it already has, reaches the example's. A finished piece is graded by its score. A letter must also be no more common among a role's finished drops than in an ATK crit build: about 1% of finished pieces reach S, 20% A or better and 27% B or better. That second rule holds narrow builds, such as EM-only supports, to the same standard. Grades are exact for domain drops: main-stat odds, a 20% chance of four starting lines, substat appearance weights, and the four roll tiers. They are not damage, and they ignore what you already own.
 
-A piece is **Ungraded**, which does not mean bad, when no useful substat can appear on it (an EM-main piece for an EM-only role) or when there is no final score or forecast. The headline shows the median projected +20 tier for unfinished pieces and the final tier at +20. Tier badges use gold S, purple A, blue B, green C, and gray D; a dashed badge means Ungraded or no scalar grade. A small **Best** tier beside an unfinished piece is its ceiling, not an earned grade. The compact overlay adds one account line that always names the comparison scope and saved count. Expanded details show P90, best possible, and the chance of reaching A or better. See the [grading approach](docs/grading-approach.md) for the method and its validation against the earlier [original](docs/character-pilot.md) and [expanded](docs/tier-expansion-review.md) hand calibrations.
+Rolls are weighted by role. Damage roles count CRIT Rate and CRIT DMG fully, ATK%, EM or ER at 0.75 of a crit roll and HP% or DEF% at 0.85, because sands, goblets, sets and buffers already supply the scaling stat. Supports count their core stats fully. Secondary stats such as a damage dealer's ER count 0.25.
+
+A piece is **Ungraded**, which does not mean bad, when no useful substat can appear on it (an EM-main piece for an EM-only role) or when there is no final score or forecast. Grade badges use gold S, purple A, blue B, green C, and gray D; a dashed badge means Ungraded. The outcome tiles show Median, P90 and best possible +20 scores with their rarity among new drops, and the chance of finishing A or better. Expanded details also show the expected number of five-star domain drops, from either of the domain's two sets, before a better piece of the same set, slot, and main stat. The compact overlay adds one account line that always names the comparison scope and saved count. See the [grading approach](docs/grading-approach.md) for the method.
 
 Choose **Manual profile** for other characters or stat combinations. The manual score remains available independently of character assessment.
 
@@ -116,7 +122,7 @@ Choose **Manual profile** for other characters or stat combinations. The manual 
 
 Manual profiles cover crit, ATK, HP, DEF, EM, ER, and common combinations. Presets label **Valued stats**; custom settings label **Roll weights** from 0 to 100. One maximum-sized useful roll at weight 100 is one point. Equal CRIT Rate and CRIT DMG roll weights already account for their approximately 1:2 stat amounts. These weights are not character percentages or damage multipliers.
 
-Character profiles use fixed core-stat weights and show secondary utility separately. ER requirements and Crit caps need full-build context and are not resolved by the card. Grades describe intrinsic screening quality; stronger saved inventory does not lower a grade.
+Character profiles use the fixed role weights above and list secondary stats separately. ER requirements and Crit caps need full-build context and are not resolved by the card. Grades describe intrinsic screening quality; stronger saved inventory does not lower a grade.
 
 Percentiles describe the artifact's possible rolls, not its rank among other players. Discrete outcomes mean the probability of exceeding P90 need not be exactly 10%. Best possible is a ceiling, not a recommendation to spend resources on every nonzero chance.
 

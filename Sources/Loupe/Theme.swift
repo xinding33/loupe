@@ -54,42 +54,39 @@ func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: B
   return headline + " · " + replacement
 }
 
-/// Which grade the headline shows: the actual tier at +20, otherwise the median projection.
+/// Which grade the headline shows: the roll grade, from the expected +20 score before +20 and
+/// the final score at +20.
 struct GradeHeadline {
   enum Kind { case graded, ungraded, mainStatFit, specialRolls, needsReread, noMatch }
   let kind: Kind
   let tier: ArtifactTier?
-  let ceiling: ArtifactTier?
   let finished: Bool
 
   init(match: CharacterMatch?, artifact: Artifact) {
     finished = artifact.level == 20
     guard let match else {
-      (kind, tier, ceiling) = (.noMatch, nil, nil)
+      (kind, tier) = (.noMatch, nil)
       return
     }
-    let grade = finished ? match.grades?.current : match.grades?.p50
-    if let grade {
-      kind = .graded
-      tier = grade
-      ceiling = finished ? nil : match.grades?.bestPossible
+    if let grade = match.grades?.grade {
+      (kind, tier) = (.graded, grade)
     } else if match.potential == nil,
       !match.usefulStats.contains(where: { $0 != artifact.main })
     {
-      (kind, tier, ceiling) = (.mainStatFit, nil, nil)
+      (kind, tier) = (.mainStatFit, nil)
     } else if match.potential == nil, artifact.rule != .ordinary {
-      (kind, tier, ceiling) = (.specialRolls, nil, nil)
+      (kind, tier) = (.specialRolls, nil)
     } else if match.potential == nil {
-      (kind, tier, ceiling) = (.needsReread, nil, nil)
+      (kind, tier) = (.needsReread, nil)
     } else {
-      (kind, tier, ceiling) = (.ungraded, nil, nil)
+      (kind, tier) = (.ungraded, nil)
     }
   }
 
   /// Short form for list rows where the full caption would truncate.
   var shortCaption: String {
     switch kind {
-    case .graded: finished ? "Final (experimental)" : "Median +20 (experimental)"
+    case .graded: finished ? "Final (experimental)" : "Roll grade (experimental)"
     case .ungraded: "Ungraded"
     case .mainStatFit: "Main-stat fit"
     case .specialRolls: "Special rolls"
@@ -100,7 +97,7 @@ struct GradeHeadline {
 
   var caption: String {
     switch kind {
-    case .graded: finished ? "Final grade · experimental" : "Median +20 · experimental"
+    case .graded: finished ? "Final grade · experimental" : "Roll grade · experimental"
     case .ungraded: "Ungraded · not a D"
     case .mainStatFit: "Main-stat fit · no core substats"
     case .specialRolls: "Special rolls · no ordinary odds"
@@ -239,14 +236,14 @@ struct OutcomeLadder: View {
 
   var body: some View {
     HStack(spacing: compact ? 6 : 8) {
-      tile("Median", result.summary.p50Score, grades?.p50, emphasized: true)
-      tile("P90", result.summary.p90Score, grades?.p90)
-      tile("Best possible", result.maximumScore, grades?.bestPossible, ceiling: true)
+      tile("Median", result.summary.p50Score, grades?.rarityShare, emphasized: true)
+      tile("P90", result.summary.p90Score, grades?.p90Share)
+      tile("Best possible", result.maximumScore, grades?.bestShare, ceiling: true)
     }
   }
 
   private func tile(
-    _ title: String, _ value: Double, _ tier: ArtifactTier?, emphasized: Bool = false,
+    _ title: String, _ value: Double, _ share: Double?, emphasized: Bool = false,
     ceiling: Bool = false
   ) -> some View {
     VStack(alignment: .leading, spacing: 3) {
@@ -261,7 +258,11 @@ struct OutcomeLadder: View {
           )
           .monospacedDigit()
           .foregroundStyle(ceiling ? Color.secondary : .primary)
-        if grades != nil { TierChip(tier: tier) }
+        if let share {
+          Text(share <= 0.5 ? "top \(percent(share))" : "bottom half")
+            .font(.system(size: compact ? 9 : 10)).foregroundStyle(.secondary)
+            .lineLimit(1).minimumScaleFactor(0.7)
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

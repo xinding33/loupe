@@ -8,10 +8,12 @@ public enum VerdictKind: String, Sendable, CaseIterable {
 /// It is advice only; nothing acts in the game.
 public struct Verdict: Sendable, Equatable {
   public let kind: VerdictKind
-  /// The checkpoint to level to next, for `.level`.
+  /// The checkpoint to level to, for `.level`.
   public let targetLevel: Int?
-  /// Chance an unfinished piece becomes a keeper at +20, when it has an ordinary forecast.
-  public let keeperChance: Double?
+  /// The grade behind the verdict, when a graded role drives it.
+  public let grade: ArtifactTier?
+  /// Chance an unfinished piece finishes A or better for that role.
+  public let chanceOfAOrBetter: Double?
   /// The character whose role drives the verdict, if any.
   public let characterID: String?
   /// That role, since a character can hold several.
@@ -21,17 +23,15 @@ public struct Verdict: Sendable, Equatable {
   /// Why, without the character's name, so a narrow surface can show it beside the name.
   public let reason: String
 
-  init(
-    kind: VerdictKind, targetLevel: Int? = nil, keeperChance: Double? = nil,
-    role: CharacterMatch?, reason: String
-  ) {
+  init(kind: VerdictKind, targetLevel: Int? = nil, role: RoleContext? = nil, reason: String) {
     self.kind = kind
     self.targetLevel = targetLevel
-    self.keeperChance = keeperChance
-    self.characterID = role?.characterID
-    self.roleID = role?.roleID
-    self.roleName = role?.roleName
-    self.characterName = role?.characterName
+    self.grade = role?.grade
+    self.chanceOfAOrBetter = role?.match.grades?.chanceOfAOrBetter
+    self.characterID = role?.match.characterID
+    self.roleID = role?.match.roleID
+    self.roleName = role?.match.roleName
+    self.characterName = role?.match.characterName
     self.reason = reason
   }
 
@@ -52,21 +52,25 @@ public struct Verdict: Sendable, Equatable {
 
 /// Tunable defaults for verdicts. They are starting points, not reviewed thresholds.
 public struct VerdictPolicy: Sendable {
-  /// A piece is a keeper when a better one would take at least this many five-star domain drops.
-  public var keepDrops: Double = 1000
-  /// A piece among a role's best saved pieces also counts as a keeper when its share of new drops
-  /// is at most this, so an empty or sparse saved pool does not keep weak pieces.
-  public var gapShare: Double = 0.15
   /// Most saved pieces one stat-profile group can use at once.
   public var maxBackups = 3
-  /// Smallest keeper chance that justifies leveling to the next checkpoint, indexed by the current
-  /// checkpoint (+0, +4, +8, +12, +16). It rises because the last levels cost the most EXP.
-  public var levelBars: [Double] = [0.05, 0.10, 0.15, 0.20, 0.30]
 
   public init() {}
   public static let standard = VerdictPolicy()
 }
 
+/// Verdicts follow the best roll grade among the piece's roles (`RollGrade`). A main-stat-only
+/// fit whose saved pool has room ranks below S and A and above B.
+/// - Unfinished: S levels to +20. A and B level to the next checkpoint, where the grade is read
+///   again, so EXP follows the rolls. C and D are fodder unless the saved pool is thin but not
+///   empty. Main-stat-only fits level while the pool has room. Supports, roles without both crit
+///   stats, mostly need their main stat, and a flower suits nearly every support, so a support's
+///   grade levels a piece only at S.
+/// - Finished: S and A are kept. B, or A or B for a support, is kept while it ranks among the
+///   saved pieces a role can use and reviewed when nothing is saved. C is reviewed only when that
+///   pool is thin but not empty, and D is fodder.
+/// A role is set aside when enough saved +20 pieces of the same slot and main stat already beat
+/// the piece's best outcome for it.
 public enum VerdictEngine {
   /// Decides from the artifact's character matches and the saved +20 inventory.
   /// `excluding` removes the saved record of this same piece from comparisons.
@@ -76,9 +80,7 @@ public enum VerdictEngine {
   ) -> Verdict {
     let kind = "\(artifact.main.label) \(artifact.slot.plural)"
     guard !matches.isEmpty else {
-      return Verdict(
-        kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "No character role uses \(kind)")
+      return Verdict(kind: .fodder, reason: "No character role uses \(kind)")
     }
     let saved = inventory.filter {
       $0.id != (excluding ?? artifact.id) && $0.level == 20 && $0.slot == artifact.slot
@@ -87,98 +89,144 @@ public enum VerdictEngine {
     let roles = matches.map {
       RoleContext($0, artifact: artifact, saved: saved, matches: matches, policy: policy)
     }
-
-    if artifact.level == 20 {
-      return finished(artifact, roles: roles, kind: kind, policy: policy)
-    }
-    guard let outcomes = try? RollOutcomes(artifact) else {
+    let outcomes = artifact.level == 20 ? nil : try? RollOutcomes(artifact)
+    if artifact.level < 20 && outcomes == nil {
       return Verdict(
-        kind: .review, targetLevel: nil, keeperChance: nil, role: nil,
+        kind: .review,
         reason: matches.compactMap(\.potentialUnavailableReason).first
           ?? "No ordinary forecast for this piece")
     }
-    // Each role's keeper scores form an upper set, so one threshold per role decides every outcome.
-    let thresholds = roles.map { $0.keeperThreshold(policy) }
-    let chance = outcomes.probability { outcome in
-      zip(roles, thresholds).contains { role, threshold in
-        threshold.map { outcomes.score(outcome.units, profile: role.profile) >= $0 } ?? false
+    // The best this piece can score for each role: its final score, or its best outcome. Roles
+    // sharing an archetype share weights, so each weight profile is scored once.
+    var bests: [[Stat: Int]: Int] = [:]
+    func ceiling(_ role: RoleContext) -> Int {
+      if let known = bests[role.profile.weights] { return known }
+      let value: Int
+      if let outcomes {
+        let weights = outcomes.stats.map { role.profile.weights[$0, default: 0] }
+        value =
+          outcomes.outcomes.lazy.map { zip(weights, $0.units).reduce(0) { $0 + $1.0 * $1.1 } }
+          .max() ?? 0
+      } else {
+        value = role.profile.score(artifact.substats)
       }
+      bests[role.profile.weights] = value
+      return value
     }
-    let leading = zip(roles, thresholds).compactMap { role, threshold in
-      threshold.map { minimum in
-        (role, outcomes.probability { outcomes.score($0.units, profile: role.profile) >= minimum })
-      }
-    }.max { ($0.1, $0.0.setRank) < ($1.1, $1.0.setRank) }
-    let bar = policy.levelBars[min(artifact.level / 4, policy.levelBars.count - 1)]
-    if chance >= bar, chance > 0, let next = artifact.nextCheckpoint {
-      let gap = leading.flatMap { lead in
-        lead.0.rarity == nil ? lead.0.keeperReason(0, kind: kind, policy: policy) : nil
-      }
+    let open = roles.filter { role in
+      role.saved.filter { $0 > ceiling(role) }.count < role.backups
+    }
+    guard !open.isEmpty else {
       return Verdict(
-        kind: .level, targetLevel: next, keeperChance: chance,
-        role: leading?.0.match,
-        reason: gap ?? "\(percentText(chance)) chance it becomes a keeper")
+        kind: .fodder,
+        reason: outcomes == nil
+          ? "Enough saved \(kind) beat it for every role"
+          : "Enough saved \(kind) beat its best outcome for every role")
     }
-    return Verdict(
-      kind: .fodder, targetLevel: nil, keeperChance: chance,
-      role: leading?.0.match,
-      reason: chance == 0
-        ? "Cannot become a keeper for any role"
-        : "Only \(percentText(chance)) chance it becomes a keeper")
-  }
+    // The best letter leads, then the role that wants this set, then the rarer result for it:
+    // more drops to replace a finished piece, or a likelier A for an unfinished one.
+    func rarity(_ role: RoleContext) -> Double {
+      outcomes == nil
+        ? role.drops(role.profile.score(artifact.substats)) ?? 0
+        : role.match.grades?.chanceOfAOrBetter ?? 0
+    }
+    func strongest(_ roles: [RoleContext]) -> RoleContext? {
+      roles.filter { $0.grade != nil }.min {
+        ($0.tierRank, -$0.setRank, -rarity($0)) < ($1.tierRank, -$1.setRank, -rarity($1))
+      }
+    }
+    // A support's grade counts only at S; below that it can still keep a finished piece that
+    // ranks among the saved ones.
+    let leading = strongest(open.filter { !$0.isSupport || $0.grade == .s })
+    let support = strongest(open.filter(\.isSupport)).flatMap {
+      $0.tierRank < (leading?.tierRank ?? .max) ? $0 : nil
+    }
+    let gap = open.filter { $0.grade == nil && $0.saved.count < $0.backups }.max {
+      $0.setRank < $1.setRank
+    }
+    // Any C role whose saved pool is thin can rescue the piece; supports only once it is
+    // finished, since their grade levels only at S. An empty pool usually means the bag was not
+    // scanned, so it does not make a C piece worth it.
+    let thin = strongest(
+      open.filter {
+        $0.grade == .c && !$0.saved.isEmpty && $0.saved.count < $0.backups
+          && (outcomes == nil || !$0.isSupport)
+      })
+    let mainFit = { (role: RoleContext) in
+      "Main stat fills a gap: \(role.saved.count) saved \(kind)"
+    }
+    let fodder = Verdict(
+      kind: .fodder, role: leading,
+      reason: leading.map { $0.grade == .c ? "C at best for every role" : "D for every role" }
+        ?? "Main-stat fit only; saved pieces already cover it")
 
-  private static func finished(
-    _ artifact: Artifact, roles: [RoleContext], kind: String, policy: VerdictPolicy
-  ) -> Verdict {
-    let scored = roles.map { ($0, $0.profile.score(artifact.substats)) }
-    // Prefer the role that would take longest to replace, then one whose saved pool has a gap.
-    let keepers = scored.compactMap { role, score in
-      role.keeperReason(score, kind: kind, policy: policy).map { (role, $0, role.drops(score)) }
+    guard outcomes != nil, let next = artifact.nextCheckpoint else {
+      // Finished.
+      switch leading?.grade {
+      case .s?, .a?:
+        let replace = leading!.drops(leading!.profile.score(artifact.substats)).map {
+          $0.isInfinite ? "no new drop beats it" : "about \(roughCount($0)) drops to replace"
+        }
+        return Verdict(
+          kind: .keep, role: leading,
+          reason: "\(leading!.grade!.rawValue)" + (replace.map { " · \($0)" } ?? ""))
+      case _ where gap != nil:
+        return Verdict(kind: .keep, role: gap, reason: mainFit(gap!))
+      default:
+        // B for a damage role, or A or B for a support: kept while it ranks among saved pieces.
+        let candidates: [RoleContext] = [leading, support].compactMap { $0 }
+        let middle = candidates.first { (role: RoleContext) -> Bool in
+          role.grade == .b || (role.isSupport && role.grade == .a)
+        }
+        if let role = middle {
+          let label = role.grade!.rawValue + (role.isSupport ? " for a support" : "")
+          if role.saved.isEmpty {
+            return Verdict(
+              kind: .review, role: role, reason: "\(label) · no saved +20 \(kind) to compare yet")
+          }
+          let score = role.profile.score(artifact.substats)
+          return Verdict(
+            kind: .keep, role: role, reason: label + " · " + role.standing(score, kind: kind))
+        }
+        if let thin {
+          return Verdict(
+            kind: .review, role: thin, reason: "C · only \(thin.saved.count) saved \(kind)")
+        }
+        return fodder
+      }
     }
-    // Main-stat fits have no replacement estimate and rank below any drop-based reason.
-    if let best = keepers.max(by: { ($0.2 ?? 0, $0.0.setRank) < ($1.2 ?? 0, $1.0.setRank) }) {
+    switch leading?.grade {
+    case .s?:
       return Verdict(
-        kind: .keep, targetLevel: nil, keeperChance: nil, role: best.0.match,
-        reason: best.1)
-    }
-    let graded = scored.filter { $0.0.rarity != nil }
-    let leading = graded.min {
-      ($0.0.rarity!.shareAtOrAbove($0.1), -$0.0.setRank)
-        < ($1.0.rarity!.shareAtOrAbove($1.1), -$1.0.setRank)
-    }
-    if graded.count == scored.count,
-      graded.allSatisfy({ $0.0.rarity!.shareAtOrAbove($0.1) > 0.5 })
-    {
+        kind: .level, targetLevel: 20, role: leading, reason: "S · could be one of your best")
+    case .a?:
+      return Verdict(kind: .level, targetLevel: next, role: leading, reason: "A · worth rolling")
+    case _ where gap != nil:
+      return Verdict(kind: .level, targetLevel: next, role: gap, reason: mainFit(gap!))
+    case .b?:
       return Verdict(
-        kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "Bottom half of new \(kind) for every role")
+        kind: .level, targetLevel: next, role: leading, reason: "B · look again at +\(next)")
+    default:
+      if let thin {
+        return Verdict(
+          kind: .level, targetLevel: next, role: thin,
+          reason: "C · only \(thin.saved.count) saved \(kind)")
+      }
+      if let support {
+        return Verdict(
+          kind: .fodder, role: support,
+          reason: "\(support.grade!.rawValue) for a support; supports level only at S")
+      }
+      return fodder
     }
-    if scored.allSatisfy({ role, score in role.saved.filter { $0 > score }.count >= role.backups })
-    {
-      return Verdict(
-        kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "Enough saved \(kind) beat it for every role")
-    }
-    guard let (role, score) = leading, let rarity = role.rarity else {
-      return Verdict(
-        kind: .review, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "Main-stat fit only; saved pieces already cover it")
-    }
-    let detail =
-      role.saved.isEmpty
-      ? "no saved +20 \(kind) to compare yet"
-      : role.drops(score).map { "about \(roughCount($0)) drops to replace" } ?? ""
-    return Verdict(
-      kind: .review, targetLevel: nil, keeperChance: nil, role: role.match,
-      reason: "Top \(percentText(rarity.shareAtOrAbove(score))) of new \(kind)"
-        + (detail.isEmpty ? "" : "; \(detail)"))
   }
 }
 
-/// Per-role inputs: profile, rarity table, replacement odds, and the saved pool's scores.
-private struct RoleContext {
+/// Per-role inputs: profile, grade, rarity table, replacement odds, and the saved pool's scores.
+struct RoleContext {
   let match: CharacterMatch
   let profile: Profile
+  let grade: ArtifactTier?
   /// Nil when no core substat can appear on this piece; the role then fits by main stat only.
   let rarity: DropRarity?
   /// An on-set role needs this set; an off-piece role accepts the slot and main from any set.
@@ -194,12 +242,21 @@ private struct RoleContext {
   ) {
     self.match = match
     profile = match.profile
-    let table = RarityCache.shared.rarity(artifact.slot, artifact.main, match.profile)
-    rarity = (table?.bestScore ?? 0) > 0 ? table : nil
+    grade = match.grades?.grade
+    rarity =
+      match.usefulStats.contains { $0 != artifact.main }
+      ? RarityCache.shared.rarity(artifact.slot, artifact.main, match.profile) : nil
     setChance = match.setFit == .offPiece ? 1 : 0.5
     self.saved = saved.map { match.profile.score($0.substats) }.sorted(by: >)
     let group = matches.filter { $0.profile.weights == match.profile.weights }.count
     backups = min(max(1, group), policy.maxBackups)
+  }
+
+  var tierRank: Int { grade.flatMap { ArtifactTier.allCases.firstIndex(of: $0) } ?? .max }
+
+  /// A role without both crit stats: a healer, shield, buffer, Energy or reaction support.
+  var isSupport: Bool {
+    !(match.usefulStats.contains(.critRate) && match.usefulStats.contains(.critDamage))
   }
 
   /// Breaks ties toward roles that want this set: preferred, then alternative, then off-piece.
@@ -216,44 +273,13 @@ private struct RoleContext {
     return rarity.expectedDropsToBeat(score, setChance: setChance) ?? .infinity
   }
 
-  func keeperReason(_ score: Int, kind: String, policy: VerdictPolicy) -> String? {
-    guard let rarity else {
-      // Main-stat fits have no substat ranking: keep while the saved pool has room.
-      return saved.count < backups
-        ? "Main stat fills a gap: \(saved.count) saved \(kind)" : nil
-    }
-    if let drops = drops(score), drops >= policy.keepDrops {
-      return drops.isInfinite
-        ? "No new drop beats it"
-        : "About \(roughCount(drops)) drops to replace"
-    }
-    // Without saved pieces of this kind there is no gap to measure; see the baseline review.
+  /// Where a finished score sits among the saved pieces.
+  func standing(_ score: Int, kind: String) -> String {
     let better = saved.filter { $0 > score }.count
-    guard !saved.isEmpty, better < backups, rarity.shareAtOrAbove(score) <= policy.gapShare
-    else { return nil }
     if better > 0 { return "#\(better + 1) of saved \(kind)" }
     return saved.contains(score)
-      ? "Tied for best of \(saved.count) saved \(kind)"
-      : "Beats all \(saved.count) saved \(kind)"
-  }
-
-  /// Lowest final score that makes this role keep the piece, or nil when none does.
-  func keeperThreshold(_ policy: VerdictPolicy) -> Int? {
-    guard let rarity else {
-      return keeperReason(0, kind: "", policy: policy) == nil ? nil : Int.min
-    }
-    var low = 0
-    var high = rarity.bestScore
-    guard keeperReason(high, kind: "", policy: policy) != nil else { return nil }
-    while low < high {
-      let middle = (low + high) / 2
-      if keeperReason(middle, kind: "", policy: policy) != nil {
-        high = middle
-      } else {
-        low = middle + 1
-      }
-    }
-    return low
+      ? "tied for best of \(saved.count) saved \(kind)"
+      : "beats all \(saved.count) saved \(kind)"
   }
 }
 

@@ -7,7 +7,7 @@ import Testing
 @testable import LoupeCore
 
 @MainActor
-@Test func shortlistKeepsEMMainOnlyFitAheadOfOffPieceCrit() async throws {
+@Test func shortlistLeadsWithTheVerdictAndKeepsTheEMMainOnlyFit() async throws {
   let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
   let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
   defer { try? FileManager.default.removeItem(at: folder) }
@@ -19,13 +19,18 @@ import Testing
       Substat(.energyRecharge, 6.48),
     ])
   await model.evaluate()?.value
-  // An EM-only role that wants this set leads; several characters share that archetype.
+  // HP%, CRIT Rate and ER on a four-line start grade A for HP reaction damage dealers, which
+  // outranks a main-stat-only fit. The EM-only role that wants this set stays in view.
   let selected = try #require(model.selectedMatch)
-  #expect(selected.usefulStats == [.elementalMastery])
-  #expect(selected.setFit == .preferred)
-  #expect(selected.potential == nil)
-  #expect(selected.grades == nil)
+  #expect(selected.roleID == model.verdict?.roleID)
+  #expect(selected.grades?.grade == .a)
+  #expect(model.verdict?.title == "Level to +4")
   #expect(model.characterShortlist.visibleMatches.first?.roleID == selected.roleID)
+  let fit = try #require(
+    model.characterShortlist.visibleMatches.first { $0.usefulStats == [.elementalMastery] })
+  #expect(fit.setFit == .preferred)
+  #expect(fit.potential == nil)
+  #expect(fit.grades == nil)
 }
 
 private func shortlistFlower() throws -> Artifact {
@@ -129,7 +134,7 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
   let artifact = try shortlistFlower()
   let matches = CharacterAssessment.evaluate(artifact)
   let kuki = try #require(matches.first { $0.characterID == "kuki-shinobu" })
-  #expect(kuki.grades?.current == .d)
+  #expect(kuki.grades?.grade == .d)
   let shortlist = CharacterShortlist(matches: matches, artifact: artifact, selectedCharacterID: nil)
   #expect(shortlist.selectedMatch?.characterID != "kuki-shinobu")
   #expect(shortlist.selectedMatch?.usefulStats.contains(.critRate) == true)
