@@ -211,7 +211,7 @@ struct CharacterAssessmentView: View {
             .help(CharacterAssessment.coverageDescription)
         }
         Text(
-          "\(displayed.count) of \(shortlist.allMatches.count) eligible users / partial roster coverage"
+          "\(displayed.count) of \(shortlist.allMatches.count) eligible roles"
         )
         .font(.caption).foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -220,12 +220,12 @@ struct CharacterAssessmentView: View {
           Text(CharacterRoles.noMatchDescription).font(.callout).foregroundStyle(.secondary)
         }
         ForEach(displayed) { match in
-          row(match)
+          row(match, label: shortlist.label(match))
         }
         if shortlist.allMatches.count > shortlist.visibleMatches.count {
           Button(
             showingAllMatches
-              ? "Show shortlist" : "Show all \(shortlist.allMatches.count) eligible users"
+              ? "Show shortlist" : "Show all \(shortlist.allMatches.count) eligible roles"
           ) {
             showingAllMatches.toggle()
           }
@@ -239,16 +239,17 @@ struct CharacterAssessmentView: View {
     }
   }
 
-  private func row(_ match: CharacterMatch) -> some View {
+  private func row(_ match: CharacterMatch, label: String) -> some View {
     let selected = model.selectedMatch?.id == match.id
     let headline = GradeHeadline(match: match, artifact: artifact)
     return Button {
       model.selectedCharacterID = match.characterID
+      model.selectedRoleID = match.roleID
     } label: {
       HStack(spacing: 10) {
         GradeBadge(tier: headline.tier, size: 28)
         VStack(alignment: .leading, spacing: 1) {
-          Text(match.characterName).font(.callout.weight(.semibold))
+          Text(label).font(.callout.weight(.semibold))
           Text(headline.shortCaption).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         Spacer(minLength: 4)

@@ -47,7 +47,7 @@ public enum Roster {
       "ifa", "Ifa", .anemoDamage, [.em, .atkCrit], ["Viridescent Venerer", "Obsidian Codex"]),
     RosterCharacter(
       "jahoda", "Jahoda", .anemoDamage, [.atkSupport],
-      ["Viridescent Venerer", "Silken Moon's Serenade"]),
+      ["Viridescent Venerer", "Silken Moon's Serenade"], heals: true),
     RosterCharacter(
       "lan-yan", "Lan Yan", .anemoDamage, [.atkSupport, .em],
       ["Viridescent Venerer", "Scroll of the Hero of Cinder City"]),
@@ -63,7 +63,8 @@ public enum Roster {
       "faruzan", "Faruzan", .anemoDamage, [.erSupport],
       ["Tenacity of the Millelith", "Noblesse Oblige"]),
     RosterCharacter(
-      "jean", "Jean", .anemoDamage, [.atkSupport], ["Viridescent Venerer", "Ocean-Hued Clam"]),
+      "jean", "Jean", .anemoDamage, [.atkSupport], ["Viridescent Venerer", "Ocean-Hued Clam"],
+      heals: true),
     RosterCharacter("lynette", "Lynette", .anemoDamage, [.atkCrit], ["Viridescent Venerer"]),
     RosterCharacter(
       "prune", "Prune", .anemoDamage, [.atkSupport], ["Viridescent Venerer", "Celestial Gift"]),
@@ -79,7 +80,7 @@ public enum Roster {
       ["Desert Pavilion Chronicle", "Shimenawa's Reminiscence"]),
     RosterCharacter(
       "xianyun", "Xianyun", .anemoDamage, [.atkSupport],
-      ["Song of Days Past", "Viridescent Venerer"]),
+      ["Song of Days Past", "Viridescent Venerer"], heals: true),
     RosterCharacter(
       "xiao", "Xiao", .anemoDamage, [.atkCrit],
       ["Vermillion Hereafter", "Desert Pavilion Chronicle"]),
@@ -99,11 +100,12 @@ public enum Roster {
     RosterCharacter("aloy", "Aloy", .cryoDamage, [.atkCrit], ["Blizzard Strayer"]),
     RosterCharacter(
       "charlotte", "Charlotte", .cryoDamage, [.atkSupport],
-      ["Song of Days Past", "Ocean-Hued Clam"]),
+      ["Song of Days Past", "Ocean-Hued Clam"], heals: true),
     RosterCharacter(
       "chongyun", "Chongyun", .cryoDamage, [.atkCrit], ["Blizzard Strayer", "Noblesse Oblige"]),
     RosterCharacter(
-      "diona", "Diona", .cryoDamage, [.hpSupport], ["Noblesse Oblige", "Tenacity of the Millelith"]),
+      "diona", "Diona", .cryoDamage, [.hpSupport],
+      ["Noblesse Oblige", "Tenacity of the Millelith"], heals: true),
     RosterCharacter("eula", "Eula", .physicalDamage, [.atkCrit], ["Pale Flame"]),
     RosterCharacter(
       "freminet", "Freminet", .physicalDamage, [.atkCrit], ["Pale Flame", "Blizzard Strayer"]),
@@ -116,12 +118,14 @@ public enum Roster {
     RosterCharacter(
       "layla", "Layla", .cryoDamage, [.hpSupport], ["Tenacity of the Millelith", "Noblesse Oblige"]),
     RosterCharacter(
-      "mika", "Mika", .cryoDamage, [.hpSupport], ["Noblesse Oblige", "Ocean-Hued Clam"]),
+      "mika", "Mika", .cryoDamage, [.hpSupport], ["Noblesse Oblige", "Ocean-Hued Clam"], heals: true
+    ),
     RosterCharacter(
       "odette", "Odette", .atkPercent, [.atkCrit],
       ["Heart of the Furnace", "Disenchantment in Deep Shadow"]),
     RosterCharacter(
-      "qiqi", "Qiqi", .cryoDamage, [.atkSupport], ["Ocean-Hued Clam", "Noblesse Oblige"]),
+      "qiqi", "Qiqi", .cryoDamage, [.atkSupport], ["Ocean-Hued Clam", "Noblesse Oblige"],
+      heals: true),
     RosterCharacter(
       "rosaria", "Rosaria", .cryoDamage, [.atkCrit], ["Noblesse Oblige", "Blizzard Strayer"]),
     RosterCharacter(
@@ -141,9 +145,10 @@ public enum Roster {
     RosterCharacter(
       "nefer", "Nefer", .dendroDamage, [.emCrit], ["Night of the Sky's Unveiling", "Gilded Dreams"]),
     RosterCharacter(
-      "traveler-dendro", "Traveler (Dendro)", .dendroDamage, [.emCrit], ["Deepwood Memories"]),
+      "traveler-dendro", "Traveler (Dendro)", .dendroDamage, [.atkEMCrit], ["Deepwood Memories"]),
     RosterCharacter(
-      "baizhu", "Baizhu", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"]),
+      "baizhu", "Baizhu", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"],
+      heals: true),
     RosterCharacter("collei", "Collei", .dendroDamage, [.atkEMCrit], ["Deepwood Memories"]),
     RosterCharacter(
       "emilie", "Emilie", .dendroDamage, [.atkCrit], ["Unfinished Reverie", "Deepwood Memories"]),
@@ -155,7 +160,8 @@ public enum Roster {
     RosterCharacter(
       "tighnari", "Tighnari", .dendroDamage, [.atkEMCrit], ["Wanderer's Troupe", "Gilded Dreams"]),
     RosterCharacter(
-      "yaoyao", "Yaoyao", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"]),
+      "yaoyao", "Yaoyao", .dendroDamage, [.hpSupport], ["Deepwood Memories", "Ocean-Hued Clam"],
+      heals: true),
 
     // Electro
     RosterCharacter(
@@ -177,7 +183,7 @@ public enum Roster {
       ["Emblem of Severed Fate", "Noblesse Oblige"]),
     RosterCharacter(
       "alyosha", "Alyosha", .electroDamage, [.atkSupport],
-      ["Heart of the Furnace", "Noblesse Oblige"]),
+      ["Heart of the Furnace", "Noblesse Oblige"], heals: true),
     RosterCharacter("beidou", "Beidou", .electroDamage, [.atkCrit], ["Emblem of Severed Fate"]),
     RosterCharacter(
       "clorinde", "Clorinde", .electroDamage, [.atkCrit],
@@ -186,7 +192,7 @@ public enum Roster {
       "cyno", "Cyno", .electroDamage, [.atkEMCrit], ["Thundering Fury", "Gilded Dreams"]),
     RosterCharacter(
       "dori", "Dori", .electroDamage, [.hpSupport],
-      ["Noblesse Oblige", "Tenacity of the Millelith"]),
+      ["Noblesse Oblige", "Tenacity of the Millelith"], heals: true),
     RosterCharacter(
       "keqing", "Keqing", .electroDamage, [.atkEMCrit], ["Thundering Fury", "Gilded Dreams"]),
     RosterCharacter(
@@ -212,7 +218,7 @@ public enum Roster {
       ["Husk of Opulent Dreams", "Aubade of Morningstar and Moon"]),
     RosterCharacter(
       "xilonen", "Xilonen", .geoDamage, [.defSupport],
-      ["Scroll of the Hero of Cinder City", "Archaic Petra"]),
+      ["Scroll of the Hero of Cinder City", "Archaic Petra"], heals: true),
     RosterCharacter(
       "zibai", "Zibai", .defPercent, [.defCrit],
       ["Night of the Sky's Unveiling", "Husk of Opulent Dreams"]),
@@ -253,7 +259,8 @@ public enum Roster {
     RosterCharacter(
       "traveler-hydro", "Traveler (Hydro)", .hydroDamage, [.hpCrit], ["Heart of Depth"]),
     RosterCharacter(
-      "barbara", "Barbara", .hydroDamage, [.hpSupport], ["Ocean-Hued Clam", "Maiden Beloved"]),
+      "barbara", "Barbara", .hydroDamage, [.hpSupport], ["Ocean-Hued Clam", "Maiden Beloved"],
+      heals: true),
     RosterCharacter(
       "candace", "Candace", .hydroDamage, [.hpSupport],
       ["Noblesse Oblige", "Tenacity of the Millelith"]),
@@ -267,12 +274,12 @@ public enum Roster {
       ["Tenacity of the Millelith", "Vourukasha's Glow"]),
     RosterCharacter(
       "sigewinne", "Sigewinne", .hydroDamage, [.hpSupport],
-      ["Song of Days Past", "Ocean-Hued Clam"]),
+      ["Song of Days Past", "Ocean-Hued Clam"], heals: true),
     RosterCharacter(
       "tartaglia", "Tartaglia", .hydroDamage, [.atkCrit], ["Nymph's Dream", "Heart of Depth"]),
     RosterCharacter(
       "vodyanitsa", "Vodyanitsa", .hydroDamage, [.hpSupport],
-      ["Tenacity of the Millelith", "Scroll of the Hero of Cinder City"]),
+      ["Tenacity of the Millelith", "Scroll of the Hero of Cinder City"], heals: true),
 
     // Pyro
     RosterCharacter(
@@ -290,7 +297,7 @@ public enum Roster {
       ["Fragment of Harmonic Whimsy", "Gladiator's Finale"]),
     RosterCharacter(
       "chevreuse", "Chevreuse", .pyroDamage, [.hpSupport],
-      ["Noblesse Oblige", "Tenacity of the Millelith"]),
+      ["Noblesse Oblige", "Tenacity of the Millelith"], heals: true),
     RosterCharacter(
       "dehya", "Dehya", .pyroDamage, [.hpCrit, .atkCrit],
       ["Emblem of Severed Fate", "Vermillion Hereafter"]),

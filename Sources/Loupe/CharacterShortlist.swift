@@ -1,9 +1,10 @@
 import LoupeCore
 
 /// A browsing order based on stat presence and set context, never cross-role strength.
-/// The character behind the current verdict, when there is one, leads the list, and the visible
-/// rows show different archetypes before repeating one, since an archetype's characters share
-/// a grade.
+/// The role behind the current verdict, when there is one, leads the list. The visible rows show
+/// one role per character and different archetypes before repeating one, since an archetype's
+/// characters share a grade. The full list keeps every role, so a character's other roles
+/// remain selectable.
 struct CharacterShortlist {
   let allMatches: [CharacterMatch]
   let visibleMatches: [CharacterMatch]
@@ -11,7 +12,7 @@ struct CharacterShortlist {
 
   init(
     matches: [CharacterMatch], artifact: Artifact?, selectedCharacterID: String?,
-    leadingCharacterID: String? = nil
+    selectedRoleID: String? = nil, leadingCharacterID: String? = nil, leadingRoleID: String? = nil
   ) {
     guard let artifact else {
       allMatches = []
@@ -31,24 +32,41 @@ struct CharacterShortlist {
         match.role.isReviewed ? 0 : 1, match.characterID + "|" + match.roleID
       )
     }
-    var seen = Set<String>()
+    var seenRoles = Set<String>()
     var ordered = matches.sorted { priority($0) < priority($1) }
-      .filter { seen.insert($0.characterID).inserted }
-    if let index = ordered.firstIndex(where: { $0.characterID == leadingCharacterID }) {
-      ordered.insert(ordered.remove(at: index), at: 0)
+      .filter { seenRoles.insert($0.roleID).inserted }
+    let leading =
+      ordered.firstIndex { $0.roleID == leadingRoleID }
+      ?? ordered.firstIndex { $0.characterID == leadingCharacterID }
+    if let leading {
+      ordered.insert(ordered.remove(at: leading), at: 0)
     }
     allMatches = ordered
-    let selected = ordered.first { $0.characterID == selectedCharacterID } ?? ordered.first
+    let selected =
+      ordered.first { $0.roleID == selectedRoleID && $0.characterID == selectedCharacterID }
+      ?? ordered.first { $0.characterID == selectedCharacterID } ?? ordered.first
     selectedMatch = selected
+    var seenCharacters = Set<String>()
+    let characters = ordered.filter { seenCharacters.insert($0.characterID).inserted }
     var shown = Set<ArchetypeID?>()
-    let varied = ordered.filter { shown.insert($0.role.archetype).inserted }
+    let varied = characters.filter { shown.insert($0.role.archetype).inserted }
     var visible = Array(
-      (varied + ordered.filter { match in !varied.contains { $0.roleID == match.roleID } })
+      (varied + characters.filter { match in !varied.contains { $0.roleID == match.roleID } })
         .prefix(5))
-    if let selected, !visible.contains(where: { $0.characterID == selected.characterID }) {
-      visible.removeLast()
-      visible.append(selected)
+    if let selected {
+      if let index = visible.firstIndex(where: { $0.characterID == selected.characterID }) {
+        visible[index] = selected
+      } else {
+        visible.removeLast()
+        visible.append(selected)
+      }
     }
     visibleMatches = visible
+  }
+
+  /// The character's name, plus the role when the full list holds another role of theirs.
+  func label(_ match: CharacterMatch) -> String {
+    allMatches.contains { $0.characterID == match.characterID && $0.roleID != match.roleID }
+      ? "\(match.characterName) · \(match.roleName)" : match.characterName
   }
 }

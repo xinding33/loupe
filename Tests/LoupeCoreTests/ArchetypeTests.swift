@@ -125,3 +125,28 @@ private func flower(_ substats: [Substat], set: String = "Test off-piece") throw
     #expect(match.grades?.p50 == matches[0].grades?.p50)
   }
 }
+
+@Test func healingCircletsFitOnlySupportsWhoHeal() throws {
+  let circlet = try Artifact(
+    setName: "Noblesse Oblige", slot: .circlet, main: .healing, level: 20,
+    substats: [
+      Substat(.atkPercent, 29.15), Substat(.energyRecharge, 12.96), Substat(.def, 23.15),
+      Substat(.hp, 298.75),
+    ])
+  let users = Set(CharacterAssessment.evaluate(circlet).map(\.characterID))
+  #expect(!users.contains("shenhe"))
+  #expect(!users.contains("yun-jin"))
+  #expect(users.contains("jean"))
+  #expect(users.contains("kokomi"))
+  let shenhe = try #require(CharacterRoles.all.first { $0.characterID == "shenhe" })
+  #expect(shenhe.mains[.circlet] == [.atkPercent, .critRate])
+}
+
+@Test func dendroTravelerTakesAnEnergySands() throws {
+  let sands = try Artifact(
+    setName: "Deepwood Memories", slot: .sands, main: .energyRecharge, level: 0,
+    substats: [
+      Substat(.elementalMastery, 23.31), Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
+    ])
+  #expect(CharacterAssessment.evaluate(sands).contains { $0.characterID == "traveler-dendro" })
+}

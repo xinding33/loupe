@@ -18,6 +18,8 @@ Code: `Sources/LoupeCore/Archetypes.swift` (definitions) and `Sources/LoupeCore/
 
 Scored stats count toward the grade, one point per roll. Utility stats are shown but not scored.
 "DMG" in the goblet column means the character's own DMG Bonus goblet (see the table below).
+\*Healing Bonus circlets fit only characters marked as healers in `Roster.swift`; CRIT Rate
+circlets are for supports on Favonius weapons.
 
 | Archetype | Scored | Utility | Sands | Goblet | Circlet |
 | --- | --- | --- | --- | --- | --- |
@@ -29,9 +31,9 @@ Scored stats count toward the grade, one point per roll. Utility stats are shown
 | EM crit damage | EM, CRIT Rate, CRIT DMG | ER, ATK% | EM, ATK% | DMG, EM | CRIT Rate, CRIT DMG, EM |
 | Energy-scaling Burst damage | ER, ATK%, CRIT Rate, CRIT DMG | none | ER, ATK% | DMG, ATK% | CRIT Rate, CRIT DMG |
 | EM reaction support | EM | ER | EM, ER | EM | EM |
-| HP healer / shield / buffer | HP% | ER, HP | HP%, ER | HP% | HP%, Healing |
-| ATK healer / buffer | ATK%, ER | ATK, CRIT Rate | ATK%, ER | ATK% | ATK%, Healing |
-| DEF shield / buffer | DEF%, ER | DEF, CRIT Rate | DEF%, ER | DEF% | DEF%, Healing |
+| HP healer / shield / buffer | HP% | ER, HP | HP%, ER | HP% | HP%, CRIT Rate, Healing* |
+| ATK healer / buffer | ATK%, ER | ATK, CRIT Rate | ATK%, ER | ATK% | ATK%, CRIT Rate, Healing* |
+| DEF shield / buffer | DEF%, ER | DEF, CRIT Rate | DEF%, ER | DEF% | DEF%, CRIT Rate, Healing* |
 | Energy / Burst support | ER, CRIT Rate | ATK%, HP% | ER | DMG, ATK%, HP% | CRIT Rate, ATK%, HP% |
 
 Choices worth knowing:
@@ -60,18 +62,18 @@ Choices worth knowing:
 | Albedo | DEF crit | Geo DMG | Golden Troupe; Husk of Opulent Dreams |
 | Alhaitham | EM crit (first is the reviewed role) | Dendro DMG | Gilded Dreams; Deepwood Memories |
 | Aloy | ATK crit | Cryo DMG | Blizzard Strayer |
-| Alyosha | ATK support | — | Heart of the Furnace; Noblesse Oblige |
+| Alyosha | ATK support; heals | — | Heart of the Furnace; Noblesse Oblige |
 | Amber | ATK reaction | Pyro DMG | Crimson Witch of Flames |
 | Arataki Itto | DEF crit (first is the reviewed role) | Geo DMG | Husk of Opulent Dreams |
 | Arlecchino | ATK crit | Pyro DMG | Fragment of Harmonic Whimsy; Gladiator's Finale |
-| Baizhu | HP support | — | Deepwood Memories; Ocean-Hued Clam |
-| Barbara | HP support | — | Ocean-Hued Clam; Maiden Beloved |
+| Baizhu | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam |
+| Barbara | HP support; heals | — | Ocean-Hued Clam; Maiden Beloved |
 | Beidou | ATK crit | Electro DMG | Emblem of Severed Fate |
 | Bennett | HP support (first is the reviewed role) | — | Noblesse Oblige; Scroll of the Hero of Cinder City |
 | Candace | HP support | — | Noblesse Oblige; Tenacity of the Millelith |
-| Charlotte | ATK support | — | Song of Days Past; Ocean-Hued Clam |
+| Charlotte | ATK support; heals | — | Song of Days Past; Ocean-Hued Clam |
 | Chasca | ATK crit | ATK% | Obsidian Codex; Marechaussee Hunter |
-| Chevreuse | HP support | — | Noblesse Oblige; Tenacity of the Millelith |
+| Chevreuse | HP support; heals | — | Noblesse Oblige; Tenacity of the Millelith |
 | Chiori | DEF crit | Geo DMG | Golden Troupe; Husk of Opulent Dreams |
 | Chongyun | ATK crit | Cryo DMG | Blizzard Strayer; Noblesse Oblige |
 | Citlali | EM reaction support | — | Scroll of the Hero of Cinder City; Tenacity of the Millelith |
@@ -82,8 +84,8 @@ Choices worth knowing:
 | Dahlia | HP support | — | Noblesse Oblige; Scroll of the Hero of Cinder City |
 | Dehya | HP crit, ATK crit | Pyro DMG | Emblem of Severed Fate; Vermillion Hereafter |
 | Diluc | ATK reaction | Pyro DMG | Crimson Witch of Flames; Gladiator's Finale |
-| Diona | HP support | — | Noblesse Oblige; Tenacity of the Millelith |
-| Dori | HP support | — | Noblesse Oblige; Tenacity of the Millelith |
+| Diona | HP support; heals | — | Noblesse Oblige; Tenacity of the Millelith |
+| Dori | HP support; heals | — | Noblesse Oblige; Tenacity of the Millelith |
 | Durin | ATK crit | Pyro DMG | A Day Carved From Rising Winds; Gilded Dreams |
 | Emilie | ATK crit | Dendro DMG | Unfinished Reverie; Deepwood Memories |
 | Escoffier | ATK crit | Cryo DMG | Golden Troupe; Blizzard Strayer |
@@ -101,8 +103,8 @@ Choices worth knowing:
 | Ifa | EM reaction support, ATK crit | Anemo DMG | Viridescent Venerer; Obsidian Codex |
 | Illuga | EM reaction support | — | Silken Moon's Serenade; Noblesse Oblige |
 | Ineffa | ATK reaction | ATK% | Aubade of Morningstar and Moon; Silken Moon's Serenade |
-| Jahoda | ATK support | — | Viridescent Venerer; Silken Moon's Serenade |
-| Jean | ATK support | — | Viridescent Venerer; Ocean-Hued Clam |
+| Jahoda | ATK support; heals | — | Viridescent Venerer; Silken Moon's Serenade |
+| Jean | ATK support; heals | — | Viridescent Venerer; Ocean-Hued Clam |
 | Kachina | DEF crit | Geo DMG | Scroll of the Hero of Cinder City; Archaic Petra |
 | Kaedehara Kazuha | EM reaction support (first is the reviewed role) | — | Viridescent Venerer |
 | Kaeya | ATK crit | Cryo DMG | Blizzard Strayer; Emblem of Severed Fate |
@@ -124,7 +126,7 @@ Choices worth knowing:
 | Lynette | ATK crit | Anemo DMG | Viridescent Venerer |
 | Lyney | ATK crit | Pyro DMG | Marechaussee Hunter |
 | Mavuika | ATK reaction | Pyro DMG | Obsidian Codex; Scroll of the Hero of Cinder City |
-| Mika | HP support | — | Noblesse Oblige; Ocean-Hued Clam |
+| Mika | HP support; heals | — | Noblesse Oblige; Ocean-Hued Clam |
 | Mona | Energy-scaling Burst | Hydro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Mualani | HP reaction | Hydro DMG | Obsidian Codex; Heart of Depth |
 | Nahida | EM crit (first is the reviewed role) | Dendro DMG | Deepwood Memories; Gilded Dreams |
@@ -138,7 +140,7 @@ Choices worth knowing:
 | Odette | ATK crit | ATK% | Heart of the Furnace; Disenchantment in Deep Shadow |
 | Ororon | ATK crit | Electro DMG | Scroll of the Hero of Cinder City; Noblesse Oblige |
 | Prune | ATK support | — | Viridescent Venerer; Celestial Gift |
-| Qiqi | ATK support | — | Ocean-Hued Clam; Noblesse Oblige |
+| Qiqi | ATK support; heals | — | Ocean-Hued Clam; Noblesse Oblige |
 | Raiden Shogun | EM reaction support, Energy-scaling Burst (first is the reviewed role) | Electro DMG | Emblem of Severed Fate |
 | Razor | ATK crit | Physical DMG | Pale Flame; Gladiator's Finale |
 | Rosaria | ATK crit | Cryo DMG | Noblesse Oblige; Blizzard Strayer |
@@ -148,14 +150,14 @@ Choices worth knowing:
 | Sethos | EM crit | Electro DMG | Wanderer's Troupe; Gilded Dreams |
 | Shenhe | ATK support | — | Noblesse Oblige; Blizzard Strayer |
 | Shikanoin Heizou | ATK crit, EM reaction support | Anemo DMG | Viridescent Venerer |
-| Sigewinne | HP support | — | Song of Days Past; Ocean-Hued Clam |
+| Sigewinne | HP support; heals | — | Song of Days Past; Ocean-Hued Clam |
 | Skirk | ATK crit | Cryo DMG | Finale of the Deep Galleries; Marechaussee Hunter |
 | Sucrose | EM reaction support (first is the reviewed role) | — | Viridescent Venerer; Deepwood Memories |
 | Tartaglia | ATK crit | Hydro DMG | Nymph's Dream; Heart of Depth |
 | Thoma | HP support, EM reaction support | — | Tenacity of the Millelith; Flower of Paradise Lost |
 | Tighnari | ATK reaction | Dendro DMG | Wanderer's Troupe; Gilded Dreams |
 | Traveler (Anemo) | EM reaction support | — | Viridescent Venerer |
-| Traveler (Dendro) | EM crit | Dendro DMG | Deepwood Memories |
+| Traveler (Dendro) | ATK reaction | Dendro DMG | Deepwood Memories |
 | Traveler (Electro) | Energy support | Electro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Traveler (Geo) | ATK crit | Geo DMG | Nighttime Whispers in the Echoing Woods |
 | Traveler (Hydro) | HP crit | Hydro DMG | Heart of Depth |
@@ -164,18 +166,18 @@ Choices worth knowing:
 | Varka | ATK crit | ATK% | A Day Carved From Rising Winds; Shimenawa's Reminiscence |
 | Venti | EM reaction support, ATK crit | Anemo DMG | Viridescent Venerer |
 | Vesna | ATK crit | ATK% | Scarlet Proof; Viridescent Venerer |
-| Vodyanitsa | HP support | — | Tenacity of the Millelith; Scroll of the Hero of Cinder City |
+| Vodyanitsa | HP support; heals | — | Tenacity of the Millelith; Scroll of the Hero of Cinder City |
 | Wanderer | ATK crit | Anemo DMG | Desert Pavilion Chronicle; Shimenawa's Reminiscence |
 | Wriothesley | ATK crit | Cryo DMG | Marechaussee Hunter; Blizzard Strayer |
 | Xiangling | ATK reaction (first is the reviewed role) | Pyro DMG | Emblem of Severed Fate; Crimson Witch of Flames |
-| Xianyun | ATK support | — | Song of Days Past; Viridescent Venerer |
+| Xianyun | ATK support; heals | — | Song of Days Past; Viridescent Venerer |
 | Xiao | ATK crit | Anemo DMG | Vermillion Hereafter; Desert Pavilion Chronicle |
-| Xilonen | DEF support | — | Scroll of the Hero of Cinder City; Archaic Petra |
+| Xilonen | DEF support; heals | — | Scroll of the Hero of Cinder City; Archaic Petra |
 | Xingqiu | ATK crit (first is the reviewed role) | Hydro DMG | Emblem of Severed Fate; Noblesse Oblige |
 | Xinyan | ATK crit | Physical DMG | Pale Flame; Noblesse Oblige |
 | Yae Miko | ATK reaction | Electro DMG | Golden Troupe; Gilded Dreams |
 | Yanfei | ATK reaction | Pyro DMG | Crimson Witch of Flames; Wanderer's Troupe |
-| Yaoyao | HP support | — | Deepwood Memories; Ocean-Hued Clam |
+| Yaoyao | HP support; heals | — | Deepwood Memories; Ocean-Hued Clam |
 | Yelan | HP crit (first is the reviewed role) | Hydro DMG | Emblem of Severed Fate; Nymph's Dream |
 | Yoimiya | ATK reaction | Pyro DMG | Shimenawa's Reminiscence; Echoes of an Offering |
 | Yumemizuki Mizuki | EM reaction support | — | Viridescent Venerer; Gilded Dreams |
@@ -218,7 +220,7 @@ Verdicts on 1,500 random domain drops per row, with no saved inventory:
 | Roles | +0 leveled: flower / sands / goblet / circlet | +20 Keep / Review / Fodder: flower; goblet |
 | --- | --- | --- |
 | 15 reviewed | 12% / 52% / 30% / 40% | 3 / 90 / 5%; 25 / 9 / 65% |
-| All archetype roles | 26% / 58% / 58% / 58% | 6 / 92 / 0%; 31 / 46 / 21% |
+| All archetype roles | 28% / 59% / 59% / 58% | 5 / 94 / 0%; 32 / 43 / 23% |
 
 Goblets level more because elemental goblets now have users; before, most had none. A finished
 flower is no longer in the bottom half of new drops for every role, so without saved pieces to

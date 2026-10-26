@@ -30,8 +30,11 @@ public struct Archetype: Sendable, Identifiable {
   let circlet: [Stat]
   let conditions: [RoleCondition]
 
-  func mains(damage: Stat) -> [Slot: [Stat]] {
-    CharacterRoles.mains(sands, (damageGoblet ? [damage] : []) + goblet, circlet)
+  /// Healing Bonus circlets fit a support archetype only for characters who heal.
+  func mains(damage: Stat, heals: Bool) -> [Slot: [Stat]] {
+    let healer = heals && [.hpSupport, .atkSupport, .defSupport].contains(id)
+    return CharacterRoles.mains(
+      sands, (damageGoblet ? [damage] : []) + goblet, circlet + (healer ? [.healing] : []))
   }
 
   public static let all: [Archetype] = [
@@ -93,19 +96,19 @@ public struct Archetype: Sendable, Identifiable {
       summary: "Supports whose healing, shields or buffs scale on Max HP.",
       usefulStats: [.hpPercent], secondaryStats: [.energyRecharge, .hp],
       sands: [.hpPercent, .energyRecharge], goblet: [.hpPercent], damageGoblet: false,
-      circlet: [.hpPercent, .healing], conditions: [energy, support]),
+      circlet: [.hpPercent, .critRate], conditions: [energy, support]),
     Archetype(
       id: .atkSupport, name: "ATK healer / buffer",
       summary: "Supports whose healing or buffs scale on ATK and need Energy for their Burst.",
       usefulStats: [.atkPercent, .energyRecharge], secondaryStats: [.atk, .critRate],
       sands: [.atkPercent, .energyRecharge], goblet: [.atkPercent], damageGoblet: false,
-      circlet: [.atkPercent, .healing], conditions: [energy, support]),
+      circlet: [.atkPercent, .critRate], conditions: [energy, support]),
     Archetype(
       id: .defSupport, name: "DEF shield / buffer",
       summary: "Supports whose shields, healing or buffs scale on DEF and need Energy.",
       usefulStats: [.defPercent, .energyRecharge], secondaryStats: [.def, .critRate],
       sands: [.defPercent, .energyRecharge], goblet: [.defPercent], damageGoblet: false,
-      circlet: [.defPercent, .healing], conditions: [energy, support]),
+      circlet: [.defPercent, .critRate], conditions: [energy, support]),
     Archetype(
       id: .erSupport, name: "Energy / Burst support",
       summary:
@@ -140,20 +143,26 @@ public struct RosterCharacter: Sendable {
   public let archetypes: [ArchetypeID]
   /// Four-piece sets, preferred first.
   public let sets: [String]
+  /// Whether the character heals, which makes Healing Bonus circlets fit its support roles.
+  public let heals: Bool
 
-  init(_ id: String, _ name: String, _ damage: Stat, _ archetypes: [ArchetypeID], _ sets: [String])
-  {
+  init(
+    _ id: String, _ name: String, _ damage: Stat, _ archetypes: [ArchetypeID], _ sets: [String],
+    heals: Bool = false
+  ) {
     self.id = id
     self.name = name
     self.damage = damage
     self.archetypes = archetypes
     self.sets = sets
+    self.heals = heals
   }
 
   func role(_ archetype: Archetype) -> CharacterRole {
     CharacterRole(
       characterID: id, characterName: name, roleID: "\(id).\(archetype.id.rawValue)",
-      roleName: "\(archetype.name) (archetype)", mains: archetype.mains(damage: damage),
+      roleName: "\(archetype.name) (archetype)",
+      mains: archetype.mains(damage: damage, heals: heals),
       usefulStats: archetype.usefulStats, secondaryStats: archetype.secondaryStats,
       sets: sets.enumerated().map { index, set in
         RoleSet(

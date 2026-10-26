@@ -176,8 +176,8 @@ Measured on 1,500 random domain drops per row with the 15 reviewed roles:
 A curated real inventory beats random saved pieces, so real verdicts should
 level less. Many goblets are Fodder only because no reviewed role uses their
 main stat; that falls as coverage grows. With every archetype role (2026-10-25)
-and no saved inventory, +0 pieces level at 26% / 58% / 58% / 58% and +20 pieces
-end 6 / 92 / 0% (flower) and 31 / 46 / 21% (goblet); see
+and no saved inventory, +0 pieces level at 28% / 59% / 59% / 58% and +20 pieces
+end 5 / 94 / 0% (flower) and 32 / 43 / 23% (goblet); see
 [archetypes](archetypes.md).
 
 Not implemented: role-free dominance, reshape candidates, chance against the

@@ -340,3 +340,31 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
   #expect(visible.first?.setFit == .preferred)
   #expect(visible.contains { $0.characterID == "furina" })
 }
+
+@MainActor
+@Test func shortlistLeadsWithTheVerdictsRoleAndKeepsOtherRoles() async throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
+  defer { try? FileManager.default.removeItem(at: folder) }
+  defer { model.setEnabled(false) }
+  // An EM-heavy Obsidian Codex flower: Ifa's EM role keeps it, her ATK crit role grades it low.
+  model.current = try Artifact(
+    setName: "Obsidian Codex", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.elementalMastery, 139.86), Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
+      Substat(.atk, 19.45),
+    ])
+  await model.evaluate()?.value
+  let verdict = try #require(model.verdict)
+  let shortlist = model.characterShortlist
+  #expect(shortlist.selectedMatch?.roleID == verdict.roleID)
+  #expect(shortlist.visibleMatches.first?.roleID == verdict.roleID)
+  let ifa = shortlist.allMatches.filter { $0.characterID == "ifa" }.map(\.roleID)
+  #expect(Set(ifa) == ["ifa.em", "ifa.atk-crit"])
+  #expect(
+    shortlist.label(try #require(shortlist.allMatches.first { $0.roleID == "ifa.em" })) != "Ifa")
+  model.selectedCharacterID = "ifa"
+  model.selectedRoleID = "ifa.atk-crit"
+  #expect(model.selectedMatch?.roleID == "ifa.atk-crit")
+  #expect(model.characterShortlist.visibleMatches.contains { $0.roleID == "ifa.atk-crit" })
+}
