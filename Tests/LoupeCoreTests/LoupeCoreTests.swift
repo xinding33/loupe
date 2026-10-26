@@ -156,6 +156,19 @@ func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
   #expect(artifact.unactivated == Substat(.defPercent, 5.1))
 }
 
+@Test func enhanceNamesTolerateOCRNoiseButNotAnotherPiece() {
+  let name = "Gladiator's Nostalgia"
+  #expect(CardParser.namesMatch("Recommendations Gladiator's Nostalgia", name))
+  #expect(
+    CardParser.namesMatch(
+      "Crystal Tear of the \u{1EA0}\u{1ECA}Wanderer", "Crystal Tear of the Wanderer"))
+  #expect(
+    CardParser.namesMatch("Viridescent Venerer's Di\u{0105}dem", "Viridescent Venerer's Diadem"))
+  #expect(!CardParser.namesMatch("Gladiator's Longing", name))
+  #expect(!CardParser.namesMatch("Gladiator's", name))
+  #expect(!CardParser.namesMatch("Witch's Heart Flames", "Witch's Flower of Blaze"))
+}
+
 @Test func onlyFlowersAndPlumesInferAMissingMainStat() {
   let sands = """
     A Moment Congealed

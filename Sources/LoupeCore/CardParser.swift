@@ -187,13 +187,34 @@ public enum CardParser {
     return nil
   }
 
+  /// Both names come from OCR. Sparkles add stray letters, and the character screen can add a
+  /// button label above the name ("Recommendations Gladiator's Nostalgia"). Slot, main stat and
+  /// substats must still agree, so allow those and up to two misread letters.
+  public static func namesMatch(_ card: String, _ enhance: String) -> Bool {
+    func key(_ name: String) -> [Character] {
+      Array(Artifact.normalizeSet(name.folding(options: .diacriticInsensitive, locale: nil)))
+    }
+    let a = key(card)
+    let b = key(enhance)
+    guard b.count >= 6 else { return a == b }
+    if a.suffix(b.count).elementsEqual(b) { return true }
+    var row = Array(0...b.count)
+    for (i, x) in a.enumerated() {
+      var next = [i + 1]
+      for (j, y) in b.enumerated() {
+        next.append(min(row[j + 1] + 1, next[j] + 1, row[j] + (x == y ? 0 : 1)))
+      }
+      row = next
+    }
+    return row[b.count] <= 2
+  }
+
   public static func parseEnhancement(_ text: String, previous: Artifact, pieceName: String) throws
     -> Artifact
   {
     let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
     guard let heading = lines.first, let slash = heading.firstIndex(of: "/"),
-      Artifact.normalizeSet(String(heading[heading.index(after: slash)...]))
-        == Artifact.normalizeSet(pieceName),
+      namesMatch(pieceName, String(heading[heading.index(after: slash)...])),
       let levelLine = lines.dropFirst().first,
       levelLine.range(of: #"^\+\d{1,2}$"#, options: .regularExpression) != nil,
       let mainRow = lines.dropFirst(2).first,
