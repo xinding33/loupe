@@ -241,11 +241,12 @@ public enum CardParser {
       ]).joined(separator: "\n")
     let candidate = try parse(canonical, stars: previous.rarity, rule: previous.rule)
     // Both readings come from the screen, where the game keeps substat order, so labels read in
-    // swapped rows cannot pass. Saved records may come from imports in another order.
+    // swapped rows cannot pass. A four-star adds lines below the existing ones, and a missed row
+    // cannot pass either. Saved records may come from imports in another order.
     func keys(_ artifact: Artifact) -> [Stat] {
       (artifact.substats + (artifact.unactivated.map { [$0] } ?? [])).map(\.key)
     }
-    guard keys(candidate) == keys(previous) else {
+    guard keys(candidate).starts(with: keys(previous)) else {
       throw ArtifactError("Enhance stats are in a different order. Waiting for a clear frame.")
     }
     return try previous.upgraded(to: candidate)

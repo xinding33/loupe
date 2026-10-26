@@ -171,7 +171,12 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
       totals = Set(totals.flatMap { total in counts.map { total + $0 } })
     }
     let events = level / 4
-    let legalTotals = level < 4 ? [substats.count] : Set(starts.map { $0 + events })
+    // Only starts that leave this many lines count: three lines at +4 mean a two-line start
+    // whose upgrade added a line, not a roll.
+    let legalTotals =
+      level < 4
+      ? [substats.count]
+      : Set(starts.filter { min(4, $0 + events) == substats.count }.map { $0 + events })
     guard !totals.isDisjoint(with: legalTotals) else {
       throw ArtifactError(
         "The substats contain an impossible number of rolls for +\(level). Check the values.")
@@ -243,11 +248,8 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
     let after = next.substats + (next.unactivated.map { [$0] } ?? [])
     guard setKey == next.setKey, slot == next.slot, main == next.main, rule == next.rule,
       rarity == next.rarity, next.level >= level,
-      // A four-star that started with two lines gains lines as it levels; each starts at one roll.
+      // A four-star that started with two lines gains lines as it levels.
       Set(before.map(\.key)).isSubset(of: after.map(\.key)),
-      after.filter({ line in !before.contains { $0.key == line.key } }).allSatisfy({
-        Self.possibleRollCounts($0, rarity: rarity).contains(1)
-      }),
       next.level >= 4 || next.unactivated == unactivated
     else {
       throw ArtifactError(
@@ -256,7 +258,12 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
     // Each upgrade either adds a line or rolls one; only the rolls show as value changes.
     let added = after.count - before.count + (unactivated != nil && next.level >= 4 ? 1 : 0)
     let events = next.level / 4 - level / 4 - added
+    // A line added since the last reading arrives with one roll and may have rolled since.
     var counts: Set<Int> = [0]
+    for line in after where !before.contains(where: { $0.key == line.key }) {
+      let extra = Self.possibleRollCounts(line, rarity: rarity).map { $0 - 1 }
+      counts = Set(counts.flatMap { count in extra.map { count + $0 } })
+    }
     for old in before {
       guard let new = after.first(where: { $0.key == old.key }), new.value >= old.value else {
         throw ArtifactError(

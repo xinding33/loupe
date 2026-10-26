@@ -94,6 +94,95 @@ import Testing
     #expect(throws: ArtifactError.self) { try four.upgraded(to: five) }
   }
 
+  @Test func linesAndRollsMustAgree() throws {
+    // Three lines at +4 mean the upgrade added a line, so no line can hold two rolls.
+    #expect(throws: ArtifactError.self) {
+      try piece(
+        "Instructor", .sands, .elementalMastery, level: 4,
+        [Substat(.energyRecharge, 8.28), Substat(.critRate, 2.49), Substat(.def, 14.82)])
+    }
+    // Four lines at +4 mean a three-line start whose upgrade added the fourth: still no rolls.
+    #expect(
+      try piece(
+        "Instructor", .sands, .elementalMastery, level: 4,
+        [
+          Substat(.energyRecharge, 4.14), Substat(.critRate, 2.49), Substat(.def, 14.82),
+          Substat(.hpPercent, 3.73),
+        ]
+      ).level == 4)
+    #expect(throws: ArtifactError.self) {
+      try piece(
+        "Instructor", .sands, .elementalMastery, level: 4,
+        [
+          Substat(.energyRecharge, 8.28), Substat(.critRate, 2.49), Substat(.def, 14.82),
+          Substat(.hpPercent, 3.73),
+        ])
+    }
+  }
+
+  @Test func aLinkedRecordFollowsLinesThatWereAddedAndThenRolled() throws {
+    let starter = try piece(
+      "Instructor", .sands, .elementalMastery, level: 0,
+      [Substat(.energyRecharge, 4.14), Substat(.critRate, 2.49)])
+    // DEF arrived at +4, HP% at +8, and DEF rolled again at +12.
+    let twelve = try piece(
+      "Instructor", .sands, .elementalMastery, level: 12,
+      [
+        Substat(.energyRecharge, 4.14), Substat(.critRate, 2.49), Substat(.def, 29.64),
+        Substat(.hpPercent, 3.73),
+      ])
+    #expect(try starter.upgraded(to: twelve).id == starter.id)
+    // One roll too many for three upgrades.
+    let tooMany = try piece(
+      "Instructor", .sands, .elementalMastery, level: 12,
+      [
+        Substat(.energyRecharge, 8.28), Substat(.critRate, 2.49), Substat(.def, 29.64),
+        Substat(.hpPercent, 3.73),
+      ])
+    #expect(throws: ArtifactError.self) { try starter.upgraded(to: tooMany) }
+  }
+
+  @Test func enhanceFollowsALineAddedBelowTheOthers() throws {
+    let previous = try CardParser.parse(
+      """
+      Instructor's Pocket Watch
+      Sands of Eon
+      Elemental Mastery
+      70
+      +4
+      Energy Recharge+4.1%
+      CRIT Rate+2.5%
+      DEF+15
+      Instructor:
+      """, stars: 4)
+    let screen = """
+      Sands of Eon / Instructor's Pocket Watch
+      +8
+      Elemental Mastery+93
+      Energy Recharge+4.1%
+      CRIT Rate+2.5%
+      DEF+15
+      HP+3.7%
+      """
+    let updated = try CardParser.parseEnhancement(
+      screen, previous: previous, pieceName: "Instructor's Pocket Watch")
+    #expect(updated.level == 8)
+    #expect(updated.rarity == 4)
+    #expect(updated.substats.map(\.key) == [.energyRecharge, .critRate, .def, .hpPercent])
+    // A missed row cannot pass as a smaller piece.
+    let missing = """
+      Sands of Eon / Instructor's Pocket Watch
+      +4
+      Elemental Mastery+70
+      Energy Recharge+4.1%
+      DEF+15
+      """
+    #expect(throws: ArtifactError.self) {
+      try CardParser.parseEnhancement(
+        missing, previous: previous, pieceName: "Instructor's Pocket Watch")
+    }
+  }
+
   @Test func savedInventoryKeepsRarityAndOldRecordsStayFiveStar() throws {
     let saved = try finishedSands()
     let decoded = try JSONDecoder().decode(Artifact.self, from: JSONEncoder().encode(saved))

@@ -10,6 +10,14 @@ import Testing
   #expect(text.contains("ATK+47"))
 }
 
+@Test func aFourStarWithFewerLinesHasFewerRows() throws {
+  // A four-star that started with two lines shows the main stat and three rows at +0.
+  let fourRows = regions.filter { !["CRIT DMG", "6.2%"].contains($0.text) }
+  let text = try EnhancementLayout.assemble(fourRows, heading: heading).text
+  #expect(!text.contains("CRIT DMG"))
+  #expect(text.contains("CRIT Rate+3.1% (unactivated)"))
+}
+
 @Test func additionalPreviewValuesAndMissingRowsWithholdAdvice() {
   #expect(throws: ArtifactError.self) {
     try EnhancementLayout.assemble(regions + [region("59", 0.86, 0.73)], heading: heading)
