@@ -107,7 +107,7 @@ struct AssessmentSummary: View {
       VStack(alignment: .leading, spacing: 3) {
         Text(headline.caption).font(.caption.weight(.medium))
           .foregroundStyle(headline.kind == .needsReread ? Theme.attention : .secondary)
-        Text(match?.characterName ?? "No reviewed match").font(.title2.bold())
+        Text(match?.characterName ?? "No character match").font(.title2.bold())
         if let match {
           HStack(spacing: 6) {
             Text(match.roleName).foregroundStyle(.secondary)
@@ -193,7 +193,7 @@ struct AssessmentSummary: View {
   }
 }
 
-/// Selectable list of reviewed roles plus the selected role's reasons and assumptions.
+/// Selectable list of character roles plus the selected role's reasons and assumptions.
 struct CharacterAssessmentView: View {
   @ObservedObject var model: Model
   let artifact: Artifact

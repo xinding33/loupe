@@ -19,10 +19,13 @@ import Testing
       Substat(.energyRecharge, 6.48),
     ])
   await model.evaluate()?.value
-  #expect(model.selectedMatch?.characterID == "kuki-shinobu")
-  #expect(model.selectedMatch?.potential == nil)
-  #expect(model.selectedMatch?.grades == nil)
-  #expect(model.characterShortlist.visibleMatches.first?.characterID == "kuki-shinobu")
+  // An EM-only role that wants this set leads; several characters share that archetype.
+  let selected = try #require(model.selectedMatch)
+  #expect(selected.usefulStats == [.elementalMastery])
+  #expect(selected.setFit == .preferred)
+  #expect(selected.potential == nil)
+  #expect(selected.grades == nil)
+  #expect(model.characterShortlist.visibleMatches.first?.roleID == selected.roleID)
 }
 
 private func shortlistFlower() throws -> Artifact {
@@ -319,4 +322,21 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
   let unknown = CharacterShortlist(
     matches: matches, artifact: artifact, selectedCharacterID: nil, leadingCharacterID: "nobody")
   #expect(unknown.allMatches.map(\.characterID) == plain.allMatches.map(\.characterID))
+}
+
+@Test func shortlistShowsDifferentArchetypesBeforeRepeatingOne() throws {
+  let artifact = try Artifact(
+    setName: "Golden Troupe", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.critRate, 10.89), Substat(.critDamage, 21.76), Substat(.hpPercent, 9.91),
+      Substat(.elementalMastery, 23.31),
+    ])
+  let matches = CharacterAssessment.evaluate(artifact)
+  let shortlist = CharacterShortlist(matches: matches, artifact: artifact, selectedCharacterID: nil)
+  let visible = shortlist.visibleMatches
+  #expect(visible.count == 5)
+  #expect(Set(visible.map(\.role.archetype)).count == 5)
+  // Preferred-set roles still lead, and the reviewed role leads its archetype.
+  #expect(visible.first?.setFit == .preferred)
+  #expect(visible.contains { $0.characterID == "furina" })
 }

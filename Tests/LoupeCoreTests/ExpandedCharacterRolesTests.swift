@@ -22,7 +22,7 @@ import Testing
   }
 
   @Test func reviewedRegistryIsDistinctCompleteAndHasLegalSourcedRoles() throws {
-    let results = CharacterAssessment.evaluate(try flower())
+    let results = CharacterAssessment.evaluate(try flower(), roles: CharacterRoles.reviewed)
     #expect(
       results.map(\.characterID) == [
         "alhaitham", "bennett", "fischl", "furina", "itto", "kazuha", "kokomi", "kuki-shinobu",
@@ -225,7 +225,10 @@ import Testing
     #expect(kazuha.conditions.contains { $0.kind == .mainStat && $0.status == .unknown })
     #expect(kazuha.conditions.contains { $0.explanation.contains("Favonius") })
     #expect(!CharacterAssessment.evaluate(er).contains { $0.characterID == "sucrose" })
-    #expect(!CharacterAssessment.evaluate(er).contains { $0.characterID == "raiden-shogun" })
+    // Only Raiden's archetype Burst role takes an ER sands; her reviewed Hyperbloom role does not.
+    #expect(
+      CharacterAssessment.evaluate(er).filter { $0.characterID == "raiden-shogun" }.map(\.roleID)
+        == ["raiden-shogun.er-crit"])
   }
 
   @Test(arguments: ["kazuha", "sucrose", "bennett", "raiden-shogun"])
@@ -236,7 +239,10 @@ import Testing
         Substat(.elementalMastery, 23.31), Substat(.hpPercent, 5.83),
         Substat(.energyRecharge, 6.48), Substat(.def, 23.15),
       ])
-    #expect(!CharacterAssessment.evaluate(piece).contains { $0.characterID == id })
+    #expect(
+      !CharacterAssessment.evaluate(piece, roles: CharacterRoles.reviewed).contains {
+        $0.characterID == id
+      })
   }
 
   @Test func expandedRolesKeepSavedScopeAndActualVersusForecastSemantics() throws {

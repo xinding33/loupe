@@ -57,7 +57,7 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
         Substat(.elementalMastery, 140), Substat(.atk, 19), Substat(.def, 23),
         Substat(.hpPercent, 5.8),
       ])
-    let results = CharacterAssessment.evaluate(piece)
+    let results = CharacterAssessment.evaluate(piece, roles: CharacterRoles.reviewed)
     #expect(
       results.map(\.characterID) == [
         "alhaitham", "bennett", "fischl", "furina", "itto", "kazuha", "kokomi", "kuki-shinobu",
@@ -70,7 +70,7 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
       .map(\.characterID) == ["furina", "itto", "kokomi", "kuki-shinobu", "xiangling"])
     #expect(Set(results.map(\.id)).count == results.count)
     #expect(try match(piece, "kuki-shinobu").potential?.currentScore == 6)
-    #expect(CharacterAssessment.coverageDescription.contains("Not roster-wide"))
+    #expect(CharacterAssessment.coverageDescription.contains("15 roles were reviewed one by one"))
   }
 
   @Test func wrongMainDoesNotProduceSpeculativeUsers() throws {
@@ -79,10 +79,20 @@ private func nearHandTier(_ actual: ArtifactTier?, _ hand: ArtifactTier) -> Bool
       Substat(.energyRecharge, 6.5),
     ]
     let geo = try artifact(.goblet, .geoDamage, stats)
-    #expect(CharacterAssessment.evaluate(geo).map(\.characterID) == ["itto"])
+    #expect(
+      CharacterAssessment.evaluate(geo, roles: CharacterRoles.reviewed).map(\.characterID) == [
+        "itto"
+      ])
     let physical = try artifact(.goblet, .physicalDamage, stats)
-    #expect(CharacterAssessment.evaluate(physical).isEmpty)
-    #expect(CharacterRoles.noMatchDescription.contains("No reviewed match"))
+    #expect(CharacterAssessment.evaluate(physical, roles: CharacterRoles.reviewed).isEmpty)
+    // Archetype roles take a DMG Bonus goblet only for the character's own damage type.
+    #expect(
+      Set(CharacterAssessment.evaluate(physical).map(\.characterID)) == [
+        "eula", "freminet", "razor", "xinyan",
+      ])
+    #expect(
+      CharacterAssessment.evaluate(geo).allSatisfy { $0.role.mains[.goblet]!.contains(.geoDamage) })
+    #expect(CharacterRoles.noMatchDescription.contains("No character role"))
   }
 
   @Test func kokomiCritRollsDoNotIncreaseHealingScreen() throws {

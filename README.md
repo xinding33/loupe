@@ -78,18 +78,18 @@ Before upgrading a candidate, save it and choose **Link upgrade** on its invento
 
 **The verdict** comes first in the overlay and dashboard: **Keep**, **Level to +N**, **Review**, or **Fodder**, with one reason. It is advice only; nothing acts in the game.
 
-- **Keep** a finished piece when a better one would take at least 1,000 five-star domain drops for some reviewed character, or when it is B or better for a character and beats enough of your saved +20 pieces of that slot and main stat.
+- **Keep** a finished piece when a better one would take at least 1,000 five-star domain drops for some character, or when it is B or better for a character and beats enough of your saved +20 pieces of that slot and main stat.
 - **Level to +N** an unfinished piece when its exact chance of becoming a keeper at +20 clears a bar that rises from 5% at +0 to 30% at +16, because the last levels cost the most.
-- **Fodder** when no reviewed character uses the slot and main stat, when it is in the bottom half of new drops for every one, when saved pieces already beat it for every one, or when its keeper chance is below the bar.
+- **Fodder** when no character uses the slot and main stat, when it is in the bottom half of new drops for every one, when saved pieces already beat it for every one, or when its keeper chance is below the bar.
 - **Review** otherwise, including good pieces with no saved +20 pieces to compare. Save your +20 pieces first (see above) so the verdicts can use them.
 
 The character behind the verdict leads the shortlist. Defaults and measurements are in the [grading approach](docs/grading-approach.md).
 
-**Character uses** is the default assessment. Coverage includes one reviewed role each for 15 characters: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, Kokomi, Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun, Sucrose, Xiangling, Xingqiu, and Yelan. It includes unowned characters and off-pieces. Roles are specific: Raiden covers Hyperbloom, for example, not her Burst-carry build. See the [coverage and source limits](docs/character-coverage-expansion.md).
+**Character uses** is the default assessment. It covers every playable character through shared [archetypes](docs/archetypes.md): twelve stat profiles such as HP crit damage or EM reaction support. Each character is assigned its archetypes, the goblet it uses, and its four-piece sets. Characters in one archetype share a grade, so a role is only as specific as its archetype. 15 roles were also reviewed one by one: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, Kokomi, Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun (Hyperbloom), Sucrose, Xiangling, Xingqiu, and Yelan. They keep their reviewed details; other roles say they come from an archetype. Coverage includes unowned characters and off-pieces. See the [coverage and source limits](docs/character-coverage-expansion.md) for the reviewed roles.
 
-The dashboard and overlay show the same shortlist of up to five potential users. The verdict's character comes first; the rest are ordered by useful-stat presence, main-stat fit, and set fit, not cross-character damage or raw scores. Select a character in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible users** reveals the remaining reviewed candidates. This is partial coverage, not a complete roster search.
+The dashboard and overlay show the same shortlist of up to five potential users. The verdict's character comes first; the rest are ordered by useful-stat presence, set fit, main-stat fit, and the number of useful substats, not cross-character damage or raw scores. The five show different archetypes before repeating one. Select a character in the dashboard to inspect its assumptions and forecast; your selection stays in the shortlist. **Show all N eligible users** reveals the remaining candidates.
 
-Experimental S/A/B/C/D tiers grade every reviewed role. A tier says how rare the piece's useful rolls are among every possible new five-star drop of the same slot and main stat, scored with that role's useful stats:
+Experimental S/A/B/C/D tiers grade every role. A tier says how rare the piece's useful rolls are among every possible new five-star drop of the same slot and main stat, scored with that role's useful stats:
 
 | Tier | Share of new drops this good or better |
 | --- | --- |
@@ -138,7 +138,7 @@ A missed reading keeps the last verified result visible for up to three seconds,
 
 Enhance reading can still fail when particles overlap text. Rechecking changes a small status label rather than replacing the recommendation heading. The diagnostic recorder below captures failures for local regression testing.
 
-A **Fodder** verdict only covers the reviewed characters. A piece may still have set value or a use outside them.
+A **Fodder** verdict covers the archetypes each character is assigned. A piece may still have set value or a use in a build no archetype describes.
 
 ## Data and privacy
 

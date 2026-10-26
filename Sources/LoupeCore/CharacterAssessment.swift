@@ -8,7 +8,8 @@ public struct CharacterMatch: Sendable, Identifiable {
   public let potential: Potential?
   public let potentialUnavailableReason: String?
   public let grades: CharacterGradeSummary?
-  public var id: String { characterID }
+  /// A character can hold several roles, so the role identifies a match.
+  public var id: String { roleID }
   public var characterID: String { role.characterID }
   public var characterName: String { role.characterName }
   public var roleID: String { role.roleID }
@@ -26,11 +27,13 @@ public enum CharacterAssessment {
   /// Potential users in stable identity order, not a cross-role strength ranking.
   public static func evaluate(
     _ artifact: Artifact, inventory: [Artifact] = [], scope: ComparisonScope = .offPiece,
-    excluding: UUID? = nil
+    excluding: UUID? = nil, roles: [CharacterRole] = CharacterRoles.all
   ) -> [CharacterMatch] {
     // One enumeration serves every role; a failure is reported per role below.
     let outcomes = try? RollOutcomes(artifact)
-    return CharacterRoles.reviewed.filter {
+    // Characters sharing an archetype share a forecast, so compute each profile once.
+    var forecasts: [[Stat]: Result<Potential, Error>] = [:]
+    return roles.filter {
       $0.mains[artifact.slot, default: []].contains(artifact.main)
     }
     .sorted { $0.characterID < $1.characterID }
@@ -84,12 +87,20 @@ public enum CharacterAssessment {
         unavailable =
           "\(artifact.main.label) main is useful, but this profile has no eligible core substats to compare. Secondary utility is not graded."
       } else {
-        do {
-          potential = try Potential.evaluate(
-            artifact, profile: role.profile, inventory: inventory, scope: scope,
-            excluding: excluding, outcomes: outcomes)
+        let key = role.usefulStats.sorted { $0.rawValue < $1.rawValue }
+        let forecast =
+          forecasts[key]
+          ?? Result {
+            try Potential.evaluate(
+              artifact, profile: role.profile, inventory: inventory, scope: scope,
+              excluding: excluding, outcomes: outcomes)
+          }
+        forecasts[key] = forecast
+        switch forecast {
+        case .success(let value):
+          potential = value
           unavailable = nil
-        } catch {
+        case .failure(let error):
           potential = nil
           unavailable = error.localizedDescription
         }

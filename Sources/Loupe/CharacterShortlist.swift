@@ -1,7 +1,9 @@
 import LoupeCore
 
 /// A browsing order based on stat presence and set context, never cross-role strength.
-/// The character behind the current verdict, when there is one, leads the list.
+/// The character behind the current verdict, when there is one, leads the list, and the visible
+/// rows show different archetypes before repeating one, since an archetype's characters share
+/// a grade.
 struct CharacterShortlist {
   let allMatches: [CharacterMatch]
   let visibleMatches: [CharacterMatch]
@@ -17,15 +19,16 @@ struct CharacterShortlist {
       selectedMatch = nil
       return
     }
-    func priority(_ match: CharacterMatch) -> (Int, Int, Int, String, String) {
-      let activeCore = artifact.substats.contains { match.usefulStats.contains($0.key) }
+    func priority(_ match: CharacterMatch) -> (Int, Int, Int, Int, Int, String) {
+      let active = artifact.substats.filter { match.usefulStats.contains($0.key) }.count
       // Fixed flower/plume mains do not distinguish users. EM-only mains still count as fit.
       let coreMain =
         artifact.slot != .flower && artifact.slot != .plume
         && match.usefulStats.contains(artifact.main)
       let set = match.setFit == .preferred ? 0 : match.setFit == .alternative ? 1 : 2
       return (
-        activeCore || coreMain ? 0 : 1, set, coreMain ? 0 : 1, match.characterID, match.roleID
+        active > 0 || coreMain ? 0 : 1, set, coreMain ? 0 : 1, -active,
+        match.role.isReviewed ? 0 : 1, match.characterID + "|" + match.roleID
       )
     }
     var seen = Set<String>()
@@ -37,7 +40,11 @@ struct CharacterShortlist {
     allMatches = ordered
     let selected = ordered.first { $0.characterID == selectedCharacterID } ?? ordered.first
     selectedMatch = selected
-    var visible = Array(ordered.prefix(5))
+    var shown = Set<ArchetypeID?>()
+    let varied = ordered.filter { shown.insert($0.role.archetype).inserted }
+    var visible = Array(
+      (varied + ordered.filter { match in !varied.contains { $0.roleID == match.roleID } })
+        .prefix(5))
     if let selected, !visible.contains(where: { $0.characterID == selected.characterID }) {
       visible.removeLast()
       visible.append(selected)

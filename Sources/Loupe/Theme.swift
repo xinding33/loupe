@@ -105,7 +105,7 @@ struct GradeHeadline {
     case .mainStatFit: "Main-stat fit · no core substats"
     case .specialRolls: "Special rolls · no ordinary odds"
     case .needsReread: "Forecast needs a full read"
-    case .noMatch: "No reviewed match"
+    case .noMatch: "No character match"
     }
   }
 }
