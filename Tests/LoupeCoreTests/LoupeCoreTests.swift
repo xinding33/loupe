@@ -106,6 +106,20 @@ private let starredCard = """
   #expect(artifact.substats.map(\.key) == [.critDamage, .critRate, .hpPercent])
   #expect(artifact.unactivated == Substat(.elementalMastery, 23))
   #expect(CardParser.parsedLines(text) == [2, 4, 3, 5, 6, 7, 8, 9, 10, 11])
+  #expect(CardParser.pieceName(text) == "Crystal Tear of the Wanderer")
+  // Enhance titles the piece in full, so the wrapped name must still match.
+  let enhance = """
+    Flower of Life / Crystal Tear of the Wanderer
+    +0
+    HP+717
+    CRIT DMG+7.0%
+    CRIT Rate+2.7%
+    HP+5.3%
+    Elemental Mastery+23 (unactivated)
+    """
+  let read = try CardParser.parseEnhancement(
+    enhance, previous: artifact, pieceName: CardParser.pieceName(text))
+  #expect(read.signature == artifact.signature)
 }
 
 @Test func strayMarksAndMisreadLettersStillRead() throws {

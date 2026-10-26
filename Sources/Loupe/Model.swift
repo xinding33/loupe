@@ -202,8 +202,7 @@ final class Model: ObservableObject {
           status =
             "Enhance verified against the last Inventory card. Odds update after rolls settle."
         } else {
-          let title = reading.text.components(separatedBy: .newlines).first ?? ""
-          enhancementContext = (title, artifact)
+          enhancementContext = (CardParser.pieceName(reading.text), artifact)
           status = "Live card verified across two frames. Ordinary-drop model only."
         }
         decision = "Parsed and verified across frames"

@@ -21,6 +21,18 @@ public enum CardParser {
   /// rarity stars as low-confidence text.
   public static func parsedLines(_ text: String) -> [Int]? { try? layout(text).used }
 
+  /// The piece name above the slot line. The character screen wraps long names, as in
+  /// "Crystal Tear of the" / "Wanderer", and Enhance compares against the whole name.
+  public static func pieceName(_ text: String) -> String {
+    let lines = text.components(separatedBy: .newlines).map(tidied).filter { !$0.isEmpty }
+    guard
+      let slot = lines.firstIndex(where: { line in
+        slotNames.contains { line.localizedCaseInsensitiveContains($0.0) }
+      })
+    else { return lines.first ?? "" }
+    return lines[..<slot].joined(separator: " ")
+  }
+
   /// Replaces Cyrillic and Greek capitals and lowercase letters that Vision returns for their
   /// Latin look-alikes, such as the Cyrillic Р in "HР".
   public static func latinized(_ text: String) -> String {
@@ -46,6 +58,11 @@ public enum CardParser {
     return map
   }()
 
+  private static let slotNames: [(String, Slot)] = [
+    ("Flower of Life", .flower), ("Plume of Death", .plume), ("Sands of Eon", .sands),
+    ("Goblet of Eonothem", .goblet), ("Circlet of Logos", .circlet),
+  ]
+
   private struct Layout {
     var slot: Slot
     var level: Int
@@ -59,15 +76,12 @@ public enum CardParser {
   private static func layout(_ text: String) throws -> Layout {
     let lines = text.components(separatedBy: .newlines).map(tidied)
     let filled = lines.indices.filter { !lines[$0].isEmpty }
-    let slots: [(String, Slot)] = [
-      ("Flower of Life", .flower), ("Plume of Death", .plume), ("Sands of Eon", .sands),
-      ("Goblet of Eonothem", .goblet), ("Circlet of Logos", .circlet),
-    ]
     guard
       let slotLine = filled.first(where: { line in
-        slots.contains { lines[line].localizedCaseInsensitiveContains($0.0) }
+        slotNames.contains { lines[line].localizedCaseInsensitiveContains($0.0) }
       }),
-      let slot = slots.first(where: { lines[slotLine].localizedCaseInsensitiveContains($0.0) })?.1
+      let slot = slotNames.first(where: { lines[slotLine].localizedCaseInsensitiveContains($0.0) })?
+        .1
     else {
       throw ArtifactError(
         "No artifact card found. Open a piece in Inventory, or paste its card text.")
