@@ -169,7 +169,7 @@ public enum Roster {
       ["Night of the Sky's Unveiling", "Marechaussee Hunter"]),
     RosterCharacter(
       "iansan", "Iansan", .electroDamage, [.atkSupport],
-      ["Scroll of the Hero of Cinder City", "Noblesse Oblige"]),
+      ["Scroll of the Hero of Cinder City", "Noblesse Oblige"], heals: true),
     RosterCharacter(
       "ineffa", "Ineffa", .atkPercent, [.atkEMCrit],
       ["Aubade of Morningstar and Moon", "Silken Moon's Serenade"]),

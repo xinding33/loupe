@@ -16,6 +16,7 @@ public struct Verdict: Sendable, Equatable {
   public let characterID: String?
   /// That role, since a character can hold several.
   public let roleID: String?
+  public let roleName: String?
   public let characterName: String?
   /// Why, without the character's name, so a narrow surface can show it beside the name.
   public let reason: String
@@ -29,6 +30,7 @@ public struct Verdict: Sendable, Equatable {
     self.keeperChance = keeperChance
     self.characterID = role?.characterID
     self.roleID = role?.roleID
+    self.roleName = role?.roleName
     self.characterName = role?.characterName
     self.reason = reason
   }

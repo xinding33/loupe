@@ -99,7 +99,7 @@ Choices worth knowing:
 | Ganyu | ATK crit | Cryo DMG | Blizzard Strayer; Wanderer's Troupe |
 | Gorou | DEF support | — | Noblesse Oblige; Husk of Opulent Dreams |
 | Hu Tao | HP reaction | Pyro DMG | Crimson Witch of Flames; Shimenawa's Reminiscence |
-| Iansan | ATK support | — | Scroll of the Hero of Cinder City; Noblesse Oblige |
+| Iansan | ATK support; heals | — | Scroll of the Hero of Cinder City; Noblesse Oblige |
 | Ifa | EM reaction support, ATK crit | Anemo DMG | Viridescent Venerer; Obsidian Codex |
 | Illuga | EM reaction support | — | Silken Moon's Serenade; Noblesse Oblige |
 | Ineffa | ATK reaction | ATK% | Aubade of Morningstar and Moon; Silken Moon's Serenade |

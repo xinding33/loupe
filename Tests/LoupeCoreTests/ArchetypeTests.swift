@@ -137,6 +137,7 @@ private func flower(_ substats: [Substat], set: String = "Test off-piece") throw
   #expect(!users.contains("shenhe"))
   #expect(!users.contains("yun-jin"))
   #expect(users.contains("jean"))
+  #expect(users.contains("iansan"))
   #expect(users.contains("kokomi"))
   let shenhe = try #require(CharacterRoles.all.first { $0.characterID == "shenhe" })
   #expect(shenhe.mains[.circlet] == [.atkPercent, .critRate])

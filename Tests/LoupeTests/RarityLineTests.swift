@@ -92,3 +92,24 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
       == "\(name) · \(verdict.reason)")
   #expect(VerdictBanner.text(verdict, lines: 2, displayedCharacterID: id) == verdict.summary)
 }
+
+@MainActor
+@Test func bannerNamesTheVerdictsRoleWhenAnotherRoleOfTheCharacterIsShown() throws {
+  let flower = try Artifact(
+    setName: "Obsidian Codex", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.elementalMastery, 139.86), Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
+      Substat(.atk, 19.45),
+    ])
+  let verdict = VerdictEngine.evaluate(
+    flower, matches: CharacterAssessment.evaluate(flower), inventory: [])
+  let character = try #require(verdict.characterID)
+  let role = try #require(verdict.roleID)
+  #expect(
+    VerdictBanner.text(verdict, lines: 1, displayedCharacterID: character, displayedRoleID: role)
+      == verdict.reason)
+  let other = VerdictBanner.text(
+    verdict, lines: 1, displayedCharacterID: character, displayedRoleID: "\(character).other")
+  #expect(other.contains(try #require(verdict.roleName)))
+  #expect(other.hasSuffix(verdict.reason))
+}
