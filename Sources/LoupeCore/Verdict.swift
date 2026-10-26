@@ -268,15 +268,19 @@ extension VerdictEngine {
         ? Verdict(kind: .keep, match: lead, reason: reason)
         : Verdict(kind: .level, targetLevel: artifact.maxLevel, match: lead, reason: reason)
     }
-    // Enough copies: only more useful lines than a saved copy make it worth a look.
-    let useful = Set(lead.usefulStats + lead.secondaryStats)
-    func lines(_ piece: Artifact) -> Int {
-      (piece.substats + (piece.unactivated.map { [$0] } ?? [])).filter { useful.contains($0.key) }
-        .count
+    // Enough copies: only more useful lines than a saved copy, for any eligible character, make
+    // it worth a look.
+    func lines(_ piece: Artifact, _ match: CharacterMatch) -> Int {
+      let useful = Set(match.usefulStats + match.secondaryStats)
+      return (piece.substats + (piece.unactivated.map { [$0] } ?? [])).filter {
+        useful.contains($0.key)
+      }.count
     }
-    if let weakest = saved.map(lines).min(), lines(artifact) > weakest {
+    if let better = matches.first(where: { match in
+      lines(artifact, match) > saved.map { lines($0, match) }.min() ?? .max
+    }) {
       return Verdict(
-        kind: .review, match: lead, reason: "More useful lines than a saved \(kind) piece")
+        kind: .review, match: better, reason: "More useful lines than a saved \(kind) piece")
     }
     return Verdict(kind: .fodder, match: lead, reason: "Enough saved \(kind)")
   }

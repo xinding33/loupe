@@ -294,6 +294,28 @@ import Testing
       ).kind == .keep)
   }
 
+  @Test func anyEligibleCharacterCanWantAThirdCopy() throws {
+    // Saved copies suit Kuki (HP%, ER); the candidate's crit and ATK% lines suit Nahida.
+    let saved = try (0..<2).map { _ in
+      try piece(
+        "Instructor", .sands, .elementalMastery, level: 16,
+        [
+          Substat(.hpPercent, 3.73), Substat(.energyRecharge, 12.43), Substat(.atk, 14.00),
+          Substat(.def, 14.82),
+        ])
+    }
+    let candidate = try piece(
+      "Instructor", .sands, .elementalMastery, level: 16,
+      [
+        Substat(.critRate, 6.22), Substat(.critDamage, 9.94), Substat(.atkPercent, 3.73),
+        Substat(.def, 14.82),
+      ])
+    let verdict = VerdictEngine.evaluate(
+      candidate, matches: CharacterAssessment.evaluate(candidate), inventory: saved)
+    #expect(verdict.kind == .review)
+    #expect(verdict.characterID == "nahida")
+  }
+
   @Test func otherFourStarsAreFodderWithAReason() throws {
     func verdict(_ artifact: Artifact) -> Verdict {
       VerdictEngine.evaluate(
