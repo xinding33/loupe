@@ -82,8 +82,8 @@ Verdicts follow the best grade (below) among the piece's characters:
 
 - **Level to +20** an unfinished S. **Level to +N**, the next checkpoint, for an A or B, so the grade is read again as rolls land. A piece whose main stat fills an empty saved slot for a character who can only use that main stat also levels a checkpoint at a time.
 - **Keep** a finished S or A. A finished B is kept while it ranks among the saved +20 pieces of that slot and main stat that its characters can use.
-- **Fodder** for C and D, when no character uses the slot and main stat, or when enough saved pieces already beat its best outcome for every character. A C piece levels anyway when you have one or two saved pieces of its kind, but not none, since an empty pool usually means an unscanned bag.
-- **Review** a finished B with no saved +20 pieces to compare, and pieces without an ordinary forecast. Save your +20 pieces first (see above) so the verdicts can use them.
+- **Fodder** for C and D, when no character uses the slot and main stat, or when enough saved pieces already beat its best outcome for every character. A C piece is rescued when some character's saved pool of its kind is thin: not empty, since that usually means an unscanned bag, but smaller than the number of pieces that character's group can use. An unfinished one then levels to the next checkpoint; a finished one goes to Review.
+- **Review** a finished B with no saved +20 pieces to compare, a rescued finished C, and pieces without an ordinary forecast. Save your +20 pieces first (see above) so the verdicts can use them.
 
 Supports, roles without both crit stats, mostly need their main stat, and a flower suits nearly every support. Their grade levels a piece only at S; a finished support A or B is kept while it ranks among the saved pieces.
 
