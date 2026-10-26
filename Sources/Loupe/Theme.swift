@@ -105,7 +105,7 @@ struct GradeHeadline {
     case .mainStatFit: "Main-stat fit · no core substats"
     case .specialRolls: "Special rolls · no ordinary odds"
     case .needsReread: "Forecast needs a full read"
-    case .noMatch: "No reviewed match"
+    case .noMatch: "No character match"
     }
   }
 }
@@ -154,8 +154,10 @@ struct VerdictBanner: View {
   /// Smaller type for the overlay.
   var compact = false
   var lines = 2
-  /// The character shown beside the banner. The name is omitted only when it is the verdict's.
+  /// The character and role shown beside the banner. The name is omitted only when that role is
+  /// the verdict's.
   var displayedCharacterID: String?
+  var displayedRoleID: String?
 
   var body: some View {
     HStack(spacing: 8) {
@@ -164,21 +166,40 @@ struct VerdictBanner: View {
         .foregroundStyle(Theme.hud)
         .padding(.horizontal, 7).padding(.vertical, 3)
         .background(Theme.verdict(verdict.kind), in: Capsule())
-      Text(Self.text(verdict, lines: lines, displayedCharacterID: displayedCharacterID))
-        .font(compact ? .caption2 : .callout).foregroundStyle(.secondary)
-        .lineLimit(lines).minimumScaleFactor(0.85)
-        .fixedSize(horizontal: false, vertical: lines > 1)
+      Text(
+        Self.text(
+          verdict, lines: lines, displayedCharacterID: displayedCharacterID,
+          displayedRoleID: displayedRoleID)
+      )
+      .font(compact ? .caption2 : .callout).foregroundStyle(.secondary)
+      .lineLimit(lines).minimumScaleFactor(0.85)
+      .fixedSize(horizontal: false, vertical: lines > 1)
       Spacer(minLength: 0)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(verdict.title). \(verdict.summary)")
+    .accessibilityLabel(
+      "\(verdict.title). "
+        + Self.text(
+          verdict, lines: 2, displayedCharacterID: displayedCharacterID,
+          displayedRoleID: displayedRoleID)
+    )
     .help("Advice only. Rules and defaults: docs/grading-approach.md")
   }
 
-  /// One line sits just above the displayed character, so it drops the name only when that
-  /// character is the verdict's; otherwise the name leads.
-  static func text(_ verdict: Verdict, lines: Int, displayedCharacterID: String?) -> String {
-    lines == 1 && displayedCharacterID == verdict.characterID ? verdict.reason : verdict.summary
+  /// One line sits just above the displayed role, so it drops the name only when that role is
+  /// the verdict's. Another role of the same character names the verdict's role.
+  static func text(
+    _ verdict: Verdict, lines: Int, displayedCharacterID: String?, displayedRoleID: String? = nil
+  ) -> String {
+    let sameRole =
+      displayedRoleID.map { $0 == verdict.roleID } ?? (displayedCharacterID == verdict.characterID)
+    if sameRole { return lines == 1 ? verdict.reason : verdict.summary }
+    if displayedCharacterID == verdict.characterID, let name = verdict.characterName,
+      let role = verdict.roleName
+    {
+      return "\(name), \(role) · \(verdict.reason)"
+    }
+    return verdict.summary
   }
 }
 

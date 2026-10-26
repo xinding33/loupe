@@ -19,10 +19,13 @@ import Testing
       Substat(.energyRecharge, 6.48),
     ])
   await model.evaluate()?.value
-  #expect(model.selectedMatch?.characterID == "kuki-shinobu")
-  #expect(model.selectedMatch?.potential == nil)
-  #expect(model.selectedMatch?.grades == nil)
-  #expect(model.characterShortlist.visibleMatches.first?.characterID == "kuki-shinobu")
+  // An EM-only role that wants this set leads; several characters share that archetype.
+  let selected = try #require(model.selectedMatch)
+  #expect(selected.usefulStats == [.elementalMastery])
+  #expect(selected.setFit == .preferred)
+  #expect(selected.potential == nil)
+  #expect(selected.grades == nil)
+  #expect(model.characterShortlist.visibleMatches.first?.roleID == selected.roleID)
 }
 
 private func shortlistFlower() throws -> Artifact {
@@ -319,4 +322,49 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
   let unknown = CharacterShortlist(
     matches: matches, artifact: artifact, selectedCharacterID: nil, leadingCharacterID: "nobody")
   #expect(unknown.allMatches.map(\.characterID) == plain.allMatches.map(\.characterID))
+}
+
+@Test func shortlistShowsDifferentArchetypesBeforeRepeatingOne() throws {
+  let artifact = try Artifact(
+    setName: "Golden Troupe", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.critRate, 10.89), Substat(.critDamage, 21.76), Substat(.hpPercent, 9.91),
+      Substat(.elementalMastery, 23.31),
+    ])
+  let matches = CharacterAssessment.evaluate(artifact)
+  let shortlist = CharacterShortlist(matches: matches, artifact: artifact, selectedCharacterID: nil)
+  let visible = shortlist.visibleMatches
+  #expect(visible.count == 5)
+  #expect(Set(visible.map(\.role.archetype)).count == 5)
+  // Preferred-set roles still lead, and the reviewed role leads its archetype.
+  #expect(visible.first?.setFit == .preferred)
+  #expect(visible.contains { $0.characterID == "furina" })
+}
+
+@MainActor
+@Test func shortlistLeadsWithTheVerdictsRoleAndKeepsOtherRoles() async throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
+  defer { try? FileManager.default.removeItem(at: folder) }
+  defer { model.setEnabled(false) }
+  // An EM-heavy Obsidian Codex flower: Ifa's EM role keeps it, her ATK crit role grades it low.
+  model.current = try Artifact(
+    setName: "Obsidian Codex", slot: .flower, main: .hp, level: 20,
+    substats: [
+      Substat(.elementalMastery, 139.86), Substat(.critRate, 3.89), Substat(.critDamage, 7.77),
+      Substat(.atk, 19.45),
+    ])
+  await model.evaluate()?.value
+  let verdict = try #require(model.verdict)
+  let shortlist = model.characterShortlist
+  #expect(shortlist.selectedMatch?.roleID == verdict.roleID)
+  #expect(shortlist.visibleMatches.first?.roleID == verdict.roleID)
+  let ifa = shortlist.allMatches.filter { $0.characterID == "ifa" }.map(\.roleID)
+  #expect(Set(ifa) == ["ifa.em", "ifa.atk-crit"])
+  #expect(
+    shortlist.label(try #require(shortlist.allMatches.first { $0.roleID == "ifa.em" })) != "Ifa")
+  model.selectedCharacterID = "ifa"
+  model.selectedRoleID = "ifa.atk-crit"
+  #expect(model.selectedMatch?.roleID == "ifa.atk-crit")
+  #expect(model.characterShortlist.visibleMatches.contains { $0.roleID == "ifa.atk-crit" })
 }

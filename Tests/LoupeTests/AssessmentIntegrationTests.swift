@@ -30,7 +30,8 @@ private let assessmentFlower = """
   let ids = model.characterMatches.map(\.characterID)
   #expect(ids.contains("alhaitham"))
   #expect(ids.contains("kuki-shinobu"))
-  #expect(Set(ids).count == ids.count)
+  let roles = model.characterMatches.map(\.roleID)
+  #expect(Set(roles).count == roles.count)
   // The verdict's character leads by default: five EM rolls are rarest for an EM-only role.
   #expect(model.verdict?.kind == .keep)
   #expect(model.verdict?.characterID == "kuki-shinobu")

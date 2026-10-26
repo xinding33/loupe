@@ -48,8 +48,10 @@ behavior on the real game, or performance.
   median, P90, and best possible, with saved-inventory rank comparisons.
 - Saved inventory with collection, upgrade linking, GOOD and backup import,
   undo, and coverage by slot and main stat.
-- Character assessment for 15 reviewed roles, dataset `reviewed-2026-09-27.1`,
-  with a five-candidate shortlist shared by the dashboard and overlay.
+- Character assessment for every playable character through 12 shared
+  [archetypes](archetypes.md), dataset `archetypes-2026-10-25.1` (2026-10-25),
+  plus the 15 reviewed roles of `reviewed-2026-09-27.1`, which keep their
+  advice. A five-candidate shortlist is shared by the dashboard and overlay.
 - Experimental S/A/B/C/D tiers for 15 role/slot/main combinations, calibration
   `experimental-reviewed-2026-09-27.1`: Furina 7, Itto 6, Kuki Shinobu 2.
 - Opt-in diagnostic buffer, report preview and export, and a headless
@@ -110,12 +112,14 @@ In suggested order. The first two need the game running.
 3. Recorded fixtures: no recorded Enhance sequence is available to the two
    skipped tests, so live-reader regressions are covered only by synthetic
    images.
-4. Grading: all 15 reviewed roles are graded by rarity among new drops, and
-   verdicts are shown. Next: a whole-bag scan, then roles for all characters.
-   Verdict defaults still need tuning on a real inventory. See
+4. Grading: every role is graded by rarity among new drops, and verdicts are
+   shown. Next: a whole-bag scan. Verdict defaults still need tuning on a real
+   inventory, more so now that every archetype counts. See
    [grading approach](grading-approach.md).
-5. Character coverage: 15 roles, one per character. This is not a roster-wide
-   search and the app says so.
+5. Character coverage: every character has archetype roles; 15 were reviewed
+   one by one. Archetype assignments for characters from 5.0 onward rest on
+   one or two guides each, and "Somnia" and the Cryo Traveler are unassigned.
+   See [archetypes](archetypes.md).
 
 Grading direction changed on 2026-10-22: see [grading approach](grading-approach.md).
 Its first step, enumerating final substat outcomes once for every profile, is

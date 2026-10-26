@@ -42,7 +42,7 @@ struct VerdictTests {
     let piece = try Self.emFlower(2)
     let verdict = VerdictEngine.evaluate(piece, matches: [], inventory: [])
     #expect(verdict.kind == .fodder)
-    #expect(verdict.reason == "No reviewed role uses HP flowers")
+    #expect(verdict.reason == "No character role uses HP flowers")
   }
 
   @Test func aPieceNoNewDropCanBeatIsKept() throws {
@@ -70,7 +70,7 @@ struct VerdictTests {
     let verdict = VerdictEngine.evaluate(
       piece, matches: [Self.match("em", piece, useful: [.elementalMastery])], inventory: [])
     #expect(verdict.kind == .fodder)
-    #expect(verdict.reason == "Bottom half of new HP flowers for every reviewed role")
+    #expect(verdict.reason == "Bottom half of new HP flowers for every role")
   }
 
   @Test func aGoodPieceWithoutSavedComparablesAsksForABaseline() throws {
@@ -94,7 +94,7 @@ struct VerdictTests {
     #expect(tied.reason == "Tied for best of 1 saved HP flowers")
     let fodder = VerdictEngine.evaluate(piece, matches: [em], inventory: [stronger])
     #expect(fodder.kind == .fodder)
-    #expect(fodder.reason == "Enough saved HP flowers beat it for every reviewed role")
+    #expect(fodder.reason == "Enough saved HP flowers beat it for every role")
     // The candidate's own saved record is not a comparison.
     let own = VerdictEngine.evaluate(
       piece, matches: [em], inventory: [stronger], excluding: stronger.id)

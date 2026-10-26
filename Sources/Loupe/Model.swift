@@ -17,6 +17,10 @@ final class Model: ObservableObject {
   @Published var selectedCharacterID: String? {
     didSet { refreshDiagnosticRecommendation() }
   }
+  /// The chosen role of the selected character, when it holds several.
+  @Published var selectedRoleID: String? {
+    didSet { refreshDiagnosticRecommendation() }
+  }
   @Published private(set) var evaluationIssue: String?
   @Published var profileName = "Crit" { didSet { evaluate() } }
   @Published var scope: ComparisonScope = .offPiece { didSet { evaluate() } }
@@ -135,7 +139,8 @@ final class Model: ObservableObject {
   var characterShortlist: CharacterShortlist {
     CharacterShortlist(
       matches: characterMatches, artifact: current, selectedCharacterID: selectedCharacterID,
-      leadingCharacterID: verdict?.characterID)
+      selectedRoleID: selectedRoleID, leadingCharacterID: verdict?.characterID,
+      leadingRoleID: verdict?.roleID)
   }
   var selectedMatch: CharacterMatch? { characterShortlist.selectedMatch }
   var displayedPotential: Potential? {

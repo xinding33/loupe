@@ -1,7 +1,7 @@
 import Foundation
 
 public enum RoleConditionKind: String, Sendable {
-  case energy, critBalance, team, rotation, setActivation, mainStat
+  case energy, critBalance, team, rotation, setActivation, mainStat, coverage
 }
 
 public enum RoleConditionStatus: String, Sendable {
@@ -56,22 +56,30 @@ public struct CharacterRole: Sendable, Identifiable {
   public let sets: [RoleSet]
   public let conditions: [RoleCondition]
   public let source: RoleSource
+  /// False for roles generated from the archetype table rather than reviewed one by one.
+  public internal(set) var isReviewed = true
   public var id: String { roleID }
   public var profile: Profile {
     Profile(roleID, weights: Dictionary(uniqueKeysWithValues: usefulStats.map { ($0, 100) }))
   }
+  /// The archetype with exactly these scored stats. Every reviewed role has one.
+  public var archetype: ArchetypeID? {
+    Archetype.all.first { Set($0.usefulStats) == Set(usefulStats) }?.id
+  }
 }
 
 public enum CharacterRoles {
-  public static let datasetVersion = "reviewed-2026-09-27.1"
+  public static let reviewedVersion = "reviewed-2026-09-27.1"
+  public static let datasetVersion = "\(reviewedVersion)+\(Roster.version)"
   public static let coverageDescription =
-    "15-character local review: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, Kokomi, "
-    + "Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun, Sucrose, Xiangling, Xingqiu, and Yelan. "
-    + "One reviewed role each; includes unowned characters and off-pieces. Not roster-wide. "
+    "Every character in the archetype table, including unowned ones and off-pieces. "
+    + "15 roles were reviewed one by one: Alhaitham, Bennett, Fischl, Furina, Itto, Kazuha, "
+    + "Kokomi, Kuki Shinobu, Nahida, Neuvillette, Raiden Shogun, Sucrose, Xiangling, Xingqiu, "
+    + "and Yelan. Other roles come from shared archetypes and are marked as such. "
     + "Experimental grades rank each piece against every possible new drop of its slot and main "
     + "stat, under the role's useful stats."
   public static let noMatchDescription =
-    "No reviewed match in these 15 roles. Manual profiles remain available for other uses."
+    "No character role uses this slot and main stat. Manual profiles remain available."
   public static let excludedCoverage =
     "No full-build optimization, ownership filter, constellation or weapon variants, "
     + "Itto plunge/DEF-goblet builds, Kuki Quicken/pure healing, or Kokomi off-field/Bloom roles. "
@@ -84,6 +92,22 @@ public enum CharacterRoles {
   public static let reviewed: [CharacterRole] = (pilot + expanded).sorted {
     $0.characterID < $1.characterID
   }
+
+  /// Reviewed roles plus one role per character archetype. A reviewed role replaces the
+  /// archetype role it matches for the same character.
+  public static let all: [CharacterRole] = {
+    let covered = Set(
+      reviewed.compactMap { role in role.archetype.map { "\(role.characterID).\($0)" } })
+    let generated = Roster.characters.flatMap { character in
+      character.archetypes.filter { !covered.contains("\(character.id).\($0)") }.map {
+        character.role(Archetype.named($0))
+      }
+    }
+    return (reviewed + generated).sorted {
+      ($0.characterID, $0.isReviewed ? 0 : 1, $0.roleID)
+        < ($1.characterID, $1.isReviewed ? 0 : 1, $1.roleID)
+    }
+  }()
 
   static let energy = RoleCondition(
     .energy,

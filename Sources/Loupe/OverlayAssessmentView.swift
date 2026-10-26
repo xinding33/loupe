@@ -23,7 +23,8 @@ struct OverlayView: View {
         if model.assessmentMode == .characters, let verdict = model.verdict {
           VerdictBanner(
             verdict: verdict, compact: true, lines: expanded ? 2 : 1,
-            displayedCharacterID: model.selectedMatch?.characterID)
+            displayedCharacterID: model.selectedMatch?.characterID,
+            displayedRoleID: model.selectedMatch?.roleID)
         }
         hero(artifact)
         if expanded {

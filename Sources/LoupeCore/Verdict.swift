@@ -14,6 +14,9 @@ public struct Verdict: Sendable, Equatable {
   public let keeperChance: Double?
   /// The character whose role drives the verdict, if any.
   public let characterID: String?
+  /// That role, since a character can hold several.
+  public let roleID: String?
+  public let roleName: String?
   public let characterName: String?
   /// Why, without the character's name, so a narrow surface can show it beside the name.
   public let reason: String
@@ -26,6 +29,8 @@ public struct Verdict: Sendable, Equatable {
     self.targetLevel = targetLevel
     self.keeperChance = keeperChance
     self.characterID = role?.characterID
+    self.roleID = role?.roleID
+    self.roleName = role?.roleName
     self.characterName = role?.characterName
     self.reason = reason
   }
@@ -73,7 +78,7 @@ public enum VerdictEngine {
     guard !matches.isEmpty else {
       return Verdict(
         kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "No reviewed role uses \(kind)")
+        reason: "No character role uses \(kind)")
     }
     let saved = inventory.filter {
       $0.id != (excluding ?? artifact.id) && $0.level == 20 && $0.slot == artifact.slot
@@ -118,7 +123,7 @@ public enum VerdictEngine {
       kind: .fodder, targetLevel: nil, keeperChance: chance,
       role: leading?.0.match,
       reason: chance == 0
-        ? "Cannot become a keeper for any reviewed role"
+        ? "Cannot become a keeper for any role"
         : "Only \(percentText(chance)) chance it becomes a keeper")
   }
 
@@ -146,13 +151,13 @@ public enum VerdictEngine {
     {
       return Verdict(
         kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "Bottom half of new \(kind) for every reviewed role")
+        reason: "Bottom half of new \(kind) for every role")
     }
     if scored.allSatisfy({ role, score in role.saved.filter { $0 > score }.count >= role.backups })
     {
       return Verdict(
         kind: .fodder, targetLevel: nil, keeperChance: nil, role: nil,
-        reason: "Enough saved \(kind) beat it for every reviewed role")
+        reason: "Enough saved \(kind) beat it for every role")
     }
     guard let (role, score) = leading, let rarity = role.rarity else {
       return Verdict(

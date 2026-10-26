@@ -175,7 +175,10 @@ Measured on 1,500 random domain drops per row with the 15 reviewed roles:
 
 A curated real inventory beats random saved pieces, so real verdicts should
 level less. Many goblets are Fodder only because no reviewed role uses their
-main stat; that falls as coverage grows.
+main stat; that falls as coverage grows. With every archetype role (2026-10-25)
+and no saved inventory, +0 pieces level at 28% / 59% / 59% / 58% and +20 pieces
+end 5 / 94 / 0% (flower) and 32 / 43 / 23% (goblet); see
+[archetypes](archetypes.md).
 
 Not implemented: role-free dominance, reshape candidates, chance against the
 equipped piece, and an off-piece margin over the best on-set piece. The
@@ -211,7 +214,9 @@ review report. The output is local-only.
    calibrated cells. Done.
 3. Stat-profile groups and Keep / Level verdicts in the overlay. Done.
 4. Whole-bag OCR scan of all five-star levels, then the fodder list.
-5. Reviewed weights for all characters; damage-derived weights for close calls.
+5. Roles for all characters. Done on 2026-10-25 as shared
+   [archetypes](archetypes.md) rather than one reviewed build each.
+   Damage-derived weights for close calls remain open.
 
 Open questions: verdict defaults tuned on a real scanned inventory;
 whether the inventory card's equipped-by line can be read reliably; how to
