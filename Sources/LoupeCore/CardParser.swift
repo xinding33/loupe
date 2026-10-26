@@ -27,6 +27,13 @@ public enum CardParser {
     String(String.UnicodeScalarView(text.unicodeScalars.map { lookalikes[$0] ?? $0 }))
   }
 
+  /// Latinizes a line and trims the bullets, sparkles and stray dots Vision reads at its ends,
+  /// as in "•15.2%" or "Serenade:(4) *". Keeps "+", "%", "(" and ":", which carry meaning.
+  public static func tidied(_ line: String) -> String {
+    latinized(line).trimmingCharacters(
+      in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "•·*.,-_'\"`~")))
+  }
+
   private static let lookalikes: [Unicode.Scalar: Unicode.Scalar] = {
     let pairs: [(String, String)] = [
       ("АВЕКМНОРСТХУІЅЈ", "ABEKMHOPCTXYISJ"), ("аеорсухіјѕ", "aeopcyxijs"),
@@ -50,9 +57,7 @@ public enum CardParser {
   }
 
   private static func layout(_ text: String) throws -> Layout {
-    let lines = text.components(separatedBy: .newlines).map {
-      latinized($0).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    let lines = text.components(separatedBy: .newlines).map(tidied)
     let filled = lines.indices.filter { !lines[$0].isEmpty }
     let slots: [(String, Slot)] = [
       ("Flower of Life", .flower), ("Plume of Death", .plume), ("Sands of Eon", .sands),
@@ -76,17 +81,21 @@ public enum CardParser {
       throw ArtifactError("Cannot read the artifact level. Keep the full card visible.")
     }
     let header = filled.filter { $0 > slotLine && $0 < levelLine }
-    guard let mainLine = header.first(where: { identifyStat(lines[$0], hasPercent: false) != nil }),
-      let main = identifyStat(
-        lines[mainLine], hasPercent: header.contains { lines[$0].contains("%") })
+    let mainLine = header.first(where: { identifyStat(lines[$0], hasPercent: false) != nil })
+    // A flower or plume has only one main stat, so its label can be lost to the background.
+    let fixedMain: Stat? = slot == .flower ? .hp : slot == .plume ? .atk : nil
+    guard
+      let main = mainLine.flatMap({
+        identifyStat(lines[$0], hasPercent: header.contains { lines[$0].contains("%") })
+      }) ?? fixedMain
     else {
       throw ArtifactError("Cannot read the main stat.")
     }
     var card = Layout(
       slot: slot, level: level, main: main,
-      used: [slotLine, mainLine] + header.filter { lines[$0].contains(where: \.isNumber) }
-        + [levelLine])
-    for index in filled where index > levelLine {
+      used: [slotLine] + (mainLine.map { [$0] } ?? [])
+        + header.filter { lines[$0].contains(where: \.isNumber) } + [levelLine])
+    for (position, index) in filled.enumerated() where index > levelLine {
       let line = lines[index]
       if line.localizedCaseInsensitiveContains("2-Piece")
         || line.localizedCaseInsensitiveContains("2 Piece")
@@ -103,7 +112,11 @@ public enum CardParser {
           throw ArtifactError("Cannot read \(key.label). Correct the card text.")
         }
         let stat = Substat(key, value)
-        if line.localizedCaseInsensitiveContains("unactivated") {
+        // The character screen's narrower card wraps "(unactivated)" onto its own line.
+        let wrapped = filled.dropFirst(position + 1).first.flatMap {
+          marksUnactivated(lines[$0]) && !lines[$0].contains(where: \.isNumber) ? $0 : nil
+        }
+        if marksUnactivated(line) || wrapped != nil {
           guard card.unactivated == nil else {
             throw ArtifactError("Multiple unactivated lines. Read one card at a time.")
           }
@@ -111,23 +124,39 @@ public enum CardParser {
         } else {
           card.substats.append(stat)
         }
+        card.used += [index] + (wrapped.map { [$0] } ?? [])
+      } else if !card.substats.isEmpty,
+        // The character screen adds the equipped count: "Set Name: (4)".
+        let colon = line.range(of: #":\s*(\(\d\))?$"#, options: .regularExpression)
+      {
+        card.setName = line[..<colon.lowerBound]
+          .folding(options: .diacriticInsensitive, locale: nil)
+          .trimmingCharacters(
+            in: .whitespaces.union(.punctuationCharacters).union(.symbols))
         card.used.append(index)
+        return card
       } else if line.contains(where: \.isNumber) {
         // Only substats carry numbers here; skipping one would read a four-stat card as three.
         throw ArtifactError("Cannot read a substat line. Correct the card text.")
-      } else if line.hasSuffix(":"), !card.substats.isEmpty {
-        card.setName = String(line.dropLast())
-        card.used.append(index)
-        return card
       }
     }
     throw ArtifactError("Cannot read the set name. Include the line above the set bonuses.")
   }
 
+  /// Vision can misread letters inside the marker, as in "(unagtivated)".
+  private static func marksUnactivated(_ line: String) -> Bool {
+    line.range(of: #"\(\s*un\w{4,}"#, options: [.regularExpression, .caseInsensitive]) != nil
+  }
+
   static func identifyStat(_ text: String, hasPercent: Bool) -> Stat? {
-    let cleaned = text.replacingOccurrences(of: "%", with: "").trimmingCharacters(
-      in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "•·-"))
-    ).lowercased()
+    // Bullets and background sparkles read as stray marks in and around the label
+    // ("Elemental-Mastery", "CRIT, Rate"), and Vision sometimes adds diacritics ("Mästery").
+    let cleaned = text.replacingOccurrences(of: "%", with: "")
+      .folding(options: .diacriticInsensitive, locale: nil)
+      .components(
+        separatedBy: .whitespacesAndNewlines.union(.punctuationCharacters).union(.symbols)
+      )
+      .filter { !$0.isEmpty }.joined(separator: " ").lowercased()
     for stat in Stat.allCases where stat != .hpPercent && stat != .atkPercent && stat != .defPercent
     {
       if cleaned == stat.label.lowercased() || cleaned.hasPrefix(stat.label.lowercased() + " ") {

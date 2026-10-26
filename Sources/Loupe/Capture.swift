@@ -71,7 +71,7 @@ enum CardOCR {
     let observations = request.results ?? []
     func text(_ observation: VNRecognizedTextObservation) -> String? {
       observation.topCandidates(1).first.map {
-        CardParser.latinized($0.string).replacingOccurrences(of: "\n", with: " ")
+        CardParser.tidied($0.string.replacingOccurrences(of: "\n", with: " "))
       }
     }
     let slots = [
@@ -83,7 +83,8 @@ enum CardOCR {
     }
     guard anchors.count == 1, let anchor = anchors.first else {
       throw ArtifactError(
-        "Open one artifact card in Inventory. Comparison screens are not supported yet.")
+        "Open one artifact card in Inventory or on a character's Artifacts screen. Comparison screens are not supported yet."
+      )
     }
     if text(anchor)?.contains("/") == true {
       throw ArtifactError("Waiting for a readable Enhance title and stat table.")
@@ -95,29 +96,65 @@ enum CardOCR {
         && $0.boundingBox.minY <= anchor.boundingBox.maxY + 0.08
     }.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
     if let diagnostics { recordInventoryCrop(image, card: card, trace: diagnostics) }
-    let lines = card.compactMap { observation in
-      text(observation).map { (observation, $0, observation.topCandidates(1)[0].confidence) }
+    var lines = CardRows.joined(
+      card.compactMap { observation in
+        text(observation).map {
+          TextRegion(
+            text: $0, bounds: observation.boundingBox,
+            confidence: observation.topCandidates(1)[0].confidence)
+        }
+      })
+    let isLevel = { (line: TextRegion) in
+      line.text.range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
+    }
+    if !lines.contains(where: isLevel),
+      let level = try recoveredLevel(image, lines: lines, left: left).first(where: isLevel)
+    {
+      lines = (lines + [level]).sorted { $0.bounds.midY > $1.bounds.midY }
     }
     guard
-      let level = lines.first(where: {
-        $0.1.range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
-      })?.0,
+      let level = lines.first(where: isLevel)?.bounds,
       let mainValue = lines.last(where: {
-        $0.0.boundingBox.minY > level.boundingBox.maxY
-          && $0.1.range(of: #"^\d[\d,.]*%?$"#, options: .regularExpression) != nil
-      })?.0
+        $0.bounds.minY > level.maxY
+          && $0.text.range(of: #"^\d[\d,.]*%?$"#, options: .regularExpression) != nil
+      })?.bounds
     else { throw ArtifactError("Waiting for a clear level and main-stat value.") }
     let band = CGRect(
-      x: left, y: level.boundingBox.maxY, width: right - left,
-      height: max(0, mainValue.boundingBox.minY - level.boundingBox.maxY))
+      x: left, y: level.maxY, width: right - left, height: max(0, mainValue.minY - level.maxY))
     let fiveStars = countStars(in: image, band: band) == 5
-    let text = lines.map(\.1).joined(separator: "\n")
+    let text = lines.map(\.text).joined(separator: "\n")
     // Judge only the lines the parser reads; Vision often reads the rarity stars as junk text.
     let judged =
       CardParser.parsedLines(text).map { $0.map { lines[$0] } }
-      ?? lines.filter { $0.0.boundingBox.minY >= level.boundingBox.minY - 0.23 }
+      ?? lines.filter { $0.bounds.minY >= level.minY - 0.23 }
     return CardReading(
-      text: text, fiveStars: fiveStars, confidence: judged.map(\.2).min() ?? 0)
+      text: text, fiveStars: fiveStars, confidence: judged.map(\.confidence).min() ?? 0)
+  }
+
+  /// Vision sometimes skips the small white-on-dark level tag, so read the gap between the
+  /// main-stat value and the first substat again, enlarged.
+  private static func recoveredLevel(_ image: CGImage, lines: [TextRegion], left: Double) throws
+    -> [TextRegion]
+  {
+    guard
+      let substat = lines.firstIndex(where: {
+        $0.text.range(of: #"[A-Za-z]\s*\+\s*\d"#, options: .regularExpression) != nil
+      }),
+      let value = lines[..<substat].last(where: {
+        $0.text.range(of: #"^\d[\d,.]*%?$"#, options: .regularExpression) != nil
+      }),
+      value.bounds.minY > lines[substat].bounds.maxY
+    else { return [] }
+    let area = CGRect(
+      x: left, y: 1 - value.bounds.minY, width: 0.12,
+      height: value.bounds.minY - lines[substat].bounds.maxY)
+    return try recognize(
+      image, in: area, targetWidth: 900, kind: .inventoryCard, diagnostics: nil
+    ).map {
+      TextRegion(
+        text: CardParser.tidied($0.text),
+        bounds: $0.bounds, confidence: $0.confidence)
+    }
   }
 
   private static func recognize(

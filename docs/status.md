@@ -84,6 +84,18 @@ frames stay on that Mac; they show the account UID. Findings, all fixed:
 After the fixes, 313 of 314 Inventory card frames parse (the other is
 mid-transition) and all four Enhance frames read.
 
+A second recording and a user video the same day added the character
+Artifacts screen, where the card is narrower, the main stat shares a row with
+its value, and the set line ends in an equipped count ("Set: (4)"). Fixes:
+"(unactivated)" on its own line, Vision splitting one row into two
+observations, punctuation inside labels, stray marks at line ends, a missed
+level tag (read again from an enlarged crop), and a lost flower or plume
+main-stat label. Afterwards 155 of 162 card frames in the recording, 52 of 53
+in the video and 313 of 314 in the first recording parse, with no wrong
+readings among them. The failures are single frames that two-frame
+verification skips. Enhance read 3 of 4 video frames; Enhance upgrades past
++0 are still unrecorded.
+
 ## Open work
 
 In suggested order. The first two need the game running.

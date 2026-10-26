@@ -81,6 +81,73 @@ private let starredCard = """
   #expect(CardParser.latinized("\u{0425}\u{0410}\u{0397}\u{03BF}") == "XAHo")
 }
 
+@Test func theCharacterScreenCardReads() throws {
+  // OCR of a live character-screen card: the main stat shares a row with its value, a sparkle
+  // reads as a dot, the narrower card wraps "(unactivated)", and the set line ends in a count.
+  let text = """
+    Crystal Tear of the
+    Wanderer
+    Flower of Life
+    717
+    .HP
+    +0
+    • CRIT DMG+7.0%
+    • CRIT Rate+2.7%
+    • HP+5.3%
+    *Elemental Mästery+23
+    (unactivated)
+    Silken Moon's Serenade: (4)
+    02-Piece Set: Energy Recharge
+    """
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.slot == .flower)
+  #expect(artifact.main == .hp)
+  #expect(artifact.setName == "Silken Moon's Serenade")
+  #expect(artifact.substats.map(\.key) == [.critDamage, .critRate, .hpPercent])
+  #expect(artifact.unactivated == Substat(.elementalMastery, 23))
+  #expect(CardParser.parsedLines(text) == [2, 4, 3, 5, 6, 7, 8, 9, 10, 11])
+}
+
+@Test func strayMarksAndMisreadLettersStillRead() throws {
+  // Live character-screen slips: a lost main-stat label, punctuation inside labels, a misread
+  // "(unactivated)" and stray marks at line ends.
+  let text = """
+    Crystal Tear of the
+    Wanderer
+    Flower of Life-
+    •717.
+    +0
+    • CRIT. DMG+7.0%
+    • CRIT, Rate+2.7% .
+    *• HP+5.3%
+    • Elemental-Mastery+23
+    (unagtivated)
+    Silkén Moon's Serenade:(4) *
+    """
+  let artifact = try CardParser.parse(text, fiveStarsConfirmed: true)
+  #expect(artifact.main == .hp)
+  #expect(artifact.setName == "Silken Moon's Serenade")
+  #expect(artifact.substats.map(\.key) == [.critDamage, .critRate, .hpPercent])
+  #expect(artifact.unactivated == Substat(.elementalMastery, 23))
+  #expect(CardParser.tidied("•15.2%") == "15.2%")
+  #expect(CardParser.tidied("+4") == "+4")
+}
+
+@Test func onlyFlowersAndPlumesInferAMissingMainStat() {
+  let sands = """
+    A Moment Congealed
+    Sands of Eon
+    60
+    +4
+    HP+4.1%
+    ATK+18
+    DEF+6.6%
+    Energy Recharge+4.5%
+    Flower of Paradise Lost:
+    """
+  #expect(throws: ArtifactError.self) { try CardParser.parse(sands, fiveStarsConfirmed: true) }
+}
+
 @Test func aFourLineStarterGetsFiveRandomUpgrades() throws {
   let artifact = try flower(level: 0, crit: 3.9)
   let potential = try Potential.evaluate(
