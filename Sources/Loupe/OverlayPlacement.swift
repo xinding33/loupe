@@ -117,6 +117,7 @@ final class OverlayController {
       controls.orderOut(nil)
       placement = nil
       model.diagnosticPlacement = nil
+      syncPointerTracking()
       return
     }
     if timer == nil {
@@ -128,6 +129,7 @@ final class OverlayController {
   }
 
   private func refreshPlacement() {
+    defer { syncPointerTracking() }
     guard model.enabled else { return }
     let screens = NSScreen.screens
     guard let id = model.capture.selectedWindowID,
@@ -194,7 +196,11 @@ final class OverlayController {
   /// window gets no mouse events, so the pointer is polled while any row is on screen.
   private func setHitRegions(_ regions: [CGRect]) {
     hitRegions = regions
-    if regions.isEmpty {
+    syncPointerTracking()
+  }
+
+  private func syncPointerTracking() {
+    if hitRegions.isEmpty || !panel.isVisible {
       pointerTimer?.invalidate()
       pointerTimer = nil
       panel.ignoresMouseEvents = true
