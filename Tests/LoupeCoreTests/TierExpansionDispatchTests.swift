@@ -134,7 +134,7 @@ import Testing
       ])
     let linked = try candidate.withID(UUID())
     let results = CharacterAssessment.evaluate(
-      candidate, inventory: [hpHeavy, defHeavy, linked], scope: .offPiece, excluding: linked.id)
+      candidate, inventory: [hpHeavy, defHeavy, linked], excluding: linked.id)
     let furina = try #require(results.first { $0.characterID == "furina" })
     let itto = try #require(results.first { $0.characterID == "itto" })
     #expect(furina.potential?.leaders.first?.id == hpHeavy.id)

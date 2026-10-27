@@ -17,6 +17,24 @@ public struct CharacterMatch: Sendable, Identifiable {
   public var usefulStats: [Stat] { role.usefulStats }
   public var secondaryStats: [Stat] { role.secondaryStats }
   public var profile: Profile { role.profile }
+  /// An on-set role wears this set's pieces, so only those compete with it. An off-piece fills
+  /// the build's one off-set slot, which a piece of any set can fill.
+  public var scope: ComparisonScope { setFit == .offPiece ? .offPiece : .sameSet }
+
+  /// How likely the build is to wear the piece, highest first. A 4+1 build's one off-set piece
+  /// is usually the goblet, sometimes the sands or circlet, and rarely the flower or plume.
+  public func wearRank(_ slot: Slot) -> Int {
+    switch setFit {
+    case .preferred: 3
+    case .alternative: 2
+    case .offPiece: slot == .goblet ? 2 : isRareOffPiece(slot) ? 0 : 1
+    }
+  }
+
+  /// An off-set flower or plume: worth listing, never worth keeping a piece for.
+  public func isRareOffPiece(_ slot: Slot) -> Bool {
+    setFit == .offPiece && (slot == .flower || slot == .plume)
+  }
 }
 
 public enum CharacterAssessment {
@@ -24,15 +42,20 @@ public enum CharacterAssessment {
   public static let calibrationVersion = TierCalibration.version
   public static let coverageDescription = CharacterRoles.coverageDescription
 
-  /// Potential users in stable identity order, not a cross-role strength ranking.
+  /// Potential users in stable identity order, not a cross-role strength ranking. Each role
+  /// compares with the saved pieces it would wear instead; see `CharacterMatch.scope`.
   public static func evaluate(
-    _ artifact: Artifact, inventory: [Artifact] = [], scope: ComparisonScope = .offPiece,
-    excluding: UUID? = nil, roles: [CharacterRole] = CharacterRoles.all
+    _ artifact: Artifact, inventory: [Artifact] = [], excluding: UUID? = nil,
+    roles: [CharacterRole] = CharacterRoles.all
   ) -> [CharacterMatch] {
     // One enumeration serves every role; a failure is reported per role below.
     let outcomes = try? RollOutcomes(artifact)
-    // Characters sharing an archetype share a forecast, so compute each profile once.
-    var forecasts: [[Stat: Int]: Result<Potential, Error>] = [:]
+    // Characters sharing an archetype and a scope share a forecast, so compute each once.
+    struct ForecastKey: Hashable {
+      let weights: [Stat: Int]
+      let scope: ComparisonScope
+    }
+    var forecasts: [ForecastKey: Result<Potential, Error>] = [:]
     // A four-star piece is only worth using for a character whose build lists its set.
     let fourStar = artifact.rarity == 4
     return roles.filter { role in
@@ -44,6 +67,7 @@ public enum CharacterAssessment {
       guard !Task.isCancelled else { return nil }
       let set = role.sets.first { Artifact.normalizeSet($0.name) == artifact.setKey }
       let fit = set?.fit ?? .offPiece
+      let scope: ComparisonScope = set == nil ? .offPiece : .sameSet
       var conditions = role.conditions
       conditions.append(
         RoleCondition(
@@ -93,7 +117,7 @@ public enum CharacterAssessment {
         unavailable =
           "\(artifact.main.label) main is useful, but this profile has no eligible core substats to compare. Secondary stats alone are not graded."
       } else {
-        let key = role.profile.weights
+        let key = ForecastKey(weights: role.profile.weights, scope: scope)
         let forecast =
           forecasts[key]
           ?? Result {

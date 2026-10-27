@@ -277,6 +277,8 @@ import Testing
     let enough = verdict(finished, saved: copies)
     #expect(enough.kind == .fodder)
     #expect(enough.reason == "Enough saved Instructor Elemental Mastery sands")
+    #expect(!enough.standings.isEmpty)
+    #expect(enough.standings.values.allSatisfy { $0 == .covered(2) })
     // A saved copy with fewer useful lines leaves room to compare.
     let weaker = try piece(
       "Instructor", .sands, .elementalMastery, level: 16,
@@ -314,6 +316,11 @@ import Testing
       candidate, matches: CharacterAssessment.evaluate(candidate), inventory: saved)
     #expect(verdict.kind == .review)
     #expect(verdict.characterID == "nahida")
+    // Roles the saved copies already suit are covered; the one wanting another copy is open.
+    #expect(verdict.standings[verdict.roleID ?? ""] == nil)
+    let kuki = try #require(
+      CharacterAssessment.evaluate(candidate).first { $0.characterID == "kuki-shinobu" })
+    #expect(verdict.standings[kuki.roleID] == .covered(2))
   }
 
   @Test func otherFourStarsAreFodderWithAReason() throws {

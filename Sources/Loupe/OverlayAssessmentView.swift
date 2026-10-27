@@ -122,9 +122,11 @@ struct OverlayView: View {
   @ViewBuilder
   private func accountLine(_ artifact: Artifact) -> some View {
     if let result = model.displayedPotential {
-      Text(AccountSummary.label(result, scope: model.scope, finished: artifact.level == 20))
-        .font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
-        .foregroundStyle(result.comparisonCount == 0 ? Color.secondary : .primary)
+      Text(
+        AccountSummary.label(result, scope: model.displayedScope, finished: artifact.level == 20)
+      )
+      .font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
+      .foregroundStyle(result.comparisonCount == 0 ? Color.secondary : .primary)
     } else if model.assessmentMode == .characters,
       GradeHeadline(match: model.selectedMatch, artifact: artifact).kind == .needsReread
     {
@@ -166,7 +168,7 @@ struct OverlayView: View {
       if let line = rarityLine(grades, artifact: artifact, compact: true) {
         Text(line).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
       }
-      AccountBlock(result: result, scope: model.scope, finished: finished, compact: true)
+      AccountBlock(result: result, scope: model.displayedScope, finished: finished, compact: true)
         .padding(8)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     } else {
@@ -195,8 +197,8 @@ struct OverlayView: View {
         Text("POTENTIAL USERS").font(.system(size: 8.5, weight: .semibold))
           .foregroundStyle(.secondary)
         Spacer()
-        Text("Not damage ranking").font(.system(size: 9)).foregroundStyle(
-          .tertiary)
+        Text(RoleRowStatus.orderCaption).font(.system(size: 9)).foregroundStyle(.tertiary)
+          .help(RoleRowStatus.orderHelp + CharacterAssessment.coverageDescription)
       }
       if shortlist.allMatches.isEmpty {
         Text(CharacterRoles.noMatchDescription).font(.caption).foregroundStyle(.secondary)
@@ -205,6 +207,8 @@ struct OverlayView: View {
       ForEach(shortlist.visibleMatches) { match in
         let selected = model.selectedMatch?.id == match.id
         let headline = GradeHeadline(match: match, artifact: artifact)
+        let status = RoleRowStatus(
+          match, standing: shortlist.standing(match), artifact: artifact)
         Button {
           model.selectedCharacterID = match.characterID
           model.selectedRoleID = match.roleID
@@ -215,12 +219,14 @@ struct OverlayView: View {
             Text(match.characterName).font(.caption.weight(selected ? .bold : .regular))
               .lineLimit(1)
             Spacer(minLength: 4)
-            Text(match.setFit.shortLabel).font(.system(size: 9.5)).foregroundStyle(.secondary)
+            Text(status.label).font(.system(size: 9.5)).foregroundStyle(.secondary)
             TierChip(tier: headline.tier)
           }
+          .opacity(status.setAside && !selected ? 0.45 : 1)
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(status.help ?? "")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .background {
           GeometryReader { proxy in

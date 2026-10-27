@@ -4,11 +4,10 @@ import Testing
 
 @Suite struct ExpandedCharacterRolesTests {
   private func match(
-    _ piece: Artifact, _ id: String, inventory: [Artifact] = [],
-    scope: ComparisonScope = .offPiece, excluding: UUID? = nil
+    _ piece: Artifact, _ id: String, inventory: [Artifact] = [], excluding: UUID? = nil
   ) throws -> CharacterMatch {
     try #require(
-      CharacterAssessment.evaluate(piece, inventory: inventory, scope: scope, excluding: excluding)
+      CharacterAssessment.evaluate(piece, inventory: inventory, excluding: excluding)
         .first { $0.characterID == id })
   }
 
@@ -266,9 +265,12 @@ import Testing
     let duplicate = try candidate.withID(UUID())
     let otherSet = try flower()
     let saved = [linked, duplicate, otherSet]
-    let same = try match(
-      candidate, "kazuha", inventory: saved, scope: .sameSet, excluding: linked.id)
-    let all = try match(candidate, "kazuha", inventory: saved, excluding: linked.id)
+    // Kazuha runs Viridescent Venerer, so only saved Venerer flowers compete with this one. The
+    // same stats off his set fill an off-piece slot, which any set's flower can fill.
+    let same = try match(candidate, "kazuha", inventory: saved, excluding: linked.id)
+    let all = try match(try flower(), "kazuha", inventory: saved, excluding: linked.id)
+    #expect(same.scope == .sameSet)
+    #expect(all.scope == .offPiece)
     #expect(same.potential?.comparisonCount == 1)
     #expect(all.potential?.comparisonCount == 2)
     #expect(all.potential?.distribution == [6000: 1])

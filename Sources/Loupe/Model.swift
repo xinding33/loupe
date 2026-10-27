@@ -183,9 +183,13 @@ final class Model: ObservableObject {
     CharacterShortlist(
       matches: characterMatches, artifact: current, selectedCharacterID: selectedCharacterID,
       selectedRoleID: selectedRoleID, leadingCharacterID: verdict?.characterID,
-      leadingRoleID: verdict?.roleID)
+      leadingRoleID: verdict?.roleID, standings: verdict?.standings ?? [:])
   }
   var selectedMatch: CharacterMatch? { characterShortlist.selectedMatch }
+  /// A character role compares with the saved pieces it would wear; a profile follows the picker.
+  var displayedScope: ComparisonScope {
+    assessmentMode == .characters ? selectedMatch?.scope ?? scope : scope
+  }
   var displayedPotential: Potential? {
     assessmentMode == .characters ? selectedMatch?.potential : potential
   }
@@ -362,8 +366,7 @@ final class Model: ObservableObject {
         else { return nil }
         return (preset.id, result)
       }
-      let matches = CharacterAssessment.evaluate(
-        current, inventory: pool, scope: scope, excluding: excluded)
+      let matches = CharacterAssessment.evaluate(current, inventory: pool, excluding: excluded)
       let verdict =
         Task.isCancelled
         ? nil
@@ -533,7 +536,7 @@ final class Model: ObservableObject {
       let excluded = linkedID ?? inventory.artifacts.first { $0.signature == current.signature }?.id
       diagnosticRecommendation = DiagnosticRecommendation.evaluated(
         current, result: result, profile: scoringProfile,
-        pool: inventory.artifacts, scope: scope, excluded: excluded, match: match)
+        pool: inventory.artifacts, scope: displayedScope, excluded: excluded, match: match)
     }
     recordDiagnosticDisplay()
   }

@@ -1,34 +1,46 @@
 import LoupeCore
 
-/// A browsing order based on stat presence and set context, never cross-role strength.
-/// The role behind the current verdict, when there is one, leads the list. The visible rows show
-/// one role per character and different archetypes before repeating one, since an archetype's
-/// characters share a grade. The full list keeps every role, so a character's other roles
-/// remain selectable.
+/// The list reads top-down as the reason for the verdict, in the verdict's own order: roles
+/// still open before roles set aside (`RoleStanding`), then the roll grade, then how likely the
+/// build is to wear the piece, then the rarer result. Grades are rarity among drops, so they
+/// compare across roles; they are not damage. The verdict's role leads even where the verdict's
+/// special rules pick a lower row, such as a support's grade counting only at S. The visible rows
+/// show one role per character and different archetypes before repeating one, since an
+/// archetype's characters share a grade. The full list keeps every role, so a character's other
+/// roles remain selectable.
 struct CharacterShortlist {
   let allMatches: [CharacterMatch]
   let visibleMatches: [CharacterMatch]
   let selectedMatch: CharacterMatch?
+  private let standings: [String: RoleStanding]
 
   init(
     matches: [CharacterMatch], artifact: Artifact?, selectedCharacterID: String?,
-    selectedRoleID: String? = nil, leadingCharacterID: String? = nil, leadingRoleID: String? = nil
+    selectedRoleID: String? = nil, leadingCharacterID: String? = nil, leadingRoleID: String? = nil,
+    standings: [String: RoleStanding] = [:]
   ) {
+    self.standings = standings
     guard let artifact else {
       allMatches = []
       visibleMatches = []
       selectedMatch = nil
       return
     }
-    func priority(_ match: CharacterMatch) -> (Int, Int, Int, Int, Int, String) {
-      let active = artifact.substats.filter { match.usefulStats.contains($0.key) }.count
-      // Fixed flower/plume mains do not distinguish users. EM-only mains still count as fit.
-      let coreMain =
-        artifact.slot != .flower && artifact.slot != .plume
+    func priority(_ match: CharacterMatch) -> (Int, Int, Int, Double, Int, String) {
+      // A main-stat-only fit, such as an EM sands for an EM role, ranks below A and above B, as
+      // in the verdict. Fixed flower and plume mains fit everyone, so they do not count. Other
+      // ungraded roles come last.
+      let mainOnly =
+        artifact.slot != .flower && artifact.slot != .plume && match.grades == nil
         && match.usefulStats.contains(artifact.main)
-      let set = match.setFit == .preferred ? 0 : match.setFit == .alternative ? 1 : 2
+        && !match.usefulStats.contains { $0 != artifact.main }
+      let grade =
+        match.grades.flatMap { grade in
+          ArtifactTier.allCases.firstIndex(of: grade.grade).map { $0 < 2 ? $0 : $0 + 1 }
+        } ?? (mainOnly ? 2 : ArtifactTier.allCases.count + 1)
       return (
-        active > 0 || coreMain ? 0 : 1, set, coreMain ? 0 : 1, -active,
+        standings[match.roleID, default: .open] == .open ? 0 : 1, grade,
+        -match.wearRank(artifact.slot), match.grades?.rarityShare ?? 1,
         match.role.isReviewed ? 0 : 1, match.characterID + "|" + match.roleID
       )
     }
@@ -48,11 +60,16 @@ struct CharacterShortlist {
     selectedMatch = selected
     var seenCharacters = Set<String>()
     let characters = ordered.filter { seenCharacters.insert($0.characterID).inserted }
-    var shown = Set<ArchetypeID?>()
-    let varied = characters.filter { shown.insert($0.role.archetype).inserted }
-    var visible = Array(
-      (varied + characters.filter { match in !varied.contains { $0.roleID == match.roleID } })
-        .prefix(5))
+    // Variety applies within the open roles, then within the set-aside ones, so a set-aside role
+    // of a new archetype never hides an open one.
+    func varied(_ group: [CharacterMatch]) -> [CharacterMatch] {
+      var shown = Set<ArchetypeID?>()
+      let first = group.filter { shown.insert($0.role.archetype).inserted }
+      return first + group.filter { match in !first.contains { $0.roleID == match.roleID } }
+    }
+    let open = characters.filter { standings[$0.roleID, default: .open] == .open }
+    let setAside = characters.filter { standings[$0.roleID, default: .open] != .open }
+    var visible = Array((varied(open) + varied(setAside)).prefix(5))
     if let selected {
       if let index = visible.firstIndex(where: { $0.characterID == selected.characterID }) {
         visible[index] = selected
@@ -62,6 +79,10 @@ struct CharacterShortlist {
       }
     }
     visibleMatches = visible
+  }
+
+  func standing(_ match: CharacterMatch) -> RoleStanding {
+    standings[match.roleID, default: .open]
   }
 
   /// The character's name, plus the role when the full list holds another role of theirs.

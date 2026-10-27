@@ -45,7 +45,7 @@ private func shortlistFlower() throws -> Artifact {
 // Test-only identities exercise expansion without adding unreviewed production roles.
 private func syntheticMatch(
   _ id: String, artifact: Artifact, usefulStats: [Stat] = [.critRate],
-  setFit: CharacterSetFit = .offPiece
+  setFit: CharacterSetFit = .offPiece, grade: ArtifactTier? = nil, rarityShare: Double = 0.5
 ) throws -> CharacterMatch {
   let role = CharacterRole(
     characterID: id, characterName: id.capitalized, roleID: id + ".synthetic",
@@ -58,9 +58,15 @@ private func syntheticMatch(
     usefulStats.contains(where: { $0 != artifact.main })
     ? try Potential.evaluate(artifact, profile: role.profile, inventory: [], scope: .offPiece)
     : nil
+  let grades = grade.map {
+    CharacterGradeSummary(
+      grade: $0, chanceOfAOrBetter: nil, rarityShare: rarityShare, p90Share: nil, bestShare: nil,
+      replacementDrops: nil, calibrationID: "test", experimental: true)
+  }
   return CharacterMatch(
     role: role, setFit: setFit, conditions: [], reasons: [], potential: potential,
-    potentialUnavailableReason: potential == nil ? "No eligible core substats" : nil, grades: nil)
+    potentialUnavailableReason: potential == nil ? "No eligible core substats" : nil,
+    grades: grades)
 }
 
 private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
@@ -114,7 +120,7 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
   #expect(Set(reversed.visibleMatches.map(\.characterID)).count == 5)
 }
 
-@Test func shortlistDoesNotPreferLargerRawCrossRoleScore() throws {
+@Test func shortlistRanksByGradeNotRawCrossRoleScore() throws {
   let artifact = try Artifact(
     setName: "Gilded Dreams", slot: .flower, main: .hp, level: 20,
     substats: [
@@ -127,7 +133,11 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
   let itto = try #require(matches.first { $0.characterID == "itto" })
   #expect(try #require(furina.potential).currentScore < #require(itto.potential).currentScore)
   let shortlist = CharacterShortlist(matches: matches, artifact: artifact, selectedCharacterID: nil)
-  #expect(shortlist.selectedMatch?.characterID == "furina")
+  let best = [furina, itto].min {
+    ArtifactTier.allCases.firstIndex(of: $0.grades!.grade)!
+      < ArtifactTier.allCases.firstIndex(of: $1.grades!.grade)!
+  }
+  #expect(shortlist.selectedMatch?.characterID == best?.characterID)
 }
 
 @Test func shortlistDoesNotPreferCalibratedKukiOverUngradedActiveCritFit() throws {
@@ -166,17 +176,27 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
     Set(shortlist.allMatches.map(\.characterID)) == Set(model.characterMatches.map(\.characterID)))
 }
 
-@Test func shortlistPreservesActiveCoreBeforeSetAndSetBeforeIdentity() throws {
+@Test func shortlistOrdersOpenRolesThenGradeThenSetThenRarity() throws {
   let artifact = try shortlistFlower()
-  let inactivePreferred = try syntheticMatch(
-    "ada", artifact: artifact, usefulStats: [.elementalMastery], setFit: .preferred)
-  let activeOffPiece = try syntheticMatch("anna", artifact: artifact)
-  let activeAlternative = try syntheticMatch("grace", artifact: artifact, setFit: .alternative)
-  let activePreferred = try syntheticMatch("margaret", artifact: artifact, setFit: .preferred)
+  let matches = try [
+    syntheticMatch("ada", artifact: artifact, grade: .s),
+    syntheticMatch("anna", artifact: artifact, setFit: .preferred, grade: .a, rarityShare: 0.2),
+    syntheticMatch("dorothy", artifact: artifact, setFit: .preferred, grade: .a, rarityShare: 0.1),
+    syntheticMatch("evelyn", artifact: artifact, setFit: .alternative, grade: .a),
+    syntheticMatch("grace", artifact: artifact, setFit: .preferred, grade: .b),
+    syntheticMatch("margaret", artifact: artifact, usefulStats: [.elementalMastery]),
+  ]
+  // Ada's S comes from an off-set flower, which the verdict sets aside.
   let shortlist = CharacterShortlist(
-    matches: [inactivePreferred, activeOffPiece, activeAlternative, activePreferred],
-    artifact: artifact, selectedCharacterID: nil)
-  #expect(shortlist.allMatches.map(\.characterID) == ["margaret", "grace", "anna", "ada"])
+    matches: matches, artifact: artifact, selectedCharacterID: nil,
+    standings: ["ada.synthetic": .rareOffPiece, "grace.synthetic": .open])
+  #expect(
+    shortlist.allMatches.map(\.characterID) == [
+      "dorothy", "anna", "evelyn", "grace", "margaret", "ada",
+    ])
+  #expect(shortlist.standing(matches[0]) == .rareOffPiece)
+  // Roles missing from the standings are open.
+  #expect(shortlist.standing(matches[1]) == .open)
 }
 
 @Test func shortlistCoreMainFitSurvivesMoreThanFiveActiveCritUsers() throws {
@@ -203,13 +223,12 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
     setName: "Golden Troupe", slot: slot, main: slot == .flower ? .hp : .atk, level: 0,
     substats: [Substat(.critRate, 3.89), Substat(.hpPercent, 5.83), Substat(.def, 23.15)],
     unactivated: Substat(.elementalMastery, 23.31))
-  let fixedMain = try syntheticMatch("ada", artifact: artifact, usefulStats: [artifact.main])
-  let futureCore = try syntheticMatch(
-    "anna", artifact: artifact, usefulStats: [.elementalMastery], setFit: .preferred)
-  let active = try syntheticMatch("grace", artifact: artifact)
+  let fixedMain = try syntheticMatch(
+    "ada", artifact: artifact, usefulStats: [artifact.main], setFit: .preferred)
+  let graded = try syntheticMatch("grace", artifact: artifact, grade: .d)
   let shortlist = CharacterShortlist(
-    matches: [fixedMain, futureCore, active], artifact: artifact, selectedCharacterID: nil)
-  #expect(shortlist.allMatches.map(\.characterID) == ["grace", "anna", "ada"])
+    matches: [fixedMain, graded], artifact: artifact, selectedCharacterID: nil)
+  #expect(shortlist.allMatches.map(\.characterID) == ["grace", "ada"])
 }
 
 @Test func shortlistEmptyAndUnavailableSelectionDoNotInventCandidates() throws {
@@ -372,4 +391,48 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
   model.selectedRoleID = "ifa.atk-crit"
   #expect(model.selectedMatch?.roleID == "ifa.atk-crit")
   #expect(model.characterShortlist.visibleMatches.contains { $0.roleID == "ifa.atk-crit" })
+}
+
+@MainActor
+@Test func shortlistShowsOpenRolesBeforeSetAsideOnes() async throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
+  defer { try? FileManager.default.removeItem(at: folder) }
+  defer { model.setEnabled(false) }
+  func flower(_ set: String, _ lines: [(Stat, Double)]) throws -> Artifact {
+    try Artifact(
+      setName: set, slot: .flower, main: .hp, level: 20,
+      substats: lines.map { Substat($0.0, $0.1) })
+  }
+  // The user's report: one stronger saved Codex flower and crit flowers of other sets.
+  var inventory = Inventory()
+  for piece in try [
+    flower(
+      "Golden Troupe",
+      [(.critDamage, 26.4), (.critRate, 7.4), (.energyRecharge, 5.8), (.atkPercent, 4.1)]),
+    flower(
+      "Heart of the Furnace",
+      [(.atk, 19), (.critRate, 8.9), (.atkPercent, 11.1), (.critDamage, 21)]),
+    flower(
+      "Obsidian Codex",
+      [(.critRate, 6.6), (.critDamage, 23.3), (.defPercent, 6.6), (.atkPercent, 5.3)]),
+  ] {
+    inventory.save(piece)
+  }
+  model.inventory = inventory
+  model.current = try flower(
+    "Obsidian Codex",
+    [(.critRate, 7.8), (.critDamage, 5.4), (.atkPercent, 9.9), (.defPercent, 17.5)])
+  await model.evaluate()?.value
+  let shortlist = model.characterShortlist
+  #expect(model.verdict?.kind == .keep)
+  #expect(shortlist.selectedMatch?.roleID == model.verdict?.roleID)
+  // Set-aside roles of new archetypes, such as off-set Gorou, do not hide open ones.
+  let standings = shortlist.visibleMatches.map { shortlist.standing($0) == .open }
+  #expect(standings == standings.sorted { $0 && !$1 })
+  #expect(standings.filter { $0 }.count >= 3)
+  let gorou = try #require(shortlist.allMatches.first { $0.characterID == "gorou" })
+  #expect(shortlist.standing(gorou) == .rareOffPiece)
+  #expect(
+    RoleRowStatus(gorou, standing: shortlist.standing(gorou), artifact: model.current!).setAside)
 }

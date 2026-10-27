@@ -203,11 +203,24 @@ the shortlist unless the user picked another. Defaults live in
 `VerdictPolicy` and are starting points, not reviewed thresholds.
 
 Since 2026-10-26 verdicts follow the best roll grade among the piece's roles.
-Ties go to the preferred set, then the alternative set, then the rarer result:
-more drops to replace a finished piece, or a likelier A for an unfinished one.
-A role is set aside when its saved +20 pieces of this slot and main stat
+Ties go to the role likelier to wear the piece, then the rarer result: more
+drops to replace a finished piece, or a likelier A for an unfinished one. A
+role is set aside when its saved +20 pieces of this slot and main stat
 already include as many as its group can use (see below) that beat the
 piece's best outcome.
+
+**Set and slot.** An on-set role compares only with saved pieces of this set,
+which its four-piece build would wear instead; its group is the on-set roles
+with the same profile. An off-piece role compares with every set. A 4+1
+build's one off-set piece is usually the goblet, sometimes the sands or
+circlet, and rarely the flower or plume, so `CharacterMatch.wearRank` orders
+preferred set, then alternative set or off-set goblet, then off-set sands or
+circlet, then off-set flower or plume. An off-set flower or plume is set aside
+outright (`RoleStanding.rareOffPiece`). 2+2 builds are not modeled. The verdict
+publishes each role's standing, and the shortlist lists open roles first,
+then by grade, wear rank and rarity, dimming the rest. Four-star pieces mark a
+role covered once enough copies are saved and none has fewer useful lines for
+it.
 
 | Grade | Unfinished | Finished |
 | --- | --- | --- |
