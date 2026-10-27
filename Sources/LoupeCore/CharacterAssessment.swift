@@ -33,8 +33,11 @@ public enum CharacterAssessment {
     let outcomes = try? RollOutcomes(artifact)
     // Characters sharing an archetype share a forecast, so compute each profile once.
     var forecasts: [[Stat: Int]: Result<Potential, Error>] = [:]
-    return roles.filter {
-      $0.mains[artifact.slot, default: []].contains(artifact.main)
+    // A four-star piece is only worth using for a character whose build lists its set.
+    let fourStar = artifact.rarity == 4
+    return roles.filter { role in
+      role.mains[artifact.slot, default: []].contains(artifact.main)
+        && (!fourStar || role.sets.contains { Artifact.normalizeSet($0.name) == artifact.setKey })
     }
     .sorted { $0.characterID < $1.characterID }
     .compactMap { role in
@@ -82,7 +85,10 @@ public enum CharacterAssessment {
       }
       let potential: Potential?
       let unavailable: String?
-      if !role.usefulStats.contains(where: { $0 != artifact.main }) {
+      if fourStar {
+        potential = nil
+        unavailable = RollOutcomes.fourStarReason
+      } else if !role.usefulStats.contains(where: { $0 != artifact.main }) {
         potential = nil
         unavailable =
           "\(artifact.main.label) main is useful, but this profile has no eligible core substats to compare. Secondary stats alone are not graded."

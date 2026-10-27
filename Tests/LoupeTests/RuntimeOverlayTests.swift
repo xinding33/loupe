@@ -137,7 +137,7 @@ private let runtimeCard = """
   let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
   let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
   defer { try? FileManager.default.removeItem(at: folder) }
-  let reading = CardReading(text: runtimeCard, fiveStars: true, confidence: 1)
+  let reading = CardReading(text: runtimeCard, stars: 5, confidence: 1)
   model.profileName = "ER"
   model.capture.receive?(.success(reading))
   model.capture.receive?(.success(reading))
@@ -167,7 +167,7 @@ private let runtimeCard = """
   model.setEnabled(true)
   #expect(model.current == nil)
   #expect(model.status.contains("Choose game window"))
-  let enhance = CardReading(text: "Enhance", fiveStars: false, confidence: 1, isEnhancement: true)
+  let enhance = CardReading(text: "Enhance", stars: 0, confidence: 1, isEnhancement: true)
   model.capture.receive?(.success(enhance))
   #expect(model.status.contains("Inventory first"))
   #expect(model.current == nil)

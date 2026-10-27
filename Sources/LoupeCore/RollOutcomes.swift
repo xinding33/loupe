@@ -21,6 +21,9 @@ public struct RollOutcomes: Sendable {
   /// Distinct final outcomes in ascending lexicographic unit order; probabilities sum to one.
   public let outcomes: [Outcome]
 
+  public static let fourStarReason =
+    "Four-star pieces are judged by set and main stat; their roll odds are not modelled."
+
   /// One maximum-sized roll is 10 units; validated displayed totals resolve to the nearest unit.
   public static func units(_ stat: Substat) -> Int {
     Int((stat.value / (stat.key.rolls.last ?? 1) * 10).rounded())
@@ -31,6 +34,7 @@ public struct RollOutcomes: Sendable {
       throw ArtifactError(
         "Guaranteed-roll and reshaped artifacts are outside the ordinary-roll model.")
     }
+    guard artifact.rarity == 5 else { throw ArtifactError(Self.fourStarReason) }
     guard artifact.substats.count == 4 || artifact.unactivated != nil else {
       throw ArtifactError("Read or enter the fourth stat shown as unactivated; it activates at +4.")
     }

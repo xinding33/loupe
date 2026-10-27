@@ -433,11 +433,12 @@ struct InventoryView: View {
           let linked = model.linkedID == artifact.id
           HStack(spacing: 12) {
             Text("+\(artifact.level)").font(.callout.monospacedDigit().bold())
-              .foregroundStyle(artifact.level == 20 ? Theme.accent : .secondary)
+              .foregroundStyle(artifact.isFinished ? Theme.accent : .secondary)
               .frame(width: 34, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
               HStack(spacing: 6) {
-                Text(artifact.setName).font(.callout).lineLimit(1)
+                Text(artifact.rarity == 4 ? "\(artifact.setName) · 4★" : artifact.setName)
+                  .font(.callout).lineLimit(1)
                 Text("\(artifact.slot.label) · \(artifact.main.label)").font(.caption)
                   .foregroundStyle(.secondary)
               }

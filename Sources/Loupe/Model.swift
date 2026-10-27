@@ -147,10 +147,11 @@ final class Model: ObservableObject {
     assessmentMode == .characters ? selectedMatch?.potential : potential
   }
   var recommendation: String {
+    if current?.rarity == 4 { return "Four-star: judged by set and main stat" }
     guard let current, let potential = displayedPotential else {
       return "Waiting for an assessment"
     }
-    if current.level == 20 { return "Fully upgraded" }
+    if current.isFinished { return "Fully upgraded" }
     if potential.maximumScore <= potential.currentScore { return "No further gain in this profile" }
     if potential.chanceToBeatBest == 0 {
       return "Ceiling cannot beat the best saved piece"
@@ -189,7 +190,7 @@ final class Model: ObservableObject {
             throw ArtifactError("Low-confidence text. Waiting for a sharper Inventory card.")
           }
           artifact = try CardParser.parse(
-            reading.text, fiveStarsConfirmed: reading.fiveStars,
+            reading.text, stars: reading.stars,
             rule: special ? .special : .ordinary)
         }
         parsed = artifact
@@ -419,7 +420,7 @@ final class Model: ObservableObject {
       try persist(next)
       evaluate()
       status =
-        "Imported \(imported.artifacts.count) five-star records; skipped \(imported.skipped) other rarities. Unfinished imports need ordinary-roll verification."
+        "Imported \(imported.artifacts.count) four- and five-star records; skipped \(imported.skipped) other rarities. Unfinished imports need ordinary-roll verification."
     } catch { issue = "Import failed without changing inventory: \(error.localizedDescription)" }
   }
   func exportInventory() {

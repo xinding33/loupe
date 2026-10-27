@@ -51,6 +51,14 @@ extension CharacterRoles {
         RoleSet(
           "Scroll of the Hero of Cinder City", .alternative,
           "Requires Bennett to trigger a relevant reaction; no Nightsoul-enhanced bonus assumed."),
+        RoleSet(
+          "Instructor", .alternative,
+          "Four-star. For teams whose damage comes from EM reactions, or when another character "
+            + "holds Noblesse Oblige; Bennett must trigger a reaction."),
+        RoleSet(
+          "The Exile", .alternative,
+          "Four-star Energy option for newer accounts; Noblesse Oblige or Instructor serve the "
+            + "team better."),
       ],
       conditions: [
         energy, favonius,
@@ -116,6 +124,9 @@ extension CharacterRoles {
           "Gilded Dreams", .alternative,
           "Requires reactions and suitable team elements; another holder must cover needed Deepwood uptime."
         ),
+        RoleSet(
+          "Instructor", .alternative,
+          "Four-star. For teams where others deal the damage; Nahida must trigger a reaction."),
       ],
       conditions: [
         energy, crit,

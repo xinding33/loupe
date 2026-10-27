@@ -6,7 +6,8 @@ import Vision
 
 struct CardReading: Sendable {
   let text: String
-  let fiveStars: Bool
+  /// Gold rarity stars counted on the card; 0 for the Enhance panel, which shows none.
+  let stars: Int
   let confidence: Float
   var isEnhancement = false
 
@@ -26,7 +27,7 @@ enum CardOCR {
     if let snapshot = try enhancementSnapshot(image), let heading = snapshot.heading {
       let result = try EnhancementLayout.assemble(snapshot.regions, heading: heading)
       return CardReading(
-        text: result.text, fiveStars: false, confidence: result.confidence, isEnhancement: true)
+        text: result.text, stars: 0, confidence: result.confidence, isEnhancement: true)
     }
     return try readInventory(image)
   }
@@ -121,14 +122,14 @@ enum CardOCR {
     else { throw ArtifactError("Waiting for a clear level and main-stat value.") }
     let band = CGRect(
       x: left, y: level.maxY, width: right - left, height: max(0, mainValue.minY - level.maxY))
-    let fiveStars = countStars(in: image, band: band) == 5
+    let stars = countStars(in: image, band: band)
     let text = lines.map(\.text).joined(separator: "\n")
     // Judge only the lines the parser reads; Vision often reads the rarity stars as junk text.
     let judged =
       CardParser.parsedLines(text).map { $0.map { lines[$0] } }
       ?? lines.filter { $0.bounds.minY >= level.minY - 0.23 }
     return CardReading(
-      text: text, fiveStars: fiveStars, confidence: judged.map(\.confidence).min() ?? 0)
+      text: text, stars: stars, confidence: judged.map(\.confidence).min() ?? 0)
   }
 
   /// Vision sometimes skips the small white-on-dark level tag, so read the gap between the

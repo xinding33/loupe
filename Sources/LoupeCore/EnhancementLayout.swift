@@ -114,9 +114,11 @@ public enum EnhancementLayout {
       }
       return TextRegion(text: text, bounds: observation.bounds, confidence: observation.confidence)
     }.sorted { $0.bounds.midY > $1.bounds.midY }
-    guard labels.count == 5, values.count == 5 else {
+    // The main stat and four substats; a four-star that started with two lines shows fewer until
+    // +8. The verified card decides how many rows this piece needs.
+    guard labels.count == values.count, (3...5).contains(labels.count) else {
       throw ArtifactError(
-        "Enhance: read \(labels.count)/5 stat labels and \(values.count)/5 values. Table text: \(area.map(\.text).joined(separator: "; "))."
+        "Enhance: read \(labels.count) stat labels and \(values.count) values. Table text: \(area.map(\.text).joined(separator: "; "))."
       )
     }
     var rows: [String] = []

@@ -60,7 +60,7 @@ struct DiagnosticReader {
         captureSize: CGSize(width: image.width, height: image.height),
         assembledText: reading?.text ?? "", parserDecision: "Awaiting model parsing",
         confirmationDecision: confirmation, parsedArtifact: nil, states: [], mode: trace.mode,
-        readingConfidence: reading?.confidence, fiveStars: reading?.fiveStars,
+        readingConfidence: reading?.confidence, fiveStars: reading.map { $0.stars == 5 },
         resetsConfirmation: reset),
       inputs: trace.mode == .unknown ? [] : trace.inputs)
     storageIssue = trace.storageIssue

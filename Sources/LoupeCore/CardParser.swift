@@ -4,8 +4,16 @@ public enum CardParser {
   public static func parse(_ text: String, fiveStarsConfirmed: Bool, rule: RollRule = .ordinary)
     throws -> Artifact
   {
-    guard fiveStarsConfirmed else {
-      throw ArtifactError("Confirm a five-star artifact. Other rarities are not supported.")
+    try parse(text, stars: fiveStarsConfirmed ? 5 : 0, rule: rule)
+  }
+
+  /// Parses a card with the number of rarity stars counted on it: four or five.
+  public static func parse(_ text: String, stars: Int, rule: RollRule = .ordinary) throws
+    -> Artifact
+  {
+    guard stars == 4 || stars == 5 else {
+      throw ArtifactError(
+        "Confirm a four- or five-star artifact. Other rarities are not supported.")
     }
     let card = try layout(text)
     let special = ["sanctifying", "guaranteed", "reshap", "defined affix"].contains {
@@ -13,7 +21,8 @@ public enum CardParser {
     }
     return try Artifact(
       setName: card.setName, slot: card.slot, main: card.main, level: card.level,
-      substats: card.substats, unactivated: card.unactivated, rule: special ? .special : rule)
+      substats: card.substats, unactivated: card.unactivated, rule: special ? .special : rule,
+      rarity: stars)
   }
 
   /// Indices of the newline-separated lines that `parse` reads, or nil when it cannot place them.
@@ -230,13 +239,14 @@ public enum CardParser {
       ([pieceName, slotText, mainText, mainValue, levelLine] + Array(lines.dropFirst(3)) + [
         previous.setName + ":"
       ]).joined(separator: "\n")
-    let candidate = try parse(canonical, fiveStarsConfirmed: true, rule: previous.rule)
+    let candidate = try parse(canonical, stars: previous.rarity, rule: previous.rule)
     // Both readings come from the screen, where the game keeps substat order, so labels read in
-    // swapped rows cannot pass. Saved records may come from imports in another order.
+    // swapped rows cannot pass. A four-star adds lines below the existing ones, and a missed row
+    // cannot pass either. Saved records may come from imports in another order.
     func keys(_ artifact: Artifact) -> [Stat] {
       (artifact.substats + (artifact.unactivated.map { [$0] } ?? [])).map(\.key)
     }
-    guard keys(candidate) == keys(previous) else {
+    guard keys(candidate).starts(with: keys(previous)) else {
       throw ArtifactError("Enhance stats are in a different order. Waiting for a clear frame.")
     }
     return try previous.upgraded(to: candidate)

@@ -64,8 +64,8 @@ public struct Inventory: Codable, Sendable {
     guard file.format == "GOOD" else {
       throw ArtifactError("Choose a GOOD-format inventory export.")
     }
-    let fiveStars = file.artifacts.filter { $0.rarity == 5 }
-    let artifacts = try fiveStars.enumerated().map { index, item in
+    let supported = file.artifacts.filter { $0.rarity == 5 || $0.rarity == 4 }
+    let artifacts = try supported.enumerated().map { index, item in
       guard (item.unactivatedSubstats?.count ?? 0) <= 1 else {
         throw ArtifactError("GOOD artifact \(index + 1) has multiple unactivated stats.")
       }
@@ -74,9 +74,10 @@ public struct Inventory: Codable, Sendable {
           setName: item.setKey, slot: item.slotKey, main: item.mainStatKey, level: item.level,
           substats: item.substats.filter { $0.value > 0 },
           unactivated: item.unactivatedSubstats?.first,
-          rule: item.level == 20 ? .ordinary : .special)
+          rule: item.level == Artifact.maxLevel(item.rarity) ? .ordinary : .special,
+          rarity: item.rarity)
       } catch { throw ArtifactError("GOOD artifact \(index + 1): \(error.localizedDescription)") }
     }
-    return (artifacts, file.artifacts.count - fiveStars.count)
+    return (artifacts, file.artifacts.count - supported.count)
   }
 }
