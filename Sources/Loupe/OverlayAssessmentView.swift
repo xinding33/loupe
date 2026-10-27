@@ -10,9 +10,12 @@ enum AccountSummary {
   }
 }
 
-/// Click-through result surface. The interactive strip lives in a separate panel above it.
+/// Click-through result surface, except the character rows, which report their frames through
+/// `OverlayHitRegions` so the panel can take clicks over them. The interactive strip lives in a
+/// separate panel above it.
 struct OverlayView: View {
   @ObservedObject var model: Model
+  var hitRegions: @MainActor @Sendable ([CGRect]) -> Void = { _ in }
 
   private var expanded: Bool { model.overlayExpanded }
 
@@ -47,6 +50,9 @@ struct OverlayView: View {
     .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .environment(\.colorScheme, .dark)
+    .onPreferenceChange(OverlayHitRegions.self) { regions in
+      MainActor.assumeIsolated { hitRegions(regions) }
+    }
   }
 
   private var statusRow: some View {
@@ -197,14 +203,28 @@ struct OverlayView: View {
       ForEach(shortlist.visibleMatches) { match in
         let selected = model.selectedMatch?.id == match.id
         let headline = GradeHeadline(match: match, artifact: artifact)
-        HStack(spacing: 6) {
-          RoundedRectangle(cornerRadius: 1).fill(selected ? Theme.accent : .clear)
-            .frame(width: 2, height: 12)
-          Text(match.characterName).font(.caption.weight(selected ? .bold : .regular))
-            .lineLimit(1)
-          Spacer(minLength: 4)
-          Text(match.setFit.shortLabel).font(.system(size: 9.5)).foregroundStyle(.secondary)
-          TierChip(tier: headline.tier)
+        Button {
+          model.selectedCharacterID = match.characterID
+          model.selectedRoleID = match.roleID
+        } label: {
+          HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 1).fill(selected ? Theme.accent : .clear)
+              .frame(width: 2, height: 12)
+            Text(match.characterName).font(.caption.weight(selected ? .bold : .regular))
+              .lineLimit(1)
+            Spacer(minLength: 4)
+            Text(match.setFit.shortLabel).font(.system(size: 9.5)).foregroundStyle(.secondary)
+            TierChip(tier: headline.tier)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .background {
+          GeometryReader { proxy in
+            Color.clear.preference(
+              key: OverlayHitRegions.self, value: [proxy.frame(in: .global)])
+          }
         }
       }
       Text(

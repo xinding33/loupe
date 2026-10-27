@@ -32,6 +32,13 @@ struct OverlayPlacement: Equatable {
       panelFrame: CGRect(x: x, y: y, width: width, height: height))
   }
 
+  /// Whether a point in the panel's window space, origin bottom-left, falls in a SwiftUI region
+  /// measured from the top-left of a content view `height` points tall.
+  static func hits(_ point: CGPoint, regions: [CGRect], height: CGFloat) -> Bool {
+    let flipped = CGPoint(x: point.x, y: height - point.y)
+    return regions.contains { $0.contains(flipped) }
+  }
+
   static func appKitFrame(_ quartz: CGRect, primaryTop: CGFloat) -> CGRect {
     CGRect(x: quartz.minX, y: primaryTop - quartz.maxY, width: quartz.width, height: quartz.height)
   }
@@ -39,6 +46,12 @@ struct OverlayPlacement: Equatable {
   private static func area(_ rect: CGRect) -> CGFloat {
     rect.isNull || rect.isEmpty ? 0 : rect.width * rect.height
   }
+}
+
+/// Frames of the overlay rows that take clicks, in the hosting view's top-left space.
+struct OverlayHitRegions: PreferenceKey {
+  static let defaultValue: [CGRect] = []
+  static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) { value += nextValue() }
 }
 
 @MainActor
@@ -53,6 +66,8 @@ final class OverlayController {
   private let panel: NSPanel
   private let controls: NSPanel
   private var timer: Timer?
+  private var pointerTimer: Timer?
+  private var hitRegions: [CGRect] = []
   private let defaults: UserDefaults
   private var offset: CGPoint
   private var dragOrigin: CGPoint?
@@ -67,7 +82,9 @@ final class OverlayController {
     panel = Self.makePanel()
     controls = Self.makePanel()
     panel.ignoresMouseEvents = true
-    panel.contentView = NSHostingView(rootView: OverlayView(model: model))
+    panel.contentView = NSHostingView(
+      rootView: OverlayView(
+        model: model, hitRegions: { [weak self] in self?.setHitRegions($0) }))
     controls.contentView = NSHostingView(
       rootView: OverlayControls(
         model: model,
@@ -100,6 +117,7 @@ final class OverlayController {
       controls.orderOut(nil)
       placement = nil
       model.diagnosticPlacement = nil
+      syncPointerTracking()
       return
     }
     if timer == nil {
@@ -111,6 +129,7 @@ final class OverlayController {
   }
 
   private func refreshPlacement() {
+    defer { syncPointerTracking() }
     guard model.enabled else { return }
     let screens = NSScreen.screens
     guard let id = model.capture.selectedWindowID,
@@ -171,6 +190,34 @@ final class OverlayController {
     controls.orderFrontRegardless()
     model.placementStatus =
       "Anchored to the shared window's display. Drag the grip to adjust; Reset restores the corner."
+  }
+
+  /// The result panel stays click-through except over the character rows. A click-through
+  /// window gets no mouse events, so the pointer is polled while any row is on screen.
+  private func setHitRegions(_ regions: [CGRect]) {
+    hitRegions = regions
+    syncPointerTracking()
+  }
+
+  private func syncPointerTracking() {
+    if hitRegions.isEmpty || !panel.isVisible {
+      pointerTimer?.invalidate()
+      pointerTimer = nil
+      panel.ignoresMouseEvents = true
+    } else if pointerTimer == nil {
+      pointerTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) {
+        [weak self] _ in
+        Task { @MainActor in self?.trackPointer() }
+      }
+    }
+  }
+
+  private func trackPointer() {
+    let point = panel.convertPoint(fromScreen: NSEvent.mouseLocation)
+    let reachable =
+      panel.isVisible
+      && OverlayPlacement.hits(point, regions: hitRegions, height: panel.frame.height)
+    if panel.ignoresMouseEvents == reachable { panel.ignoresMouseEvents = !reachable }
   }
 
   private func drag(_ delta: CGSize, finished: Bool) {
