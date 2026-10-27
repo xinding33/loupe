@@ -181,9 +181,11 @@ struct OverlayView: View {
     }
     if model.assessmentMode == .characters { users(artifact) }
     stats(artifact)
-    Text("Weighted-roll screen, not damage. ER needs and Crit caps are unknown.")
-      .font(.system(size: 9.5)).foregroundStyle(.tertiary)
-      .fixedSize(horizontal: false, vertical: true)
+    Text(
+      "Weighted-roll screen, not damage. ER needs and Crit caps are unknown. Resin assumes top-level domain runs."
+    )
+    .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+    .fixedSize(horizontal: false, vertical: true)
   }
 
   private func users(_ artifact: Artifact) -> some View {

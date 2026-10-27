@@ -36,7 +36,7 @@ func score(_ value: Double, digits: Int = 1) -> String {
 }
 
 /// Rarity of the headline score among new drops of the same slot and main stat, and the expected
-/// on-set domain drops before a better one. Unfinished pieces describe their median projection.
+/// days of domain resin before a better one. Unfinished pieces describe their median projection.
 func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: Bool = false)
   -> String?
 {
@@ -45,13 +45,22 @@ func rarityLine(_ grades: CharacterGradeSummary?, artifact: Artifact, compact: B
   let standing = share <= 0.5 ? "top \(percent(share)) of \(kind)" : "bottom half of \(kind)"
   let replacement =
     grades?.replacementDrops.map {
-      compact ? "~\(roughCount($0)) drops to beat" : "about \(roughCount($0)) domain drops to beat"
+      let cost = "\(ResinCost.duration(forDrops: $0)) of resin to beat"
+      return compact ? cost : cost + " (~\(roughCount(ResinCost.resin(forDrops: $0))) resin)"
     } ?? "no new drop beats it"
   let headline =
     artifact.level == 20
     ? standing.prefix(1).uppercased() + standing.dropFirst()
     : "Median +20: " + standing
   return headline + " · " + replacement
+}
+
+/// The assumptions and counts behind `rarityLine`'s resin estimate.
+func rarityHelp(_ grades: CharacterGradeSummary?) -> String? {
+  grades?.replacementDrops.map {
+    ResinCost.breakdown(forDrops: $0)
+      + ". Assumes top-level domain runs of this set: ~1.07 five-stars per 20 resin, 180 resin a day."
+  }
 }
 
 /// Which grade the headline shows: the roll grade, from the expected +20 score before +20 and

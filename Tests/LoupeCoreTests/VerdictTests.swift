@@ -191,8 +191,8 @@ struct VerdictTests {
     let a = Self.verdict(try Self.plume(cr: 3, cd: 1))
     #expect(a.kind == .keep)
     #expect(a.grade == .a)
-    #expect(a.reason.hasPrefix("A · about "))
-    #expect(a.reason.hasSuffix(" drops to replace"))
+    #expect(a.reason.hasPrefix("A · ~"))
+    #expect(a.reason.hasSuffix(" of resin to replace"))
   }
 
   @Test func finishedBDependsOnTheSavedPool() throws {

@@ -177,7 +177,8 @@ public enum VerdictEngine {
       switch leading?.grade {
       case .s?, .a?:
         let replace = leading!.drops(leading!.profile.score(artifact.substats)).map {
-          $0.isInfinite ? "no new drop beats it" : "about \(roughCount($0)) drops to replace"
+          $0.isInfinite
+            ? "no new drop beats it" : "\(ResinCost.duration(forDrops: $0)) of resin to replace"
         }
         return Verdict(
           kind: .keep, role: leading,
