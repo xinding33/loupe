@@ -12,7 +12,10 @@ final class Model: ObservableObject {
   /// Keep / Level / Review / Fodder advice across every character match and the saved inventory.
   @Published var verdict: Verdict?
   @Published var assessmentMode: AssessmentMode = .characters {
-    didSet { refreshDiagnosticRecommendation() }
+    didSet {
+      preferences.manualProfile = assessmentMode == .profile
+      refreshDiagnosticRecommendation()
+    }
   }
   @Published var selectedCharacterID: String? {
     didSet { refreshDiagnosticRecommendation() }
@@ -22,10 +25,23 @@ final class Model: ObservableObject {
     didSet { refreshDiagnosticRecommendation() }
   }
   @Published private(set) var evaluationIssue: String?
-  @Published var profileName = "Crit" { didSet { evaluate() } }
-  @Published var scope: ComparisonScope = .offPiece { didSet { evaluate() } }
+  @Published var profileName = "Crit" {
+    didSet {
+      preferences.profileName = profileName
+      evaluate()
+    }
+  }
+  @Published var scope: ComparisonScope = .offPiece {
+    didSet {
+      preferences.sameSet = scope == .sameSet
+      evaluate()
+    }
+  }
   @Published var customWeights = Dictionary(uniqueKeysWithValues: Stat.substats.map { ($0, 0) }) {
-    didSet { evaluate() }
+    didSet {
+      preferences.customWeights = customWeights
+      evaluate()
+    }
   }
   @Published var status = "Choose the GeForce NOW window to start. Screens stay on this Mac."
   @Published var issue: String?
@@ -33,6 +49,8 @@ final class Model: ObservableObject {
   @Published var recordingStatus =
     "Full-window test frames stay on this Mac and may include UID and chat."
   @Published var isRecording = false
+  /// Collection for this session. Linking, a failed save and turning the reader off stop it
+  /// without changing the remembered choice; see `setCollectCards`.
   @Published var scanMode = false
   @Published var special = false {
     didSet {
@@ -43,7 +61,12 @@ final class Model: ObservableObject {
   @Published var linkedID: UUID?
   @Published var search = ""
   @Published private(set) var enabled = true
-  @Published var overlayExpanded = false { didSet { updateOverlay?() } }
+  @Published var overlayExpanded = false {
+    didSet {
+      preferences.overlayExpanded = overlayExpanded
+      updateOverlay?()
+    }
+  }
   @Published var placementStatus = "Choose a game window to place the overlay."
   @Published var shortcutStatus = ""
   @Published var expandShortcut =
@@ -55,6 +78,15 @@ final class Model: ObservableObject {
   let diagnostics: DiagnosticReportFlow
   @Published private(set) var stability = CardStability()
   private let file: URL
+  private let preferencesFile: URL
+  private var preferences: Preferences {
+    didSet {
+      guard preferences != oldValue else { return }
+      do { try preferences.write(to: preferencesFile) } catch {
+        issue = "Cannot save settings. \(error.localizedDescription)"
+      }
+    }
+  }
   private var freshness: Timer?
   private var evaluation: Task<Void, Never>?
   private var undoInventory: Inventory?
@@ -80,6 +112,17 @@ final class Model: ObservableObject {
       ?? URL.applicationSupportDirectory.appending(
         path: "Loupe", directoryHint: .isDirectory)
     file = inventoryFile ?? folder.appending(path: "inventory.json")
+    preferencesFile = folder.appending(path: "preferences.json")
+    let saved = Preferences.read(from: preferencesFile)
+    preferences = saved
+    scanMode = saved.collectCards
+    overlayExpanded = saved.overlayExpanded
+    assessmentMode = saved.manualProfile ? .profile : .characters
+    scope = saved.sameSet ? .sameSet : .offPiece
+    profileName = saved.profileName
+    customWeights = saved.customWeights
+    diagnostics.setOptedIn(saved.bufferDiagnostics)
+    diagnostics.didChangeOptIn = { [weak self] in self?.preferences.bufferDiagnostics = $0 }
     do {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       if FileManager.default.fileExists(atPath: file.path) {
@@ -370,6 +413,11 @@ final class Model: ObservableObject {
       scanMode = false
     }
   }
+  /// The Collect cards toggle, which is remembered for the next launch.
+  func setCollectCards(_ value: Bool) {
+    scanMode = value
+    preferences.collectCards = value
+  }
   func link(_ artifact: Artifact) {
     scanMode = false
     linkedID = artifact.id
@@ -510,7 +558,7 @@ final class Model: ObservableObject {
     guard enabled != value else { return }
     enabled = value
     enhancementContext = nil
-    scanMode = false
+    scanMode = value && preferences.collectCards
     linkedID = nil
     resetLiveCard()
     clearDiagnostics?()

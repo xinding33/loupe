@@ -181,7 +181,11 @@ private struct Sidebar: View {
         .font(.caption)
       }
       Panel(title: "Reading", systemImage: "text.viewfinder") {
-        Toggle("Collect cards as I browse", isOn: $model.scanMode).disabled(!model.enabled)
+        Toggle(
+          "Collect cards as I browse",
+          isOn: Binding(get: { model.scanMode }, set: { model.setCollectCards($0) })
+        )
+        .disabled(!model.enabled)
         Toggle("Crafted / guaranteed rolls", isOn: $model.special)
           .help("Mark crafted pieces before reading. Reshaping odds are not modeled.")
         Text("Ordinary five-star drops only.").font(.caption).foregroundStyle(.secondary)
