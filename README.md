@@ -36,11 +36,13 @@ The overlay starts compact near the top-right of the shared window's display. It
 | Option + backtick | Expand or collapse the overlay |
 | Option + Shift + backtick | Enable or disable the reader |
 
-Edit the shortcuts in the main window and click **Apply shortcuts**. Keys use US keyboard positions. Registration conflicts appear there; the menu and main-window controls remain available.
+Edit the shortcuts in the main window and click **Apply shortcuts**. Keys use US keyboard positions. Registration conflicts appear there; the menus and main-window controls remain available.
+
+The viewfinder icon in the menu bar has the same controls without the main window: **Choose Game Window…**, **Reader Enabled**, **Overlay Expanded**, **Reset Overlay Placement** and **Report Issue…**. It shows a dot while auto-press is on, and dims while both the reader and auto-press are off. The **Controls** menu has the same items except **Report Issue…**, which is in the Help menu. The menu bar is hidden while the game is full screen, so use the shortcuts there.
 
 **Collapsed** still reads artifacts. **Disabled** hides the overlay, stops capture and new OCR, cancels evaluation, and clears live results. Inventory and settings remain. An in-flight read may finish, but cannot publish results or save artifacts. If macOS cannot stop sharing, the app reports the error and keeps OCR disabled.
 
-Enable again to reuse the selected window if sharing permission remains valid. Otherwise choose the window again. Read a fresh Inventory card before entering Enhance. Disabling also stops collection and clears an upgrade link; re-enable collection or relink explicitly when needed. Expanding alone never enables capture. Reopen the main window from the Dock.
+Enable again to reuse the selected window if sharing permission remains valid. Otherwise choose the window again. Read a fresh Inventory card before entering Enhance. Disabling also stops collection and clears an upgrade link; re-enable collection or relink explicitly when needed. Expanding alone never enables capture. Reopen the main window from the Dock or the menu bar icon's **Show Loupe**.
 
 ## Auto-press
 
@@ -50,7 +52,7 @@ Auto-press repeatedly presses a key while a chosen app is in front. Sending inpu
 2. It presses only while GeForce NOW is in front. Switch away and it pauses; come back and it carries on.
 3. It turns itself off after 10 minutes unless you change that.
 
-The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. The app menu has **Turn auto-press on / off**.
+The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. The **Controls** menu has **Auto-Press On**.
 
 Auto-press needs **Accessibility** access to press keys and to use a mouse button as its toggle. It asks the first time you turn it on; until then the panel shows **Open Accessibility settings** and auto-press stays off. It notices the grant without a restart.
 
@@ -164,7 +166,7 @@ Writes are atomic. **Undo** under Saved inventory reverses the last inventory ch
 
 1. Enable **Buffer diagnostic crops** in the main window.
 2. Reproduce the problem while the reader is enabled.
-3. Click **Report issue** in the main window, overlay strip, or app menu.
+3. Click **Report issue** in the main window or overlay strip, or choose **Report Issue…** from the menu bar icon or the Help menu.
 4. Review the retained crops, metadata, and replay limitations.
 5. Choose the issue type and optionally enter the expected reading and notes.
 6. Click **Save local report...** and choose a new destination.

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class AppDelegate: NSObject, NSApplicationDelegate {
   private var window: NSWindow!
   private var overlay: OverlayController!
   private var shortcuts: OverlayShortcuts!
@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
   private var model: Model!
   private var autoPress: AutoPress!
   private let updates = Updates()
+  private var menus: Menus!
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     model = Model()
@@ -18,52 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
       guard let self else { return [] }
       return [model.expandShortcut, model.enableShortcut].compactMap { try? OverlayShortcut($0) }
     }
-    let menu = NSMenu()
-    let appItem = NSMenuItem()
-    menu.addItem(appItem)
-    let appMenu = NSMenu()
-    appItem.submenu = appMenu
-    appMenu.addItem(
-      withTitle: "Show Loupe", action: #selector(showMain), keyEquivalent: "1"
-    ).target = self
-    appMenu.addItem(
-      withTitle: "Expand / collapse overlay", action: #selector(toggleExpanded), keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(
-      withTitle: "Enable / disable reader", action: #selector(toggleEnabled), keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(
-      withTitle: "Reset overlay placement", action: #selector(resetPlacement), keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(
-      withTitle: "Turn auto-press on / off", action: #selector(toggleAutoPress), keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(.separator())
-    appMenu.addItem(withTitle: "Report issue", action: #selector(reportIssue), keyEquivalent: "")
-      .target = self
-    appMenu.addItem(
-      withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(
-      withTitle: "Install Updates Automatically", action: #selector(toggleAutomaticUpdates),
-      keyEquivalent: ""
-    ).target = self
-    appMenu.addItem(.separator())
-    appMenu.addItem(
-      withTitle: "Quit Loupe", action: #selector(NSApplication.terminate(_:)),
-      keyEquivalent: "q")
-    let editItem = NSMenuItem()
-    editItem.title = "Edit"
-    menu.addItem(editItem)
-    let edit = NSMenu(title: "Edit")
-    editItem.submenu = edit
-    edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-    edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-    edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-    edit.addItem(
-      withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-    NSApplication.shared.mainMenu = menu
-
     window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1080, height: 800),
       styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false
@@ -72,11 +27,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     window.contentView = NSHostingView(
       rootView: Dashboard(model: model, autoPress: autoPress))
     window.isReleasedWhenClosed = false
+    window.isExcludedFromWindowsMenu = true
+    window.tabbingMode = .disallowed
     window.center()
     window.makeKeyAndOrderFront(nil)
     model.diagnostics.present = { [weak self] in
       self?.window.makeKeyAndOrderFront(nil)
       NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    menus = Menus(model: model, autoPress: autoPress, updates: updates) { [weak self] in
+      self?.showMain()
     }
 
     overlay = OverlayController(model: model)
@@ -109,21 +70,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
-  @objc private func showMain() { window.makeKeyAndOrderFront(nil) }
-  @objc private func toggleExpanded() { model.overlayExpanded.toggle() }
-  @objc private func toggleEnabled() { model.setEnabled(!model.enabled) }
-  @objc private func resetPlacement() { model.resetOverlayPlacement?() }
-  @objc private func reportIssue() { model.reportIssue() }
-  @objc private func toggleAutoPress() { autoPress.toggle() }
-  @objc private func checkForUpdates() { updates.checkNow() }
-  @objc private func toggleAutomaticUpdates() { updates.automatic.toggle() }
-
-  func validateMenuItem(_ item: NSMenuItem) -> Bool {
-    guard item.action == #selector(toggleAutomaticUpdates) else { return true }
-    item.state = updates.automatic && updates.canInstall ? .on : .off
-    item.toolTip =
-      updates.canInstall ? nil : "Only copies installed from a release can update themselves."
-    return updates.canInstall
+  private func showMain() {
+    // Activating first, since the menu bar icon's menu can open while another app is in front.
+    NSApp.activate()
+    window.makeKeyAndOrderFront(nil)
   }
   func applicationWillTerminate(_ notification: Notification) {
     model.setEnabled(false)

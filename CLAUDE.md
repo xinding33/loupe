@@ -25,7 +25,8 @@ Scars and invariants only. Anything a grep or `--help` can tell you doesn't go h
 ## Departures from the macOS utility defaults
 
 - A regular Dock app with a main window, not a menu bar accessory: the dashboard, inventory and
-  report flow need a window, and the overlay is a separate panel.
+  report flow need a window, and the overlay is a separate panel. It has a menu bar icon as well,
+  for the reader's controls, and the icon can't be hidden. Settings stay out of the icon's menu.
 - No login item. It's a tool you open to play.
 - Capture uses `SCContentSharingPicker`, so it needs no Screen Recording grant. Only auto-press
   needs a permission (Accessibility).
