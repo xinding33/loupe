@@ -35,10 +35,12 @@ The overlay starts compact near the top-right of the shared window's display. It
 | --- | --- |
 | Option + backtick | Expand or collapse the overlay |
 | Option + Shift + backtick | Enable or disable the reader |
+| Option + Shift + S | Save a snapshot of the game window and copy it |
+| Option + Shift + R | Start or stop recording the game window |
 
 Edit the shortcuts in the main window and click **Apply shortcuts**. Keys use US keyboard positions. Registration conflicts appear there; the menus and main-window controls remain available.
 
-The viewfinder icon in the menu bar has the same controls without the main window: **Choose Game Window…**, **Reader Enabled**, **Overlay Expanded**, **Reset Overlay Placement** and **Report Issue…**. It shows a dot while auto-press is on, and dims while both the reader and auto-press are off. The **Controls** menu has the same items except **Report Issue…**, which is in the Help menu. The menu bar is hidden while the game is full screen, so use the shortcuts there.
+The viewfinder icon in the menu bar has the same controls without the main window: **Choose Game Window…**, **Reader Enabled**, **Overlay Expanded**, **Reset Overlay Placement**, **Save Snapshot**, **Record Game Window** and **Report Issue…**. It shows a dot while auto-press is on, and dims while both the reader and auto-press are off. The **Controls** menu has the same items except **Report Issue…**, which is in the Help menu. The menu bar is hidden while the game is full screen, so use the shortcuts there.
 
 **Collapsed** still reads artifacts. **Disabled** hides the overlay, stops capture and new OCR, cancels evaluation, and clears live results. Inventory and settings remain. An in-flight read may finish, but cannot publish results or save artifacts. If macOS cannot stop sharing, the app reports the error and keeps OCR disabled.
 
@@ -161,7 +163,7 @@ Only the window selected in the sharing picker is captured. Vision OCR runs on t
 
 Writes are atomic. **Undo** under Saved inventory reverses the last inventory change during the current session. Export backups before a large scan. A damaged inventory file disables saving rather than replacing the file.
 
-**Record 40 test frames** explicitly saves 40 PNG images from the shared window, normally about 20 seconds. They may contain your UID. The app shows the saved folder under `~/Library/Application Support/Loupe/Diagnostics/`. Recording stops after 40 frames or when capture stops. These files stay outside the repository and are never uploaded automatically.
+**Snapshot** saves the next frame of the shared window as a PNG and copies it, so you can paste it into an issue or a chat. **Record** saves the shared window twice a second as numbered PNG images until you stop it, for up to 240 frames (about two minutes); capture stopping also stops it. Both work from their shortcuts while the game is full screen, with a banner to confirm, and are under Diagnostics in the main window, in the Controls menu and in the menu bar icon's menu. Files go to `~/Library/Application Support/Loupe/Diagnostics/`, and the folder button under Diagnostics shows the last one in Finder. They may contain your UID or chat. They stay outside the repository and nothing uploads them; a copied snapshot goes wherever you paste it.
 
 ## Report a reading or overlay problem
 
@@ -179,7 +181,7 @@ Reporting freezes evidence before opening the preview and pauses collection. Clo
 
 Reports contain timestamps, OCR inputs and observations, parser decisions, displayed results, relevant comparison pieces, settings, and placement geometry. Expected readings are annotations and never change inventory. Crops and metadata can contain identifying text. Nothing is uploaded automatically, and other monitors and audio are not recorded.
 
-Enhance reports retain exact prepared Vision inputs for replay. Inventory reports are partial: the current reader searches the full window, but the buffer keeps only the selected card crop or metadata. It cannot replay the full-window search or star detection. Initial confirmation history and verified Inventory context can also precede the retained sequence. Use the explicit 40-frame recorder when a full-window reproduction is needed.
+Enhance reports retain exact prepared Vision inputs for replay. Inventory reports are partial: the current reader searches the full window, but the buffer keeps only the selected card crop or metadata. It cannot replay the full-window search or star detection. Initial confirmation history and verified Inventory context can also precede the retained sequence. Use **Record** when a full-window reproduction is needed.
 
 A saved folder contains `manifest.json` and raw `.rgba` inputs. The [diagnostic integration reference](docs/diagnostics-design.md) describes the format. The preview displays all retained images before saving; no separate image viewer is required to review them. Reports include the packaged source fingerprint and the active character/calibration versions.
 

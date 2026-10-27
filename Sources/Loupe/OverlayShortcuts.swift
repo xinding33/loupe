@@ -52,6 +52,8 @@ final class OverlayShortcuts {
   private var held: Set<UInt32> = []
   var expand: (() -> Void)?
   var toggleEnabled: (() -> Void)?
+  var snapshot: (() -> Void)?
+  var toggleRecording: (() -> Void)?
 
   init(backend: any ShortcutBackend) {
     self.backend = backend
@@ -62,20 +64,27 @@ final class OverlayShortcuts {
         return
       }
       guard held.insert(id).inserted else { return }
-      if id == 1 { expand?() }
-      if id == 2 { toggleEnabled?() }
+      switch id {
+      case 1: expand?()
+      case 2: toggleEnabled?()
+      case 3: snapshot?()
+      case 4: toggleRecording?()
+      default: break
+      }
     }
   }
 
-  func configure(expand: String, enable: String) throws {
-    let first = try OverlayShortcut(expand)
-    let second = try OverlayShortcut(enable)
-    guard first != second else { throw ArtifactError("Choose two different shortcuts.") }
+  func configure(expand: String, enable: String, snapshot: String, record: String) throws {
+    let shortcuts = try [expand, enable, snapshot, record].map(OverlayShortcut.init)
+    guard Set(shortcuts.map { [$0.keyCode, $0.modifiers] }).count == shortcuts.count else {
+      throw ArtifactError("Choose a different shortcut for each action.")
+    }
     backend.unregisterAll()
     held.removeAll()
     do {
-      try backend.register(first, id: 1)
-      try backend.register(second, id: 2)
+      for (index, shortcut) in shortcuts.enumerated() {
+        try backend.register(shortcut, id: UInt32(index + 1))
+      }
     } catch {
       backend.unregisterAll()
       throw ArtifactError(

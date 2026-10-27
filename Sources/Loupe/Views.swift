@@ -219,6 +219,14 @@ private struct Sidebar: View {
             Text("Reader").font(.caption)
             TextField("Enable shortcut", text: $model.enableShortcut)
           }
+          GridRow {
+            Text("Snapshot").font(.caption)
+            TextField("Snapshot shortcut", text: $model.snapshotShortcut)
+          }
+          GridRow {
+            Text("Record").font(.caption)
+            TextField("Record shortcut", text: $model.recordShortcut)
+          }
         }
         .textFieldStyle(.roundedBorder)
         .help(
@@ -237,10 +245,22 @@ private struct Sidebar: View {
       Panel(title: "Diagnostics", systemImage: "stethoscope") {
         DiagnosticControls(flow: model.diagnostics, report: model.reportIssue)
         Divider()
-        Button("Record 40 test frames", systemImage: "record.circle") {
-          model.capture.recordSequence()
+        HStack {
+          Button("Snapshot", systemImage: "camera") { model.saveSnapshot() }
+            .help("Save the next frame of the game window and copy it.")
+            .disabled(!model.enabled)
+          Button(
+            model.isRecording ? "Stop recording" : "Record",
+            systemImage: model.isRecording ? "stop.circle" : "record.circle"
+          ) { model.toggleRecording() }
+          .help("Save the game window twice a second, for up to two minutes.")
+          .disabled(!model.enabled)
+          if model.lastCapture != nil {
+            Button("Show in Finder", systemImage: "folder") { model.showLastCapture() }
+              .labelStyle(.iconOnly)
+              .help("Show the last snapshot or recording in Finder.")
+          }
         }
-        .disabled(!model.enabled || model.isRecording)
         Text(model.recordingStatus).font(.caption2).foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -543,7 +563,7 @@ struct ScanGuide: View {
       }
       Label {
         Text(
-          "No automated clicks, upgrades, or salvage. Only the selected window is read, on this Mac. Opt-in diagnostics keep crops in memory until you save a report; test recording saves full-window frames. Both may include UID or chat. Nothing is uploaded."
+          "No automated clicks, upgrades, or salvage. Only the selected window is read, on this Mac. Opt-in diagnostics keep crops in memory until you save a report; snapshots and recordings save full-window frames. Both may include UID or chat. Nothing is uploaded."
         )
       } icon: {
         Image(systemName: "lock.shield")
