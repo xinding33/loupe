@@ -19,6 +19,8 @@ final class DiagnosticReportFlow: ObservableObject {
   private let setCollection: (Bool) -> Void
   private let exporter = DiagnosticExporter()
   var present: (() -> Void)?
+  /// Called when the user flips the buffer toggle, so the choice outlasts the launch.
+  var didChangeOptIn: ((Bool) -> Void)?
 
   init(setCollection: @escaping (Bool) -> Void) { self.setCollection = setCollection }
 
@@ -36,6 +38,7 @@ final class DiagnosticReportFlow: ObservableObject {
 
   func setOptedIn(_ value: Bool) {
     optedIn = value
+    didChangeOptIn?(value)
     reset()
   }
 
