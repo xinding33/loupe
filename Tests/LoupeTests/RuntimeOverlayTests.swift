@@ -225,6 +225,15 @@ private let runtimeCard = """
   #expect(clipped.panelFrame == small.safeFrame)
 }
 
+@Test func runtimeOverlayHitRegionsFlipToWindowSpace() {
+  // A row 100 to 120 points from the top of a 600-point panel sits 480 to 500 points up.
+  let rows = [CGRect(x: 12, y: 100, width: 300, height: 20)]
+  #expect(OverlayPlacement.hits(CGPoint(x: 50, y: 490), regions: rows, height: 600))
+  #expect(!OverlayPlacement.hits(CGPoint(x: 50, y: 110), regions: rows, height: 600))
+  #expect(!OverlayPlacement.hits(CGPoint(x: 5, y: 490), regions: rows, height: 600))
+  #expect(!OverlayPlacement.hits(CGPoint(x: 50, y: 490), regions: [], height: 600))
+}
+
 @Test func runtimeShortcutDefaultsAndInvalidInputs() throws {
   let expand = try OverlayShortcut("option+`")
   #expect(expand.keyCode == UInt32(kVK_ANSI_Grave))
