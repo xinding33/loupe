@@ -160,16 +160,24 @@ private struct Sidebar: View {
           ForEach(AssessmentMode.allCases) { Text($0.rawValue).tag($0) }
         }
         .pickerStyle(.segmented).labelsHidden()
-        LabeledContent("Compare with") {
-          Picker("Compare with", selection: $model.scope) {
-            Text("All sets").tag(ComparisonScope.offPiece)
-            Text("Same set").tag(ComparisonScope.sameSet)
+        if model.assessmentMode == .profile {
+          LabeledContent("Compare with") {
+            Picker("Compare with", selection: $model.scope) {
+              Text("All sets").tag(ComparisonScope.offPiece)
+              Text("Same set").tag(ComparisonScope.sameSet)
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 150)
           }
-          .pickerStyle(.segmented).labelsHidden().frame(width: 150)
-        }
-        .font(.callout)
-        Text("Saved +20 pieces with the same slot and main stat.")
+          .font(.callout)
+          Text("Saved +20 pieces with the same slot and main stat.")
+            .font(.caption).foregroundStyle(.secondary)
+        } else {
+          Text(
+            "Each role compares with saved +20 pieces of the same slot and main stat that it would wear: this set's for a role that runs it, every set's for an off-piece."
+          )
           .font(.caption).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        }
         if model.assessmentMode == .profile { profileControls }
         DisclosureGroup("How scores work") {
           Text(

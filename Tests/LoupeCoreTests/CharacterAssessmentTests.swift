@@ -153,7 +153,7 @@ import Testing
     let empty = try match(candidate, "kuki-shinobu")
     let populated = try #require(
       CharacterAssessment.evaluate(
-        candidate, inventory: [linked, duplicate], scope: .offPiece, excluding: linked.id
+        candidate, inventory: [linked, duplicate], excluding: linked.id
       ).first { $0.characterID == "kuki-shinobu" })
     #expect(populated.potential?.comparisonCount == 1)
     #expect(populated.potential?.chanceToBeatBest == 0)

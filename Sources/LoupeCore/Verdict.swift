@@ -4,6 +4,15 @@ public enum VerdictKind: String, Sendable, CaseIterable {
   case keep, level, review, fodder
 }
 
+/// Whether a role still has a use for the piece.
+public enum RoleStanding: Sendable, Equatable {
+  case open
+  /// This many saved pieces the role would wear instead already beat the piece's best outcome.
+  case covered(Int)
+  /// An off-set flower or plume: a 4+1 build's off-piece is rarely that slot.
+  case rareOffPiece
+}
+
 /// One at-a-glance answer for an artifact: keep it, level it, look closer, or feed it.
 /// It is advice only; nothing acts in the game.
 public struct Verdict: Sendable, Equatable {
@@ -22,6 +31,8 @@ public struct Verdict: Sendable, Equatable {
   public let characterName: String?
   /// Why, without the character's name, so a narrow surface can show it beside the name.
   public let reason: String
+  /// Each role's standing by role ID. Roles missing from it are open.
+  public internal(set) var standings: [String: RoleStanding] = [:]
 
   init(kind: VerdictKind, targetLevel: Int? = nil, role: RoleContext? = nil, reason: String) {
     self.init(kind: kind, targetLevel: targetLevel, match: role?.match, reason: reason)
@@ -77,7 +88,9 @@ public struct VerdictPolicy: Sendable {
 ///   saved pieces a role can use and reviewed when nothing is saved. C is reviewed only when that
 ///   pool is thin but not empty, and D is fodder.
 /// A role is set aside when enough saved +20 pieces of the same slot and main stat already beat
-/// the piece's best outcome for it.
+/// the piece's best outcome for it. An on-set role counts only saved pieces of this set, which
+/// are what it would wear instead; an off-piece role counts every set. An off-set flower or
+/// plume is set aside too, since a 4+1 build rarely takes its off-piece in that slot.
 public enum VerdictEngine {
   /// Decides from the artifact's character matches and the saved +20 inventory.
   /// `excluding` removes the saved record of this same piece from comparisons.
@@ -85,11 +98,23 @@ public enum VerdictEngine {
     _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact],
     excluding: UUID? = nil, policy: VerdictPolicy = .standard
   ) -> Verdict {
-    if artifact.rarity == 4 {
-      return fourStar(
-        artifact, matches: matches, inventory: inventory, excluding: excluding,
-        policy: policy)
-    }
+    var standings: [String: RoleStanding] = [:]
+    var verdict =
+      artifact.rarity == 4
+      ? fourStar(
+        artifact, matches: matches, inventory: inventory, excluding: excluding, policy: policy,
+        standings: &standings)
+      : ordinary(
+        artifact, matches: matches, inventory: inventory, excluding: excluding, policy: policy,
+        standings: &standings)
+    verdict.standings = standings
+    return verdict
+  }
+
+  private static func ordinary(
+    _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact], excluding: UUID?,
+    policy: VerdictPolicy, standings: inout [String: RoleStanding]
+  ) -> Verdict {
     let kind = "\(artifact.main.label) \(artifact.slot.plural)"
     guard !matches.isEmpty else {
       return Verdict(kind: .fodder, reason: "No character role uses \(kind)")
@@ -101,6 +126,8 @@ public enum VerdictEngine {
     let roles = matches.map {
       RoleContext($0, artifact: artifact, saved: saved, matches: matches, policy: policy)
     }
+    // Set and slot alone set aside an off-set flower or plume, even without a forecast.
+    for role in roles where role.rareOffPiece { standings[role.match.roleID] = .rareOffPiece }
     let outcomes = artifact.level == 20 ? nil : try? RollOutcomes(artifact)
     if artifact.level < 20 && outcomes == nil {
       return Verdict(
@@ -125,17 +152,22 @@ public enum VerdictEngine {
       bests[role.profile.weights] = value
       return value
     }
-    let open = roles.filter { role in
-      role.saved.filter { $0 > ceiling(role) }.count < role.backups
-    }
+    for role in roles { standings[role.match.roleID] = role.standing(best: ceiling(role)) }
+    let open = roles.filter { standings[$0.match.roleID] == .open }
     guard !open.isEmpty else {
-      return Verdict(
-        kind: .fodder,
-        reason: outcomes == nil
-          ? "Enough saved \(kind) beat it for every role"
-          : "Enough saved \(kind) beat its best outcome for every role")
+      if roles.allSatisfy(\.rareOffPiece) {
+        return Verdict(
+          kind: .fodder,
+          reason:
+            "No role runs \(artifact.setName); off-set \(artifact.slot.plural) are rarely worn")
+      }
+      let worn = roles.filter { !$0.rareOffPiece }
+      let pool = worn.allSatisfy { $0.match.scope == .sameSet } ? worn[0].kind : kind
+      let beaten = outcomes == nil ? "beat it" : "beat its best outcome"
+      let users = worn.count < roles.count ? "every role on this set" : "every role"
+      return Verdict(kind: .fodder, reason: "Enough saved \(pool) \(beaten) for \(users)")
     }
-    // The best letter leads, then the role that wants this set, then the rarer result for it:
+    // The best letter leads, then the role likelier to wear it, then the rarer result for it:
     // more drops to replace a finished piece, or a likelier A for an unfinished one.
     func rarity(_ role: RoleContext) -> Double {
       outcomes == nil
@@ -144,7 +176,7 @@ public enum VerdictEngine {
     }
     func strongest(_ roles: [RoleContext]) -> RoleContext? {
       roles.filter { $0.grade != nil }.min {
-        ($0.tierRank, -$0.setRank, -rarity($0)) < ($1.tierRank, -$1.setRank, -rarity($1))
+        ($0.tierRank, -$0.wearRank, -rarity($0)) < ($1.tierRank, -$1.wearRank, -rarity($1))
       }
     }
     // A support's grade counts only at S; below that it can still keep a finished piece that
@@ -154,7 +186,7 @@ public enum VerdictEngine {
       $0.tierRank < (leading?.tierRank ?? .max) ? $0 : nil
     }
     let gap = open.filter { $0.grade == nil && $0.saved.count < $0.backups }.max {
-      $0.setRank < $1.setRank
+      $0.wearRank < $1.wearRank
     }
     // Any C role whose saved pool is thin can rescue the piece; supports only once it is
     // finished, since their grade levels only at S. An empty pool usually means the bag was not
@@ -165,7 +197,7 @@ public enum VerdictEngine {
           && (outcomes == nil || !$0.isSupport)
       })
     let mainFit = { (role: RoleContext) in
-      "Main stat fills a gap: \(role.saved.count) saved \(kind)"
+      "Main stat fills a gap: \(role.saved.count) saved \(role.kind)"
     }
     let fodder = Verdict(
       kind: .fodder, role: leading,
@@ -195,15 +227,15 @@ public enum VerdictEngine {
           let label = role.grade!.rawValue + (role.isSupport ? " for a support" : "")
           if role.saved.isEmpty {
             return Verdict(
-              kind: .review, role: role, reason: "\(label) · no saved +20 \(kind) to compare yet")
+              kind: .review, role: role,
+              reason: "\(label) · no saved +20 \(role.kind) to compare yet")
           }
           let score = role.profile.score(artifact.substats)
-          return Verdict(
-            kind: .keep, role: role, reason: label + " · " + role.standing(score, kind: kind))
+          return Verdict(kind: .keep, role: role, reason: label + " · " + role.rank(score))
         }
         if let thin {
           return Verdict(
-            kind: .review, role: thin, reason: "C · only \(thin.saved.count) saved \(kind)")
+            kind: .review, role: thin, reason: "C · only \(thin.saved.count) saved \(thin.kind)")
         }
         return fodder
       }
@@ -223,7 +255,7 @@ public enum VerdictEngine {
       if let thin {
         return Verdict(
           kind: .level, targetLevel: next, role: thin,
-          reason: "C · only \(thin.saved.count) saved \(kind)")
+          reason: "C · only \(thin.saved.count) saved \(thin.kind)")
       }
       if let support {
         return Verdict(
@@ -241,7 +273,7 @@ extension VerdictEngine {
   /// a character whose build lists the set.
   static func fourStar(
     _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact], excluding: UUID?,
-    policy: VerdictPolicy
+    policy: VerdictPolicy, standings: inout [String: RoleStanding]
   ) -> Verdict {
     let kind = "\(artifact.setName) \(artifact.main.label) \(artifact.slot.plural)"
     guard
@@ -277,9 +309,13 @@ extension VerdictEngine {
         useful.contains($0.key)
       }.count
     }
-    if let better = matches.first(where: { match in
+    let wanting = matches.filter { match in
       lines(artifact, match) > saved.map { lines($0, match) }.min() ?? .max
-    }) {
+    }
+    for match in matches where !wanting.contains(where: { $0.roleID == match.roleID }) {
+      standings[match.roleID] = .covered(saved.count)
+    }
+    if let better = wanting.first {
       return Verdict(
         kind: .review, match: better, reason: "More useful lines than a saved \(kind) piece")
     }
@@ -296,10 +332,15 @@ struct RoleContext {
   let rarity: DropRarity?
   /// An on-set role needs this set; an off-piece role accepts the slot and main from any set.
   let setChance: Double
-  /// Saved +20 scores of the same slot and main stat, all sets, highest first.
+  /// Saved +20 scores of the same slot and main stat that the role would wear instead, highest
+  /// first: this set's for an on-set role, every set's for an off-piece.
   let saved: [Int]
+  /// What those saved pieces are, for reasons: "Obsidian Codex HP flowers" or "HP flowers".
+  let kind: String
   /// Saved pieces this role's stat-profile group can use at once, capped by the policy.
   let backups: Int
+  let wearRank: Int
+  let rareOffPiece: Bool
 
   init(
     _ match: CharacterMatch, artifact: Artifact, saved: [Artifact], matches: [CharacterMatch],
@@ -312,9 +353,25 @@ struct RoleContext {
       match.usefulStats.contains { $0 != artifact.main }
       ? RarityCache.shared.rarity(artifact.slot, artifact.main, match.profile) : nil
     setChance = match.setFit == .offPiece ? 1 : 0.5
-    self.saved = saved.map { match.profile.score($0.substats) }.sorted(by: >)
-    let group = matches.filter { $0.profile.weights == match.profile.weights }.count
+    let onSet = match.scope == .sameSet
+    self.saved = saved.filter { !onSet || $0.setKey == artifact.setKey }
+      .map { match.profile.score($0.substats) }.sorted(by: >)
+    kind =
+      (onSet ? "\(artifact.setName) " : "") + "\(artifact.main.label) \(artifact.slot.plural)"
+    // Roles that run this set share its saved pieces; an off-piece shares every set's.
+    let group = matches.filter {
+      $0.profile.weights == match.profile.weights && (!onSet || $0.scope == .sameSet)
+    }.count
     backups = min(max(1, group), policy.maxBackups)
+    wearRank = match.wearRank(artifact.slot)
+    rareOffPiece = match.isRareOffPiece(artifact.slot)
+  }
+
+  /// Set aside when the slot is a rare off-piece or enough saved pieces beat `best`.
+  func standing(best: Int) -> RoleStanding {
+    if rareOffPiece { return .rareOffPiece }
+    let beaten = saved.filter { $0 > best }.count
+    return beaten < backups ? .open : .covered(beaten)
   }
 
   var tierRank: Int { grade.flatMap { ArtifactTier.allCases.firstIndex(of: $0) } ?? .max }
@@ -324,22 +381,13 @@ struct RoleContext {
     !(match.usefulStats.contains(.critRate) && match.usefulStats.contains(.critDamage))
   }
 
-  /// Breaks ties toward roles that want this set: preferred, then alternative, then off-piece.
-  var setRank: Int {
-    switch match.setFit {
-    case .preferred: 2
-    case .alternative: 1
-    case .offPiece: 0
-    }
-  }
-
   func drops(_ score: Int) -> Double? {
     guard let rarity else { return nil }
     return rarity.expectedDropsToBeat(score, setChance: setChance) ?? .infinity
   }
 
   /// Where a finished score sits among the saved pieces.
-  func standing(_ score: Int, kind: String) -> String {
+  func rank(_ score: Int) -> String {
     let better = saved.filter { $0 > score }.count
     if better > 0 { return "#\(better + 1) of saved \(kind)" }
     return saved.contains(score)

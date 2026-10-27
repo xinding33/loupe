@@ -76,7 +76,7 @@ struct AssessmentSummary: View {
       if let result = model.displayedPotential {
         forecast(result)
         Divider().overlay(Theme.hairline)
-        AccountBlock(result: result, scope: model.scope, finished: artifact.level == 20)
+        AccountBlock(result: result, scope: model.displayedScope, finished: artifact.level == 20)
       } else {
         if let reason = unavailableReason {
           Label(reason, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
@@ -195,8 +195,8 @@ struct CharacterAssessmentView: View {
         HStack(alignment: .firstTextBaseline) {
           Text("Potential users").font(.headline)
           Spacer()
-          Text("Not damage ranking").font(.caption).foregroundStyle(.secondary)
-            .help(CharacterAssessment.coverageDescription)
+          Text(RoleRowStatus.orderCaption).font(.caption).foregroundStyle(.secondary)
+            .help(RoleRowStatus.orderHelp + CharacterAssessment.coverageDescription)
         }
         Text(
           "\(displayed.count) of \(shortlist.allMatches.count) eligible roles"
@@ -208,7 +208,9 @@ struct CharacterAssessmentView: View {
           Text(CharacterRoles.noMatchDescription).font(.callout).foregroundStyle(.secondary)
         }
         ForEach(displayed) { match in
-          row(match, label: shortlist.label(match))
+          row(
+            match, label: shortlist.label(match),
+            status: RoleRowStatus(match, standing: shortlist.standing(match), artifact: artifact))
         }
         if shortlist.allMatches.count > shortlist.visibleMatches.count {
           Button(
@@ -227,7 +229,7 @@ struct CharacterAssessmentView: View {
     }
   }
 
-  private func row(_ match: CharacterMatch, label: String) -> some View {
+  private func row(_ match: CharacterMatch, label: String, status: RoleRowStatus) -> some View {
     let selected = model.selectedMatch?.id == match.id
     let headline = GradeHeadline(match: match, artifact: artifact)
     return Button {
@@ -241,8 +243,9 @@ struct CharacterAssessmentView: View {
           Text(headline.shortCaption).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         Spacer(minLength: 4)
-        Chip(text: match.setFit.shortLabel)
+        Chip(text: status.label)
       }
+      .opacity(status.setAside && !selected ? 0.45 : 1)
       .padding(.horizontal, 8).padding(.vertical, 6)
       .contentShape(Rectangle())
       .background(
@@ -255,6 +258,7 @@ struct CharacterAssessmentView: View {
       }
     }
     .buttonStyle(.plain)
+    .help(status.help ?? "")
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
 }

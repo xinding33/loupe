@@ -242,6 +242,39 @@ extension CharacterSetFit {
   }
 }
 
+/// A potential user's row label: its set fit, or why the verdict set the role aside.
+struct RoleRowStatus {
+  let label: String
+  let help: String?
+  let setAside: Bool
+
+  init(_ match: CharacterMatch, standing: RoleStanding, artifact: Artifact) {
+    switch standing {
+    case .open:
+      (label, help, setAside) = (match.setFit.shortLabel, nil, false)
+    case .covered(let count):
+      let pool = match.scope == .sameSet ? "\(artifact.setName) " : ""
+      (label, help, setAside) = (
+        "Covered",
+        "\(count) saved \(pool)\(artifact.main.label) \(artifact.slot.plural) already cover "
+          + "this role.", true
+      )
+    case .rareOffPiece:
+      (label, help, setAside) = (
+        match.setFit.shortLabel,
+        "A 4+1 build rarely wears its off-set piece in the \(artifact.slot.rawValue) slot.", true
+      )
+    }
+  }
+
+  /// The potential-users caption: grades rank the list, and they are rarity, not damage.
+  static let orderCaption = "By grade, not damage"
+  static let orderHelp =
+    "Open roles first, then by roll grade, then on-set before off-piece. Dimmed roles are set "
+    + "aside: enough saved pieces they would wear beat this one, or it is an off-set flower or "
+    + "plume. "
+}
+
 /// Median, P90, and best-possible +20 outcomes for one stated role or profile.
 struct OutcomeLadder: View {
   let result: Potential
