@@ -3,7 +3,7 @@ import AppKit
 /// A brief on-screen confirmation, since the menu bar and the main window are hidden while the
 /// game is full screen.
 @MainActor
-final class AutoPressHUD {
+final class HUD {
   private let label = NSTextField(labelWithString: "")
   private lazy var panel = makePanel()
   private var hideWork: DispatchWorkItem?

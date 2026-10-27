@@ -234,6 +234,8 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
   private var latest: CGImage?
   var ocr: DiagnosticReader
   var recording: FrameRecording?
+  /// Takes the next frame, or nil if capture ends first.
+  var snapshot: ((CGImage?) -> Void)?
   init(
     sessionID: UUID, diagnosticsEnabled: Bool,
     receive:
@@ -248,6 +250,8 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
   func clear() {
     latest = nil
     recording = nil
+    snapshot?(nil)
+    snapshot = nil
     ocr.clear()
     context.clearCaches()
   }
@@ -279,12 +283,19 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
       return
     }
     latest = image
+    if let snapshot {
+      self.snapshot = nil
+      snapshot(image)
+    }
     if let recording {
       do {
-        if try recording.append(image) { self.recording = nil }
+        if try recording.append(image) {
+          self.recording = nil
+          recording.ended(recording, recording.finish())
+        }
       } catch {
-        recording.finish("Recording failed: \(error.localizedDescription)")
         self.recording = nil
+        recording.ended(recording, recording.finish(failure: error))
       }
     }
     guard gate.isActive else {
@@ -318,6 +329,10 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
   var status: ((String) -> Void)?
   var didStop: (() -> Void)?
   var recordingStatus: ((String, Bool) -> Void)?
+  /// The folder of a recording that ended with at least one frame.
+  var recordingSaved: ((URL) -> Void)?
+  private var activeRecording: FrameRecording?
+  var isRecording: Bool { activeRecording != nil }
 
   override init() {
     super.init()
@@ -326,10 +341,10 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
     }
     runtime.failed = { [weak self] error in
       guard let self else { return }
+      stopRecording()
       reader = nil
       currentConnection = nil
       didStop?()
-      recordingStatus?("Recording stopped.", false)
       if enabled {
         status?("Sharing is unavailable. Choose game window again. \(error.localizedDescription)")
       } else {
@@ -340,20 +355,79 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
     }
   }
 
-  func recordSequence() {
+  func startRecording() {
+    guard activeRecording == nil else { return }
     guard enabled, let reader, reader.gate.isActive else {
       recordingStatus?("Share the game window before recording.", false)
       return
     }
-    recordingStatus?("Recording 40 game frames locally...", true)
-    let token = runtime.generation
-    queue.async { [weak self] in
+    let folder: URL
+    do { folder = try FrameRecording.reserveFolder() } catch {
+      recordingStatus?(error.localizedDescription, false)
+      return
+    }
+    let recording = FrameRecording(folder: folder) { [weak self] recording, message in
+      Task { @MainActor in self?.recordingEnded(recording, message: message) }
+    }
+    activeRecording = recording
+    recordingStatus?("Recording the game window. Stop it when you're done.", true)
+    queue.async {
       guard reader.gate.isActive else { return }
-      reader.recording = FrameRecording { message in
-        Task { @MainActor in
-          guard let self, self.runtime.accepts(token) else { return }
-          self.recordingStatus?(message, false)
+      reader.recording = recording
+    }
+  }
+
+  /// A recording that filled up or failed. One stopped by hand reports through `stopRecording`,
+  /// and a late report from it can't end a newer recording.
+  private func recordingEnded(_ recording: FrameRecording, message: String) {
+    if let saved = recording.saved { recordingSaved?(saved) }
+    guard activeRecording === recording else { return }
+    activeRecording = nil
+    recordingStatus?(message, false)
+  }
+
+  func stopRecording() {
+    guard let recording = activeRecording else { return }
+    activeRecording = nil
+    recordingStatus?("Saving the recording...", false)
+    // The reader writes frames on the capture queue, so the count is final once it's run there.
+    queue.async { [weak self, reader] in
+      if reader?.recording === recording { reader?.recording = nil }
+      let message = recording.finish()
+      let saved = recording.saved
+      Task { @MainActor in
+        guard let self else { return }
+        if let saved { self.recordingSaved?(saved) }
+        // A recording started since then owns the status.
+        guard self.activeRecording == nil else { return }
+        self.recordingStatus?(message, false)
+      }
+    }
+  }
+
+  /// Saves the next frame of the shared window as a PNG.
+  func saveSnapshot(_ done: @escaping @MainActor (Result<(url: URL, png: Data), Error>) -> Void) {
+    guard enabled, let reader, reader.gate.isActive else {
+      done(.failure(ArtifactError("Share the game window before taking a snapshot.")))
+      return
+    }
+    let deliver: @Sendable (Result<(url: URL, png: Data), Error>) -> Void = { result in
+      Task { @MainActor in done(result) }
+    }
+    queue.async {
+      guard reader.gate.isActive else {
+        deliver(.failure(ArtifactError("Capture stopped before the snapshot.")))
+        return
+      }
+      // A second press before the frame arrives saves the same frame twice.
+      let earlier = reader.snapshot
+      reader.snapshot = { image in
+        earlier?(image)
+        guard let image else {
+          deliver(.failure(ArtifactError("Capture stopped before the snapshot.")))
+          return
         }
+        deliver(Result { try CaptureFiles.saveSnapshot(image) })
       }
     }
   }
@@ -457,10 +531,10 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
 
   private func replace(_ filter: SCContentFilter?) {
     currentSample = nil
+    stopRecording()
     didStop?()
     reader = nil
     currentConnection = nil
-    recordingStatus?("Recording stopped.", false)
     guard let filter else {
       runtime.replace(with: nil)
       return

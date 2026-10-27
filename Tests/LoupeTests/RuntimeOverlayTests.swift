@@ -266,8 +266,14 @@ private final class TestShortcutBackend: ShortcutBackend {
   var expanded = false
   var enabled = true
   shortcuts.expand = { expanded.toggle() }
+  var snapshots = 0
+  var recording = false
   shortcuts.toggleEnabled = { enabled.toggle() }
-  try shortcuts.configure(expand: "option+`", enable: "option+shift+`")
+  shortcuts.snapshot = { snapshots += 1 }
+  shortcuts.toggleRecording = { recording.toggle() }
+  try shortcuts.configure(
+    expand: "option+`", enable: "option+shift+`", snapshot: "option+shift+s",
+    record: "option+shift+r")
   backend.event?(1, true)
   backend.event?(1, true)
   #expect(expanded)
@@ -281,12 +287,19 @@ private final class TestShortcutBackend: ShortcutBackend {
   backend.event?(1, true)
   #expect(expanded)
   #expect(!enabled)
+  backend.event?(3, true)
+  backend.event?(3, true)
+  backend.event?(4, true)
+  #expect(snapshots == 1)
+  #expect(recording)
   #expect(throws: ArtifactError.self) {
-    try shortcuts.configure(expand: "option+a", enable: "option+a")
+    try shortcuts.configure(
+      expand: "option+a", enable: "option+b", snapshot: "option+c", record: "option+a")
   }
   backend.conflict = true
   #expect(throws: ArtifactError.self) {
-    try shortcuts.configure(expand: "option+b", enable: "control+b")
+    try shortcuts.configure(
+      expand: "option+b", enable: "control+b", snapshot: "option+c", record: "option+d")
   }
   #expect(backend.registered.isEmpty)
 }

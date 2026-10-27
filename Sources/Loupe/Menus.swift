@@ -53,6 +53,9 @@ final class Menus: NSObject, NSMenuItemValidation {
     add("Overlay Expanded", to: menu, action: #selector(toggleExpanded))
     add("Reset Overlay Placement", to: menu, action: #selector(resetPlacement))
     menu.addItem(.separator())
+    add("Save Snapshot", to: menu, action: #selector(saveSnapshot))
+    add("Record Game Window", to: menu, action: #selector(toggleRecording))
+    menu.addItem(.separator())
     add("Report Issue…", to: menu, action: #selector(reportIssue))
     add("Check for Updates…", to: menu, action: #selector(checkForUpdates))
     menu.addItem(.separator())
@@ -104,6 +107,9 @@ final class Menus: NSObject, NSMenuItemValidation {
     add("Overlay Expanded", to: controls, action: #selector(toggleExpanded))
     add("Reset Overlay Placement", to: controls, action: #selector(resetPlacement))
     controls.addItem(.separator())
+    add("Save Snapshot", to: controls, action: #selector(saveSnapshot))
+    add("Record Game Window", to: controls, action: #selector(toggleRecording))
+    controls.addItem(.separator())
     add("Auto-Press On", to: controls, action: #selector(toggleAutoPress))
 
     let window = submenu("Window", in: main)
@@ -153,7 +159,10 @@ final class Menus: NSObject, NSMenuItemValidation {
 
   func validateMenuItem(_ item: NSMenuItem) -> Bool {
     switch item.action {
-    case #selector(chooseWindow): return model.enabled
+    case #selector(chooseWindow), #selector(saveSnapshot): return model.enabled
+    case #selector(toggleRecording):
+      item.state = model.isRecording ? .on : .off
+      return model.enabled
     case #selector(toggleEnabled): item.state = model.enabled ? .on : .off
     case #selector(toggleExpanded): item.state = model.overlayExpanded ? .on : .off
     case #selector(toggleAutoPress): item.state = autoPress.session.isOn ? .on : .off
@@ -173,6 +182,8 @@ final class Menus: NSObject, NSMenuItemValidation {
   @objc private func toggleEnabled() { model.setEnabled(!model.enabled) }
   @objc private func toggleExpanded() { model.overlayExpanded.toggle() }
   @objc private func resetPlacement() { model.resetOverlayPlacement?() }
+  @objc private func saveSnapshot() { model.saveSnapshot() }
+  @objc private func toggleRecording() { model.toggleRecording() }
   @objc private func toggleAutoPress() { autoPress.toggle() }
   @objc private func importInventory() { model.importInventory() }
   @objc private func exportInventory() { model.exportInventory() }

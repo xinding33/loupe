@@ -47,8 +47,10 @@ final class Model: ObservableObject {
   @Published var issue: String?
   @Published var rawText = ""
   @Published var recordingStatus =
-    "Full-window test frames stay on this Mac and may include UID and chat."
+    "Snapshots and recordings of the game window stay on this Mac and may include UID and chat."
   @Published var isRecording = false
+  /// The last snapshot or recording, for Show in Finder.
+  @Published private(set) var lastCapture: URL?
   /// Collection for this session. Linking, a failed save and turning the reader off stop it
   /// without changing the remembered choice; see `setCollectCards`.
   @Published var scanMode = false
@@ -73,6 +75,10 @@ final class Model: ObservableObject {
     UserDefaults.standard.string(forKey: "expandShortcut") ?? "option+`"
   @Published var enableShortcut =
     UserDefaults.standard.string(forKey: "enableShortcut") ?? "option+shift+`"
+  @Published var snapshotShortcut =
+    UserDefaults.standard.string(forKey: "snapshotShortcut") ?? "option+shift+s"
+  @Published var recordShortcut =
+    UserDefaults.standard.string(forKey: "recordShortcut") ?? "option+shift+r"
   @Published var allProfiles: [(name: String, result: Potential)] = []
   let capture: Capture
   let diagnostics: DiagnosticReportFlow
@@ -99,6 +105,8 @@ final class Model: ObservableObject {
   var updateOverlay: (() -> Void)?
   var resetOverlayPlacement: (() -> Void)?
   var applyShortcuts: (() -> Void)?
+  /// A brief confirmation that shows over a full-screen game.
+  var banner: ((String) -> Void)?
   // Clear diagnostic evidence whenever the reader changes enabled state.
   var clearDiagnostics: (() -> Void)?
   private var readingGeneration = UUID()
@@ -135,9 +143,13 @@ final class Model: ObservableObject {
     }
     capture.status = { [weak self] in self?.status = $0 }
     capture.recordingStatus = { [weak self] message, active in
-      self?.recordingStatus = message
-      self?.isRecording = active
+      guard let self else { return }
+      if isRecording && !active { banner?("Recording stopped") }
+      if !isRecording && active { banner?("Recording") }
+      recordingStatus = message
+      isRecording = active
     }
+    capture.recordingSaved = { [weak self] in self?.lastCapture = $0 }
     capture.didStop = { [weak self] in
       self?.enhancementContext = nil
       self?.resetLiveCard()
@@ -486,6 +498,39 @@ final class Model: ObservableObject {
   }
   func stop() {
     setEnabled(false)
+  }
+
+  /// Saves the next frame of the game window and copies it, to paste into a chat or an issue.
+  func saveSnapshot() {
+    capture.saveSnapshot { [weak self] result in
+      guard let self else { return }
+      switch result {
+      case .success(let saved):
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setData(saved.png, forType: .png)
+        lastCapture = saved.url
+        recordingStatus = "Snapshot saved and copied: \(saved.url.path)"
+        banner?("Snapshot copied")
+      case .failure(let error):
+        recordingStatus = error.localizedDescription
+        banner?(error.localizedDescription)
+      }
+    }
+  }
+
+  func toggleRecording() {
+    if capture.isRecording {
+      capture.stopRecording()
+      return
+    }
+    capture.startRecording()
+    if !capture.isRecording { banner?(recordingStatus) }
+  }
+
+  func showLastCapture() {
+    guard let lastCapture else { return }
+    NSWorkspace.shared.activateFileViewerSelecting([lastCapture])
   }
 
   /// Whether restarting now would interrupt the user: a capture, a recording, or a report.

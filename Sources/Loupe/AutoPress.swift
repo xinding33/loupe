@@ -24,12 +24,13 @@ final class AutoPress: ObservableObject {
   private let defaults: UserDefaults
   private let presser = AutoPresser()
   private let monitor = AutoPressTriggerMonitor()
-  private let hud = AutoPressHUD()
+  private let hud: HUD
   private var autoOff: DispatchSourceTimer?
   private var accessibilityPoll: DispatchSourceTimer?
 
-  init(defaults: UserDefaults = .standard) {
+  init(defaults: UserDefaults = .standard, hud: HUD = HUD()) {
     self.defaults = defaults
+    self.hud = hud
     settings = AutoPressSettings.decode(defaults.data(forKey: Self.defaultsKey))
     monitor.onTrigger = { [weak self] in self?.toggle() }
     // Lives as long as the app, so the observer is never removed.

@@ -11,13 +11,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var autoPress: AutoPress!
   private let updates = Updates()
   private var menus: Menus!
+  private let hud = HUD()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     model = Model()
-    autoPress = AutoPress()
+    model.banner = { [hud] in hud.show($0) }
+    autoPress = AutoPress(hud: hud)
     autoPress.overlayShortcuts = { [weak self] in
       guard let self else { return [] }
-      return [model.expandShortcut, model.enableShortcut].compactMap { try? OverlayShortcut($0) }
+      return [
+        model.expandShortcut, model.enableShortcut, model.snapshotShortcut, model.recordShortcut,
+      ].compactMap { try? OverlayShortcut($0) }
     }
     window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1080, height: 800),
@@ -47,12 +51,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       guard let self else { return }
       model.setEnabled(!model.enabled)
     }
+    shortcuts.snapshot = { [weak self] in self?.model.saveSnapshot() }
+    shortcuts.toggleRecording = { [weak self] in self?.model.toggleRecording() }
     model.applyShortcuts = { [weak self] in
       guard let self else { return }
       do {
-        try shortcuts.configure(expand: model.expandShortcut, enable: model.enableShortcut)
+        try shortcuts.configure(
+          expand: model.expandShortcut, enable: model.enableShortcut,
+          snapshot: model.snapshotShortcut, record: model.recordShortcut)
         UserDefaults.standard.set(model.expandShortcut, forKey: "expandShortcut")
         UserDefaults.standard.set(model.enableShortcut, forKey: "enableShortcut")
+        UserDefaults.standard.set(model.snapshotShortcut, forKey: "snapshotShortcut")
+        UserDefaults.standard.set(model.recordShortcut, forKey: "recordShortcut")
         model.shortcutStatus = "Global shortcuts registered. Keys use US keyboard positions."
       } catch {
         model.shortcutStatus = error.localizedDescription
