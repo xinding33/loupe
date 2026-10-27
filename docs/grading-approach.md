@@ -129,7 +129,11 @@ a plume whose median finish was in the top 1.3% of new drops was a B.
 of the domain's sets, before a piece of the same set, slot, and main stat
 finishes strictly higher: two sets per domain, five slots, the main-stat odds,
 and the share above. An EM goblet of the wanted set alone is 1 in 400 domain
-drops. The dashboard and overlay show the share and this estimate.
+drops. The dashboard and overlay show the share and this estimate as resin
+(`ResinCost`): about 1.065 five-stars per 20-resin run of a top-level domain
+and 180 resin a day, so roughly 9.6 drops a day. Below two years it reads as
+days, above that as years. It counts domain runs only, so strongboxes, bosses
+and the Transmuter make the real cost lower.
 
 Rarity is not value. A rare piece for an unwanted role is still unused; the
 account checks below cover that.

@@ -18,10 +18,10 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
     ])
   #expect(
     rarityLine(grades(share: 0.032, drops: 6234), artifact: goblet)
-      == "Top 3.2% of new Hydro Dmg Bonus goblets · about 6,200 domain drops to beat")
+      == "Top 3.2% of new Hydro Dmg Bonus goblets · ~650 days of resin to beat (~120,000 resin)")
   #expect(
     rarityLine(grades(share: 0.032, drops: 6234), artifact: goblet, compact: true)
-      == "Top 3.2% of new Hydro Dmg Bonus goblets · ~6,200 drops to beat")
+      == "Top 3.2% of new Hydro Dmg Bonus goblets · ~650 days of resin to beat")
   #expect(
     rarityLine(grades(share: 0.0001, drops: nil), artifact: goblet)
       == "Top <0.1% of new Hydro Dmg Bonus goblets · no new drop beats it")
@@ -38,7 +38,15 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
     ])
   #expect(
     rarityLine(grades(share: 0.8, drops: 12.5), artifact: flower)
-      == "Median +20: bottom half of new HP flowers · about 13 domain drops to beat")
+      == "Median +20: bottom half of new HP flowers · ~1 day of resin to beat (~230 resin)")
+}
+
+@Test func rarityHelpGivesTheCountsAndAssumptions() {
+  #expect(
+    rarityHelp(grades(share: 0.1, drops: 110))
+      == "~2,100 resin, ~100 runs, ~110 five-star drops. Assumes top-level domain runs of this set: "
+      + "~1.07 five-stars per 20 resin, 180 resin a day.")
+  #expect(rarityHelp(grades(share: 0.1, drops: nil)) == nil)
 }
 
 @Test func roughCountKeepsTwoSignificantFigures() {
@@ -72,7 +80,7 @@ private func grades(share: Double?, drops: Double?) -> CharacterGradeSummary {
     ])
   #expect(
     rarityLine(grades(share: 0.1, drops: 50), artifact: sands)
-      == "Top 10.0% of new HP% sands · about 50 domain drops to beat")
+      == "Top 10.0% of new HP% sands · ~5 days of resin to beat (~940 resin)")
 }
 
 @Test func compactVerdictNamesItsCharacterWhenAnotherIsSelected() throws {

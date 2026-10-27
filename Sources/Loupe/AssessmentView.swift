@@ -83,11 +83,9 @@ struct AssessmentSummary: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         // A finished special-rule piece has a grade but no ordinary forecast.
-        if let line = rarityLine(
-          model.assessmentMode == .characters ? model.selectedMatch?.grades : nil,
-          artifact: artifact)
-        {
-          Text(line).font(.caption).foregroundStyle(.secondary)
+        let grades = model.assessmentMode == .characters ? model.selectedMatch?.grades : nil
+        if let line = rarityLine(grades, artifact: artifact) {
+          Text(line).font(.caption).foregroundStyle(.secondary).help(rarityHelp(grades) ?? "")
         }
       }
     }
@@ -178,7 +176,7 @@ struct AssessmentSummary: View {
       }
     }
     if let line = rarityLine(grades, artifact: artifact) {
-      Text(line).font(.caption).foregroundStyle(.secondary)
+      Text(line).font(.caption).foregroundStyle(.secondary).help(rarityHelp(grades) ?? "")
     }
   }
 }
