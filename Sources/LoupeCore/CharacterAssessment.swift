@@ -46,10 +46,12 @@ public enum CharacterAssessment {
   /// compares with the saved pieces it would wear instead; see `CharacterMatch.scope`.
   public static func evaluate(
     _ artifact: Artifact, inventory: [Artifact] = [], excluding: UUID? = nil,
-    roles: [CharacterRole] = CharacterRoles.all
+    roles: [CharacterRole] = CharacterRoles.all, outcomes: RollOutcomes? = nil
   ) -> [CharacterMatch] {
-    // One enumeration serves every role; a failure is reported per role below.
-    let outcomes = try? RollOutcomes(artifact)
+    // One enumeration serves every role, and the caller's when it has one for this artifact; a
+    // failure is reported per role below.
+    let outcomes =
+      outcomes.flatMap { $0.artifact == artifact ? $0 : nil } ?? (try? RollOutcomes(artifact))
     // Characters sharing an archetype and a scope share a forecast, so compute each once.
     struct ForecastKey: Hashable {
       let weights: [Stat: Int]

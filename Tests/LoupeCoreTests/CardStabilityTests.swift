@@ -64,3 +64,18 @@ private let start = Date(timeIntervalSince1970: 1_000)
   #expect(state.signature == "flower +20")
   #expect(state.isVerified)
 }
+
+@Test func repeatsOfTheVerifiedCardLookTheSameWhileItsTimestampsMove() {
+  var state = CardStability()
+  state.observe("plume +0", at: start)
+  state.observe("plume +0", at: start.addingTimeInterval(0.5))
+  let verified = state
+  state.observe("plume +0", at: start.addingTimeInterval(1))
+  #expect(state.looksSame(as: verified))
+  state.observe(nil, at: start.addingTimeInterval(1.5))
+  #expect(!state.looksSame(as: verified))
+  #expect(state.signature == verified.signature)
+  var expired = verified
+  expired.expire(at: start.addingTimeInterval(4))
+  #expect(!expired.looksSame(as: verified))
+}

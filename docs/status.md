@@ -1,8 +1,8 @@
 # Loupe: project status
 
 Date: 2026-10-13
-Status: offline build, lint, and tests pass. Live verification, performance
-measurement, and broader calibration are still open.
+Status: offline build, lint, and tests pass. Live verification, memory and
+in-game performance measurement, and broader calibration are still open.
 
 This page is the current snapshot. [Next features](next-features-plan.md) holds
 the detailed work order and acceptance criteria; the README describes shipped
@@ -66,6 +66,33 @@ behavior on the real game, or performance.
   Accessibility. Settings and timer logic are covered by LoupeCore tests;
   key posting and the toggle have not been checked live.
 
+## Performance, measured 2026-11-23
+
+A release-build benchmark on a 240-frame recording (mostly Inventory cards and
+card-less screens) and a real 145-piece inventory, run outside the game:
+
+- Reading a frame took 142 ms (88 ms CPU): every frame ran the Enhance pass
+  (two Vision requests, about 76 ms) before the full-window Inventory read
+  (about 64 ms). After an Inventory card, the next frame now tries the
+  Inventory read first and skips the Enhance pass when it finds a card:
+  78 ms (63 ms CPU) per card frame. Card-less frames still run both, about
+  140 ms. Readings on all 240 frames are unchanged.
+- The model republished about five times a second with nothing new, and each
+  republish re-rendered the dashboard and overlay for about 21 ms of main-thread
+  CPU, 16 ms of it rebuilding the character shortlist 28 times. A repeated
+  verified card, a quiet freshness tick and an unchanged overlay status now
+  publish nothing, and the shortlist is built once per change.
+- Grading a new +0 four-line piece took about 97 ms, 66 ms of it scoring the 15
+  preset profiles that only manual-profile mode shows. One roll enumeration is
+  now shared, and the presets are scored only in that mode: about 21 ms.
+- Auto-press ran on the main queue, so main-thread stalls delayed presses: at
+  12 a second the median gap was 84 ms, but 10% of gaps were 139 ms or more and
+  one was 435 ms. Presses now run on their own high-priority queue. A test holds
+  the cadence through a 300 ms main-thread stall; it has not been re-measured
+  in the game.
+
+Memory, and CPU with the reader disabled or buffering on, are not measured.
+
 ## Live checks so far
 
 The user ran basic checks on 2026-09-27 against the preceding build:
@@ -110,9 +137,10 @@ In suggested order. The first two need the game running.
    stability, click-through and game focus, moving the game between monitors
    including fullscreen and mixed display scales, shortcut conflicts, report
    preview and save, and disabling or changing sessions during a preview.
-2. Performance: CPU, memory, OCR count, and OCR latency with the reader
-   disabled, enabled, and enabled with buffering. Buffering stays off at launch
-   and sampling stays at two reads per second until this is measured.
+2. Performance: memory, and CPU with the reader disabled and with buffering,
+   measured in the game. Reading and grading costs are above. Buffering stays
+   off at launch and sampling stays at two reads per second until this is
+   measured.
 3. Recorded fixtures: no recorded Enhance sequence is available to the two
    skipped tests, so live-reader regressions are covered only by synthetic
    images.

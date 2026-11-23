@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import LoupeCore
 
-struct DiagnosticCoverage: Sendable {
+struct DiagnosticCoverage: Equatable, Sendable {
   let count: Int
   let duration: TimeInterval
   let imageBytes: Int

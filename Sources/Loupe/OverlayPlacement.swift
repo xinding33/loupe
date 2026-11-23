@@ -142,8 +142,8 @@ final class OverlayController {
       model.diagnosticPlacement = nil
       panel.orderOut(nil)
       controls.orderOut(nil)
-      model.placementStatus =
-        "Shared window unavailable. Choose game window again to recover placement."
+      model.setPlacementStatus(
+        "Shared window unavailable. Choose game window again to recover placement.")
       return
     }
     let displays = screens.compactMap { screen -> OverlayDisplay? in
@@ -165,8 +165,8 @@ final class OverlayController {
       model.diagnosticPlacement = nil
       panel.orderOut(nil)
       controls.orderOut(nil)
-      model.placementStatus =
-        "Shared window is outside available displays. Move it, then reset placement."
+      model.setPlacementStatus(
+        "Shared window is outside available displays. Move it, then reset placement.")
       return
     }
     placement = next
@@ -188,8 +188,9 @@ final class OverlayController {
       display: true)
     panel.orderFrontRegardless()
     controls.orderFrontRegardless()
-    model.placementStatus =
+    model.setPlacementStatus(
       "Anchored to the shared window's display. Drag the grip to adjust; Reset restores the corner."
+    )
   }
 
   /// The result panel stays click-through except over the character rows. A click-through
