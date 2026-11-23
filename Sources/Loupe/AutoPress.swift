@@ -33,6 +33,13 @@ final class AutoPress: ObservableObject {
     self.hud = hud
     settings = AutoPressSettings.decode(defaults.data(forKey: Self.defaultsKey))
     monitor.onTrigger = { [weak self] in self?.toggle() }
+    presser.onUnconfirmed { [weak self] in
+      log.error("Auto-press is on but Accessibility can't confirm which app has keyboard focus")
+      Task { @MainActor in
+        guard let self, self.session.isOn else { return }
+        self.hud.show("Auto-press can't confirm the game is in front")
+      }
+    }
     // Lives as long as the app, so the observer is never removed.
     NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main

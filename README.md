@@ -58,7 +58,7 @@ The Auto-press panel sets the key, the toggle (a key, a key combination or an ex
 
 Auto-press needs **Accessibility** access to press keys and to use a mouse button as its toggle. It asks the first time you turn it on; until then the panel shows **Open Accessibility settings** and auto-press stays off. It notices the grant without a restart.
 
-Key presses are `CGEvent`s posted only while the chosen app is frontmost, checked with Accessibility just before each press. They run on their own thread, so a busy window doesn't delay them. A keyboard toggle is a Carbon hot key registered only while that app is in front, so it never takes the key from other apps. A mouse-button toggle is an event tap. Both swallow the toggle, so the game never sees it. The toggle can't be the key being pressed or one of the overlay's shortcuts. Auto-press works whether or not the reader is enabled. Don't run Mash at the same time: both would answer the same toggle.
+Key presses are `CGEvent`s posted only while the chosen app is frontmost, checked with Accessibility just before each press. They run on their own thread, so a busy window doesn't delay them. If that check can't get an answer, nothing is pressed and a banner says so. A keyboard toggle is a Carbon hot key registered only while that app is in front, so it never takes the key from other apps. A mouse-button toggle is an event tap. Both swallow the toggle, so the game never sees it. The toggle can't be the key being pressed or one of the overlay's shortcuts. Auto-press works whether or not the reader is enabled. Don't run Mash at the same time: both would answer the same toggle.
 
 ## Build the inventory baseline
 

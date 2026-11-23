@@ -13,14 +13,26 @@ final class AutoPresser: @unchecked Sendable {
     let bundleID: String
   }
 
+  /// Whether the target app receives key events right now.
+  enum Focus {
+    case target, other
+    /// The target looks frontmost, but the check that confirms it failed. Nothing is pressed.
+    case unconfirmed
+  }
+
   /// Posts a key-down (`true`) or key-up (`false`).
   typealias Post = @Sendable (CGKeyCode, Bool) -> Void
-  /// Whether the app with this bundle identifier receives key events right now.
-  typealias IsFrontmost = @Sendable (String) -> Bool
+  /// Where the app with this bundle identifier stands.
+  typealias FocusCheck = @Sendable (String) -> Focus
+
+  /// How long focus must stay unconfirmed before `onUnconfirmed` is told.
+  static let unconfirmedDelay: TimeInterval = 1
 
   private let queue = DispatchQueue(label: "Loupe.AutoPress", qos: .userInteractive)
+  /// Key-ups get their own queue, so a slow focus check for the next press can't hold a key down.
+  private let releases = DispatchQueue(label: "Loupe.AutoPress.release", qos: .userInteractive)
   private let post: Post
-  private let isFrontmost: IsFrontmost
+  private let focus: FocusCheck
   /// Guards everything below, which `stop` changes from the caller's thread.
   private let lock = NSLock()
   private var timer: DispatchSourceTimer?
@@ -30,16 +42,26 @@ final class AutoPresser: @unchecked Sendable {
   /// The key still held down, and the press that put it down.
   private var held: (keyCode: CGKeyCode, press: Int)?
   private var presses = 0
+  /// When focus was first unconfirmed in the current run of such presses.
+  private var unconfirmedSince: TimeInterval?
+  private var reportedUnconfirmed = false
+  private var unconfirmed: (@Sendable () -> Void)?
 
   init(
-    post: @escaping Post = AutoPresser.postKey,
-    isFrontmost: @escaping IsFrontmost = AutoPresser.isFrontmost
+    post: @escaping Post = AutoPresser.postKey, focus: @escaping FocusCheck = AutoPresser.focus
   ) {
     self.post = post
-    self.isFrontmost = isFrontmost
+    self.focus = focus
   }
 
   deinit { stop() }
+
+  /// Called on the press queue, once per `start`, when presses have been withheld for
+  /// `unconfirmedDelay` because focus couldn't be confirmed. Otherwise that would look like
+  /// auto-press being on and doing nothing.
+  func onUnconfirmed(_ handler: @escaping @Sendable () -> Void) {
+    lock.withLock { unconfirmed = handler }
+  }
 
   func start(_ settings: AutoPressSettings) {
     let wanted = Configuration(
@@ -68,6 +90,8 @@ final class AutoPresser: @unchecked Sendable {
     timer = nil
     configuration = nil
     generation += 1
+    unconfirmedSince = nil
+    reportedUnconfirmed = false
     releaseLocked()
   }
 
@@ -80,22 +104,43 @@ final class AutoPresser: @unchecked Sendable {
 
   private func press(_ configuration: Configuration, generation: Int) {
     // Asked at press time, outside the lock so a slow answer can't hold up `stop`.
-    guard isFrontmost(configuration.bundleID) else { return }
-    lock.withLock {
-      guard generation == self.generation else { return }
+    let focus = focus(configuration.bundleID)
+    let report: (@Sendable () -> Void)? = lock.withLock {
+      guard generation == self.generation else { return nil }
+      guard focus == .target else {
+        return focus == .unconfirmed ? unconfirmedLocked() : clearUnconfirmedLocked()
+      }
+      unconfirmedSince = nil
       releaseLocked()
       post(configuration.keyCode, true)
       presses += 1
       let press = presses
       held = (configuration.keyCode, press)
-      queue.asyncAfter(deadline: .now() + configuration.hold) { [weak self] in
+      releases.asyncAfter(deadline: .now() + configuration.hold) { [weak self] in
         guard let self else { return }
         lock.withLock {
           guard held?.press == press else { return }
           releaseLocked()
         }
       }
+      return nil
     }
+    report?()
+  }
+
+  private func clearUnconfirmedLocked() -> (@Sendable () -> Void)? {
+    unconfirmedSince = nil
+    return nil
+  }
+
+  /// The handler to call, once focus has stayed unconfirmed long enough to be worth reporting.
+  private func unconfirmedLocked() -> (@Sendable () -> Void)? {
+    let now = ProcessInfo.processInfo.systemUptime
+    let since = unconfirmedSince ?? now
+    unconfirmedSince = since
+    guard !reportedUnconfirmed, now - since >= Self.unconfirmedDelay else { return nil }
+    reportedUnconfirmed = true
+    return unconfirmed
   }
 
   /// Used only under `lock`, through `post`.
@@ -113,22 +158,23 @@ final class AutoPresser: @unchecked Sendable {
   /// `NSWorkspace` to agree, as the press check always did. Off the main thread `NSWorkspace`
   /// only catches up when the main run loop turns, so on its own it could still name the target
   /// for as long as the main thread is busy after a switch away. Fails closed.
-  @Sendable static func isFrontmost(_ bundleID: String) -> Bool {
+  @Sendable static func focus(_ bundleID: String) -> Focus {
     guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleID else {
-      return false
+      return .other
     }
     let system = AXUIElementCreateSystemWide()
-    // The answer normally takes microseconds. A slow one must not hold a key down or stall the
-    // presses behind it for the default timeout of several seconds.
+    // The answer normally takes microseconds. A slow one must not stall the presses behind it
+    // for the default timeout of several seconds.
     AXUIElementSetMessagingTimeout(system, 0.25)
     var focused: CFTypeRef?
     guard
       AXUIElementCopyAttributeValue(system, kAXFocusedApplicationAttribute as CFString, &focused)
         == .success,
       let focused, CFGetTypeID(focused) == AXUIElementGetTypeID()
-    else { return false }
+    else { return .unconfirmed }
     var pid: pid_t = 0
-    guard AXUIElementGetPid(focused as! AXUIElement, &pid) == .success else { return false }
+    guard AXUIElementGetPid(focused as! AXUIElement, &pid) == .success else { return .unconfirmed }
     return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == bundleID
+      ? .target : .other
   }
 }

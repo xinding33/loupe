@@ -5,7 +5,8 @@ import Testing
 
 @testable import Loupe
 
-/// Stands in for event posting, so these tests never send input.
+/// Stands in for event posting and the focus check, so these tests never send input. Waits are
+/// on what the presser did, with generous timeouts, so a slow machine can't fail them.
 private final class FakeKeyboard: @unchecked Sendable {
   struct Event {
     let time: TimeInterval
@@ -14,19 +15,26 @@ private final class FakeKeyboard: @unchecked Sendable {
   }
   private let lock = NSLock()
   private var recorded: [Event] = []
-  private var frontmost = true
+  private var focus = AutoPresser.Focus.target
+  private var checkDelay: TimeInterval = 0
   private var asked: Set<String> = []
   /// Signalled on each key-down.
   let pressed = DispatchSemaphore(value: 0)
+  /// Signalled on each focus check, once it has answered.
+  let checked = DispatchSemaphore(value: 0)
+  /// Signalled when the presser reports that focus stayed unconfirmed.
+  let reported = DispatchSemaphore(value: 0)
 
   var events: [Event] { lock.withLock { recorded } }
   /// The bundle identifiers the presser asked about.
   var askedFor: Set<String> { lock.withLock { asked } }
   var downs: [Event] { events.filter(\.down) }
-  func setFrontmost(_ value: Bool) { lock.withLock { frontmost = value } }
+  func setFocus(_ value: AutoPresser.Focus) { lock.withLock { focus = value } }
+  /// Makes every focus check take this long, as a slow Accessibility answer would.
+  func setCheckDelay(_ value: TimeInterval) { lock.withLock { checkDelay = value } }
 
   func presser() -> AutoPresser {
-    AutoPresser(
+    let presser = AutoPresser(
       post: { [self] keyCode, down in
         lock.withLock {
           recorded.append(
@@ -34,12 +42,23 @@ private final class FakeKeyboard: @unchecked Sendable {
         }
         if down { pressed.signal() }
       },
-      isFrontmost: { [self] bundleID in
-        lock.withLock {
+      focus: { [self] bundleID in
+        let delay = lock.withLock { checkDelay }
+        if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+        let answer = lock.withLock {
           asked.insert(bundleID)
-          return frontmost
+          return focus
         }
+        checked.signal()
+        return answer
       })
+    presser.onUnconfirmed { [self] in reported.signal() }
+    return presser
+  }
+
+  /// Waits for this many more focus checks to answer.
+  func waitForChecks(_ count: Int) -> Bool {
+    (0..<count).allSatisfy { _ in checked.wait(timeout: .now() + 5) == .success }
   }
 
   /// Every key-down is followed by its key-up, and no key is left down.
@@ -58,19 +77,14 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
 }
 
 @MainActor
-@Test func autoPressKeepsItsCadenceWhileTheMainThreadIsBusy() throws {
+@Test func autoPressKeepsPressingWhileTheMainThreadIsBusy() throws {
   let keyboard = FakeKeyboard()
   let presser = keyboard.presser()
   presser.start(settings(pressesPerSecond: 20))
-  #expect(keyboard.pressed.wait(timeout: .now() + 1) == .success)
-  let start = ProcessInfo.processInfo.systemUptime
-  Thread.sleep(forTimeInterval: 0.3)
-  let end = ProcessInfo.processInfo.systemUptime
+  // Each wait blocks the main thread. A presser on the main queue would never get to press.
+  for _ in 0..<4 { #expect(keyboard.pressed.wait(timeout: .now() + 5) == .success) }
   presser.stop()
-  let times = keyboard.downs.map(\.time).filter { $0 >= start && $0 <= end }
-  // Six presses are due in 300 ms at 20 a second; on the main queue there would be none. The
-  // bound is loose so a slow CI machine can't fail it.
-  #expect(times.count >= 3)
+  #expect(keyboard.downs.count >= 4)
   #expect(keyboard.isBalanced)
   #expect(keyboard.askedFor == ["invalid.loupe.tests"])
 }
@@ -78,16 +92,15 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
 @Test func autoPressStopReleasesTheHeldKeyAndPressesNothingAfter() throws {
   let keyboard = FakeKeyboard()
   let presser = keyboard.presser()
-  // One press a second holds the key for 40 ms.
   presser.start(settings(pressesPerSecond: 1))
-  #expect(keyboard.pressed.wait(timeout: .now() + 1) == .success)
+  #expect(keyboard.pressed.wait(timeout: .now() + 5) == .success)
   presser.stop()
   let events = keyboard.events
   #expect(events.map(\.down) == [true, false])
   #expect(events.map(\.keyCode) == [3, 3])
 
   presser.start(settings(pressesPerSecond: 20))
-  for _ in 0..<3 { _ = keyboard.pressed.wait(timeout: .now() + 1) }
+  for _ in 0..<3 { _ = keyboard.pressed.wait(timeout: .now() + 5) }
   presser.stop()
   let stopped = keyboard.events.count
   #expect(keyboard.isBalanced)
@@ -97,21 +110,50 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
 
 @Test func autoPressPostsNothingWhileTheTargetIsNotInFront() throws {
   let keyboard = FakeKeyboard()
-  keyboard.setFrontmost(false)
+  keyboard.setFocus(.other)
   let presser = keyboard.presser()
   presser.start(settings(pressesPerSecond: 20))
-  Thread.sleep(forTimeInterval: 0.2)
+  #expect(keyboard.waitForChecks(3))
   #expect(keyboard.events.isEmpty)
   #expect(keyboard.askedFor == ["invalid.loupe.tests"])
 
-  // Pressing stops on the next press once the target leaves the front.
-  keyboard.setFrontmost(true)
-  #expect(keyboard.pressed.wait(timeout: .now() + 1) == .success)
-  keyboard.setFrontmost(false)
-  Thread.sleep(forTimeInterval: 0.1)
-  let afterSwitch = keyboard.events.count
-  Thread.sleep(forTimeInterval: 0.2)
-  #expect(keyboard.events.count == afterSwitch)
+  // Once the target leaves the front, the press under way may land; none follows it.
+  keyboard.setFocus(.target)
+  #expect(keyboard.pressed.wait(timeout: .now() + 5) == .success)
+  keyboard.setFocus(.other)
+  #expect(keyboard.waitForChecks(2))
+  let afterSwitch = keyboard.downs.count
+  #expect(keyboard.waitForChecks(3))
+  #expect(keyboard.downs.count == afterSwitch)
+  presser.stop()
   #expect(keyboard.isBalanced)
+}
+
+@Test func autoPressReleasesOnTimeWhileTheNextFocusCheckIsSlow() throws {
+  let keyboard = FakeKeyboard()
+  keyboard.setCheckDelay(0.5)
+  let presser = keyboard.presser()
+  // At 20 a second the key is held for 25 ms, and each press's check takes half a second.
+  presser.start(settings(pressesPerSecond: 20))
+  #expect(keyboard.pressed.wait(timeout: .now() + 5) == .success)
+  #expect(keyboard.pressed.wait(timeout: .now() + 5) == .success)
+  presser.stop()
+  let events = keyboard.events
+  let firstUp = try #require(events.first { !$0.down })
+  // Sharing a queue with the checks would hold the key for the whole half second.
+  #expect(firstUp.time - events[0].time < 0.3)
+  #expect(keyboard.isBalanced)
+}
+
+@Test func autoPressReportsFocusItCannotConfirmOnceAndPressesNothing() throws {
+  let keyboard = FakeKeyboard()
+  keyboard.setFocus(.unconfirmed)
+  let presser = keyboard.presser()
+  presser.start(settings(pressesPerSecond: 20))
+  #expect(keyboard.reported.wait(timeout: .now() + 5) == .success)
+  // Not again for the same run of presses.
+  #expect(keyboard.waitForChecks(5))
+  #expect(keyboard.reported.wait(timeout: .now()) == .timedOut)
+  #expect(keyboard.events.isEmpty)
   presser.stop()
 }
