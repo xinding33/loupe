@@ -25,8 +25,8 @@ struct LiveCardOCR {
       }
     }
 
-    /// Whether reading the same pixels again would see the same. Our own errors are; Vision's
-    /// can be transient.
+    /// Whether reading the same pixels again would see the same. What we made of the frame
+    /// would; a failure in Vision or in preparing the frame can be transient.
     var isRepeatable: Bool {
       switch self {
       case .inventory, .enhance: true

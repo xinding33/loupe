@@ -29,24 +29,6 @@ struct ReadingOutcome: Equatable {
   }
 }
 
-extension FrameSamples {
-  /// Samples a BGRA capture buffer; nil for any other format or a buffer that can't be read, so
-  /// the frame counts as changed.
-  init?(_ buffer: CVPixelBuffer) {
-    guard CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA,
-      !CVPixelBufferIsPlanar(buffer),
-      CVPixelBufferLockBaseAddress(buffer, .readOnly) == kCVReturnSuccess
-    else { return nil }
-    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-    guard let base = CVPixelBufferGetBaseAddress(buffer) else { return nil }
-    let height = CVPixelBufferGetHeight(buffer)
-    let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
-    self.init(
-      pixels: UnsafeRawBufferPointer(start: base, count: bytesPerRow * height),
-      width: CVPixelBufferGetWidth(buffer), height: height, bytesPerRow: bytesPerRow)
-  }
-}
-
 /// Reads, reuses or holds each captured frame; see `ReadPacing`. `FrameReader` drives it from the
 /// capture stream, and tests drive it with pixel buffers and explicit times. Owned by the OCR
 /// queue.
@@ -55,14 +37,11 @@ struct FramePipeline {
   private var pacing = ReadPacing<ReadingOutcome>()
   /// The latest complete frame. Its image is copied out only when something needs it.
   private var screen: Screen?
-  /// The samples of the frame last read.
-  private var baseline: FrameSamples?
   private let context = CIContext()
 
   private struct Screen {
     var buffer: CVPixelBuffer?
     var image: CGImage?
-    let samples: FrameSamples?
   }
 
   init(ocr: DiagnosticReader) { self.ocr = ocr }
@@ -75,7 +54,7 @@ struct FramePipeline {
   /// Takes a complete frame, before `complete` decides what to do with it, so a snapshot or a
   /// recording can have it first.
   mutating func show(_ buffer: CVPixelBuffer) {
-    screen = Screen(buffer: buffer, image: nil, samples: FrameSamples(buffer))
+    screen = Screen(buffer: buffer, image: nil)
   }
 
   /// The latest frame's image, copied from its buffer the first time it's asked for.
@@ -93,16 +72,12 @@ struct FramePipeline {
 
   /// Decides for the frame `show` took.
   mutating func complete(at time: TimeInterval) -> FrameDelivery? {
-    let unchanged =
-      if let baseline, let samples = screen?.samples { !samples.differs(from: baseline) } else {
-        false
-      }
-    return perform(pacing.frame(at: time, reusable: unchanged && ocr.canReuse), at: time)
+    perform(pacing.frame(at: time), at: time)
   }
 
   /// A frame that repeats the one before it.
   mutating func idle(at time: TimeInterval) -> FrameDelivery? {
-    perform(pacing.idle(at: time, reusable: baseline != nil && ocr.canReuse), at: time)
+    perform(pacing.idle(at: time, reusable: ocr.canReuse), at: time)
   }
 
   /// The timer at `deadline`.
@@ -113,7 +88,6 @@ struct FramePipeline {
   /// Drops the frame, the last read and its outcome, as for a gap in the stream.
   mutating func reset() {
     screen = nil
-    baseline = nil
     pacing = ReadPacing()
     ocr.resetOCR()
   }
@@ -133,12 +107,10 @@ struct FramePipeline {
     switch decision {
     case .read:
       guard let image = image() else {
-        // Nothing to compare the next frame with, so it's read when due.
-        screen = nil
-        baseline = nil
+        // The frame can't be read, so no earlier read may answer for it.
+        reset()
         return nil
       }
-      baseline = screen?.samples
       let output = ocr.read(image, at: time)
       return deliver(output.result, key: output.key)
     case .reuse:

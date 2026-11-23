@@ -11,10 +11,12 @@ private struct Pacer {
   var showing = "no card"
 
   @discardableResult
-  mutating func frame(_ time: Double, matches: Bool = false, reusable: Bool = true)
+  mutating func frame(_ time: Double, repeats: Bool = false, reusable: Bool = true)
     -> ReadPacing<String>.Decision
   {
-    record(pacing.frame(at: time, reusable: matches && reusable), at: time)
+    // The stream reports a frame that repeats the one before it as idle.
+    record(
+      repeats ? pacing.idle(at: time, reusable: reusable) : pacing.frame(at: time), at: time)
   }
 
   @discardableResult
@@ -56,13 +58,13 @@ private func times(from start: Double, count: Int) -> [Double] {
   var pacer = Pacer()
   #expect(pacer.frame(0) == .read)
   for time in times(from: 0.2, count: 9) {
-    #expect(pacer.frame(time, matches: true) == .reuse)
+    #expect(pacer.frame(time, repeats: true) == .reuse)
     #expect(pacer.idle(time + 0.1) == .reuse)
   }
   #expect(pacer.reads == [0])
   // A change the comparison missed can't keep an old reading up for long.
   for time in times(from: 2, count: 41) {
-    pacer.frame(time, matches: true)
+    pacer.frame(time, repeats: true)
     pacer.idle(time + 0.1)
   }
   #expect(rounded(pacer.reads) == [0, 2, 4, 6, 8, 10])
@@ -97,12 +99,25 @@ private func times(from start: Double, count: Int) -> [Double] {
 @Test func pacingReadsANewCardOnTheFirstFrameAndConfirmsItOnTheNext() {
   var pacer = Pacer()
   pacer.frame(0)
-  pacer.frame(0.2, matches: true)
+  pacer.frame(0.2, repeats: true)
   // Settled on a still screen; a card appears long after the last read.
   pacer.showing = "card"
   #expect(pacer.frame(3) == .read)
-  // The reading changed, so the next frame isn't held: it matches, and repeats the card.
-  #expect(pacer.frame(3.2, matches: true) == .reuse)
+  // The reading changed, so the next frame isn't held. A new frame is read to confirm it.
+  #expect(pacer.frame(3.2) == .read)
+  #expect(pacer.reads == [0, 3, 3.2])
+  // Settled again: the frame after that waits its half second.
+  #expect(pacer.frame(3.4) == .hold)
+  #expect(rounded(pacer.pacing.deadline) == 3.7)
+}
+
+@Test func pacingConfirmsANewCardFromARepeatedFrameWithoutReading() {
+  var pacer = Pacer()
+  pacer.frame(0)
+  pacer.frame(0.2, repeats: true)
+  pacer.showing = "card"
+  #expect(pacer.frame(3) == .read)
+  #expect(pacer.frame(3.2, repeats: true) == .reuse)
   #expect(pacer.reads == [0, 3])
   #expect(pacer.reuses == [0.2, 3.2])
 }
@@ -114,7 +129,7 @@ private func times(from start: Double, count: Int) -> [Double] {
     #expect(pacer.frame(time) == .read)
   }
   // Two equal outcomes settle it; the next change waits.
-  pacer.frame(0.6, matches: true)
+  pacer.frame(0.6, repeats: true)
   #expect(pacer.frame(0.8) == .hold)
   #expect(rounded(pacer.pacing.deadline) == 0.9)
   #expect(pacer.reads.count == 3)
@@ -139,7 +154,7 @@ private func times(from start: Double, count: Int) -> [Double] {
 
   // Settling earns the next change a fresh burst.
   pacer.frame(5.3)
-  pacer.frame(5.4, matches: true)
+  pacer.frame(5.4, repeats: true)
   pacer.showing = "a new card"
   #expect(pacer.frame(5.6) == .hold)
   #expect(pacer.tick(5.8) == .read)
@@ -150,7 +165,7 @@ private func times(from start: Double, count: Int) -> [Double] {
 @Test func pacingHoldsAChangedFrameAndReadsItOnTimeThroughIdleFrames() {
   var pacer = Pacer()
   pacer.frame(0)
-  pacer.frame(0.2, matches: true)
+  pacer.frame(0.2, repeats: true)
   pacer.showing = "card"
   #expect(pacer.frame(0.3) == .hold)
   #expect(pacer.pacing.deadline == 0.5)
@@ -166,7 +181,7 @@ private func times(from start: Double, count: Int) -> [Double] {
 @Test func pacingTimerReadsAHeldFrameWhenNoFrameFollows() {
   var pacer = Pacer()
   pacer.frame(0)
-  pacer.frame(0.2, matches: true)
+  pacer.frame(0.2, repeats: true)
   #expect(pacer.frame(0.4) == .hold)
   #expect(pacer.tick(0.45) == .hold)
   #expect(pacer.tick(0.5) == .read)
@@ -174,30 +189,19 @@ private func times(from start: Double, count: Int) -> [Double] {
   #expect(pacer.reads == [0, 0.5])
 }
 
-@Test func pacingDropsAHeldFrameWhenTheScreenReturnsToTheReadFrame() {
-  var pacer = Pacer()
-  pacer.frame(0)
-  pacer.frame(0.2, matches: true)
-  #expect(pacer.frame(0.3) == .hold)
-  #expect(pacer.frame(0.4, matches: true) == .reuse)
-  #expect(pacer.pacing.deadline == nil)
-  #expect(pacer.tick(0.5) == .ignore)
-  #expect(pacer.reads == [0])
-}
-
 @Test func pacingReadsAFrameThatCannotBeReused() {
   var pacer = Pacer()
   pacer.frame(0)
-  pacer.frame(0.2, matches: true)
-  // The pixels match, but the last read's outcome can't stand in for them.
-  #expect(pacer.frame(0.4, matches: true, reusable: false) == .hold)
-  #expect(pacer.frame(0.6, matches: true, reusable: false) == .read)
+  pacer.frame(0.2, repeats: true)
+  // The frame repeats, but the last read's outcome can't stand in for it.
+  #expect(pacer.frame(0.4, repeats: true, reusable: false) == .hold)
+  #expect(pacer.frame(0.6, repeats: true, reusable: false) == .read)
 }
 
 @Test func pacingWithDiagnosticsReadsAStillScreenTwiceASecond() {
   // Buffering diagnostics, nothing is reusable, so a report holds real OCR inputs.
   var pacer = Pacer()
-  pacer.frame(0, matches: true, reusable: false)
+  pacer.frame(0)
   for time in times(from: 0.2, count: 20) { pacer.idle(time, reusable: false) }
   #expect(pacer.reuses.isEmpty)
   // Idle frames repeat the read frame: read again at once while unsettled, then every 0.6 s
@@ -216,7 +220,7 @@ private func times(from start: Double, count: Int) -> [Double] {
 @Test func pacingCountsAFrameJustShortOfTheIntervalAsDue() {
   var pacer = Pacer()
   pacer.frame(0)
-  pacer.frame(0.1, matches: true)
+  pacer.frame(0.1, repeats: true)
   #expect(pacer.frame(0.48) == .hold)
   #expect(pacer.frame(0.495) == .read)
 }

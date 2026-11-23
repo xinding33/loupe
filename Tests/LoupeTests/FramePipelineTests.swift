@@ -6,35 +6,22 @@ import Testing
 
 @testable import Loupe
 
-/// A BGRA buffer like the capture stream's, holding `image`. `padding` adds bytes to every row.
-private func pixelBuffer(
-  _ image: CGImage, format: OSType = kCVPixelFormatType_32BGRA, padding: Int = 0
-) throws -> CVPixelBuffer {
+/// A BGRA buffer like the capture stream's, holding `image`.
+private func pixelBuffer(_ image: CGImage) throws -> CVPixelBuffer {
   var created: CVPixelBuffer?
-  if padding == 0 {
-    let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary] as CFDictionary
-    CVPixelBufferCreate(nil, image.width, image.height, format, attributes, &created)
-  } else {
-    let bytesPerRow = image.width * 4 + padding
-    let memory = UnsafeMutableRawPointer.allocate(
-      byteCount: bytesPerRow * image.height, alignment: 64)
-    memory.initializeMemory(as: UInt8.self, repeating: 0x5A, count: bytesPerRow * image.height)
-    CVPixelBufferCreateWithBytes(
-      nil, image.width, image.height, format, memory, bytesPerRow,
-      { _, base in base?.deallocate() }, nil, nil, &created)
-  }
+  let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary] as CFDictionary
+  CVPixelBufferCreate(
+    nil, image.width, image.height, kCVPixelFormatType_32BGRA, attributes, &created)
   let buffer = try #require(created)
   CVPixelBufferLockBaseAddress(buffer, [])
   defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-  let order =
-    format == kCVPixelFormatType_32BGRA
-    ? CGBitmapInfo.byteOrder32Little.rawValue : CGBitmapInfo.byteOrder32Big.rawValue
   let context = try #require(
     CGContext(
       data: CVPixelBufferGetBaseAddress(buffer), width: image.width, height: image.height,
       bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
       space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | order))
+      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+        | CGBitmapInfo.byteOrder32Little.rawValue))
   context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
   return buffer
 }
@@ -74,18 +61,16 @@ private final class Driver {
 }
 
 @MainActor
-@Test func pipelineReusesAnUnchangedFrameAndReadsAOneDigitChange() throws {
+@Test func pipelineReusesARepeatedFrameAndReadsEveryNewOne() throws {
   let pipeline = try Driver()
   let card = try pixelBuffer(diagnosticInventoryImage())
   let first = try #require(pipeline.frame(card, at: 1)).result.get()
   #expect(pipeline.ocr.visionReads == 1)
-  // A fresh capture of the same screen gives the read's outcome without Vision.
-  let repeated = try pixelBuffer(diagnosticInventoryImage())
-  let again = try #require(pipeline.frame(repeated, at: 1.2)).result.get()
+  // A frame the stream reports as a repeat gives the read's outcome without Vision.
+  let again = try #require(pipeline.idle(at: 1.2)).result.get()
   #expect(pipeline.ocr.visionReads == 1)
   var plain = LiveCardOCR()
-  _ = try plain.read(copied(card), at: 1)
-  let expected = try plain.read(copied(repeated), at: 1.2)
+  let expected = try plain.read(copied(card), at: 1)
   for reading in [first, again] {
     #expect(reading.text == expected.text)
     #expect(reading.stars == expected.stars)
@@ -102,16 +87,22 @@ private final class Driver {
   #expect(pipeline.ocr.visionReads == 2)
   #expect(read.text.contains("DEF+19"))
   #expect(!read.text.contains("DEF+16"))
+
+  // A new capture is read even when it shows the same screen: pixels that look alike can read
+  // differently.
+  let same = try pixelBuffer(diagnosticInventoryImage(replacing: ["DEF+16": "DEF+19"]))
+  #expect(try #require(pipeline.frame(same, at: 1.7)).result.get().text.contains("DEF+19"))
+  #expect(pipeline.ocr.visionReads == 3)
 }
 
 @MainActor
-@Test func pipelineConfirmsAnUnchangedEnhanceFrameWithoutASecondVisionPass() throws {
+@Test func pipelineConfirmsARepeatedEnhanceFrameWithoutASecondVisionPass() throws {
   let pipeline = try Driver()
   let enhance = try pixelBuffer(diagnosticEnhanceImage())
   let first = try #require(pipeline.frame(enhance, at: 1))
   // One observation can't confirm the fields.
   #expect(throws: ArtifactError.self) { try first.result.get() }
-  let second = try #require(pipeline.frame(pixelBuffer(diagnosticEnhanceImage()), at: 1.2))
+  let second = try #require(pipeline.idle(at: 1.2))
   let reading = try second.result.get()
   #expect(reading.isEnhancement)
   #expect(pipeline.ocr.visionReads == 1)
@@ -133,7 +124,7 @@ private final class Driver {
   let pipeline = try Driver()
   let card = try pixelBuffer(diagnosticInventoryImage())
   _ = pipeline.frame(card, at: 1)
-  _ = pipeline.frame(card, at: 1.2)
+  _ = pipeline.idle(at: 1.2)
   let changed = try pixelBuffer(diagnosticInventoryImage(replacing: ["HP+209": "HP+299"]))
   #expect(pipeline.frame(changed, at: 1.3) == nil)
   // A snapshot now saves the held frame, not the frame last read.
@@ -185,48 +176,12 @@ private final class Driver {
     #expect(sample.inputs.map(\.metadata.kind) == [.inventoryCard])
   }
   #expect(deliveries.last?.coverage.count == 3)
-  // With the buffer off again, the last read is reused.
+  // With the buffer off again, a repeated frame reuses the last read.
   pipeline.ocr.setEnabled(false)
-  let reused = try #require(pipeline.frame(card, at: 2))
+  let reused = try #require(pipeline.idle(at: 2))
   #expect(reused.key == nil)
   #expect(pipeline.ocr.visionReads == 3)
   #expect(try reused.result.get().text == deliveries[2].result.get().text)
-}
-
-@MainActor
-@Test func pipelineReadsFramesItCannotCompare() throws {
-  let pipeline = try Driver()
-  let image = try diagnosticInventoryImage()
-  // An unexpected pixel format can't be sampled, so its frames always count as changed.
-  let argb = try pixelBuffer(image, format: kCVPixelFormatType_32ARGB)
-  #expect(FrameSamples(argb) == nil)
-  _ = pipeline.frame(argb, at: 1)
-  _ = pipeline.frame(argb, at: 1.2)
-  #expect(pipeline.ocr.visionReads == 2)
-  #expect(pipeline.frame(argb, at: 1.4) == nil)
-  // A window of another size doesn't match either.
-  let sized = try Driver()
-  let card = try pixelBuffer(image)
-  _ = sized.frame(card, at: 1)
-  let canvas = try #require(
-    CGContext(
-      data: nil, width: image.width + 8, height: image.height, bitsPerComponent: 8,
-      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-  canvas.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-  _ = sized.frame(try pixelBuffer(#require(canvas.makeImage())), at: 1.2)
-  #expect(sized.ocr.visionReads == 2)
-}
-
-@MainActor
-@Test func captureBufferSamplesSkipRowPadding() throws {
-  let image = try diagnosticInventoryImage()
-  let plain = try #require(FrameSamples(pixelBuffer(image)))
-  let padded = try pixelBuffer(image, padding: 72)
-  #expect(CVPixelBufferGetBytesPerRow(padded) == image.width * 4 + 72)
-  let samples = try #require(FrameSamples(padded))
-  #expect(samples.values == plain.values)
-  #expect(!samples.differs(from: plain))
 }
 
 @Test func recordingKeepsTwoFramesASecond() throws {
@@ -251,82 +206,4 @@ private final class Driver {
   #expect(recording.wants(at: 200))
   _ = try recording.append(image, at: 200)
   #expect(!recording.wants(at: 200.2))
-}
-
-// MARK: Sensitivity at the game's scale
-
-/// A frame like the game's at `width`: an Inventory card with two substat lines and a level tag,
-/// at the sizes measured on a 5,120-pixel-wide capture, softened as streamed video is. `shift`
-/// moves the text against the sample grid.
-@MainActor
-private func gameFrame(width: Int, lines: [String], shift: Double) throws -> CVPixelBuffer {
-  let scale = Double(width) / 5120
-  let height = Int((3414 * scale).rounded())
-  let context = try #require(
-    CGContext(
-      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-  context.setFillColor(CGColor(red: 0.16, green: 0.18, blue: 0.22, alpha: 1))
-  context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-  context.setFillColor(CGColor(red: 0.91, green: 0.88, blue: 0.83, alpha: 1))
-  context.fill(CGRect(x: 2560 * scale, y: 300 * scale, width: 1280 * scale, height: 2900 * scale))
-  context.setFillColor(CGColor(red: 0.23, green: 0.25, blue: 0.31, alpha: 1))
-  context.fill(
-    CGRect(
-      x: (2640 + shift) * scale, y: (1884 - shift) * scale, width: 120 * scale,
-      height: 64 * scale))
-  NSGraphicsContext.saveGraphicsState()
-  NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-  // The level tag's digits are about 34 pixels tall at this width, substat values about 48.
-  (lines[0] as NSString).draw(
-    at: NSPoint(x: (2650 + shift) * scale, y: (1887 - shift) * scale),
-    withAttributes: [
-      .font: NSFont.systemFont(ofSize: 48 * scale, weight: .bold), .foregroundColor: NSColor.white,
-    ])
-  for (index, line) in lines.dropFirst().enumerated() {
-    (line as NSString).draw(
-      at: NSPoint(x: (2680 + shift) * scale, y: (1654 - 100 * Double(index) - shift) * scale),
-      withAttributes: [
-        .font: NSFont.systemFont(ofSize: 64 * scale, weight: .bold),
-        .foregroundColor: NSColor(calibratedRed: 0.24, green: 0.26, blue: 0.31, alpha: 1),
-      ])
-  }
-  NSGraphicsContext.restoreGraphicsState()
-  let sharp = try #require(context.makeImage())
-  let soft = CIImage(cgImage: sharp).clampedToExtent().applyingGaussianBlur(sigma: 2 * scale)
-    .cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
-  return try pixelBuffer(#require(CIContext().createCGImage(soft, from: soft.extent)))
-}
-
-@MainActor
-@Test(arguments: [5120, 2560])
-func oneDigitChangesOnAGameSizedFrameAreCaught(_ width: Int) throws {
-  let scale = Double(width) / 5120
-  let step = Double(FrameSamples.step(width: width, height: Int((3414 * scale).rounded())))
-  // Each frame changes one digit of the one before: the changes named in the design, and the
-  // closest pairs of digits found by trying every pair offline.
-  let frames = [
-    ["+0", "DEF+5.8%", "Elemental Mastery+16"],
-    ["+0", "DEF+5.3%", "Elemental Mastery+16"],
-    ["+0", "DEF+5.3%", "Elemental Mastery+19"],
-    ["+4", "DEF+5.3%", "Elemental Mastery+19"],
-    ["+5", "DEF+5.3%", "Elemental Mastery+19"],
-    ["+6", "DEF+5.3%", "Elemental Mastery+19"],
-    ["+8", "DEF+5.3%", "Elemental Mastery+19"],
-  ]
-  for shift in [0, step * 2.5 / scale] {
-    var previous: FrameSamples?
-    for lines in frames {
-      let samples = try #require(FrameSamples(gameFrame(width: width, lines: lines, shift: shift)))
-      if let previous {
-        let difference = try #require(samples.largestDifference(from: previous))
-        // Every pair of digits measured at least 10.6 offline, over three times the threshold.
-        #expect(difference >= 2 * FrameSamples.threshold, "\(lines) at \(width) shifted \(shift)")
-      }
-      previous = samples
-    }
-    let again = try #require(FrameSamples(gameFrame(width: width, lines: frames[6], shift: shift)))
-    #expect(again.largestDifference(from: try #require(previous)) == 0)
-  }
 }

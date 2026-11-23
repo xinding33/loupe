@@ -92,28 +92,21 @@ card-less screens) and a real 145-piece inventory, run outside the game:
   in the game.
 
 - Sampling changed on 2026-11-23, approved by the user: capture delivers five
-  frames a second. Each frame is compared with the frame last read, sampled
-  straight from the capture buffer on a grid of 1,280 samples across a 16:9
-  picture (0.8 ms) and compared in overlapping 8 x 8-sample squares (0.9 ms) at
-  5120 x 3414. Within 3.0 (the most changed square's mean absolute difference
-  per channel, 0-255), the frame repeats that read's outcome without Vision;
-  Enhance fields go through confirmation again. A changed frame is read at once
-  while the reading is changing, otherwise half a second after the last read,
-  so a screen that keeps changing is still read twice a second. Two limits
-  bound a mistake: a reading that never settles gets four fast reads and then
-  the usual two a second, and a still screen is read again every two seconds,
-  so a change the comparison missed can't keep an old reading up for longer.
-- The margins behind 3.0: captures of a still screen in the recording differed
-  by at most 1.1, one-digit changes drawn at the game's text size (every pair of
-  digits in a substat value and in the level tag, 5,120 and 2,560 pixels wide,
-  softened like streamed video) by at least 10.6, and frames whose reading
-  changed by at least 116. Driven through the new pipeline at their 0.5 s
-  spacing, all 240 frames gave the same outcome as reading every frame, at both
-  sizes.
-- Only 9 of the 240 frames were reused. In Inventory the selected item's
-  highlight pulses, so the window is rarely still, and Vision ran on the other
-  231. Simulated, a new card is verified 0.30 s after it appears on a still
-  screen and 0.53 s on one that keeps changing, against 0.83 s before.
+  frames a second. A new frame is read at once while the reading is changing,
+  otherwise half a second after the last read, so a settled screen is still
+  read twice a second. Simulated, a new card is verified 0.54 s after it
+  appears, against 0.83 s before. A reading that never settles gets four fast
+  reads and then the usual two a second.
+- A frame the stream reports as a repeat of one already read takes that read's
+  outcome without Vision, and is read again every two seconds; Enhance fields
+  go through confirmation again. Driven through the new pipeline at their
+  0.5 s spacing, all 240 recorded frames gave the same outcome as reading every
+  frame.
+- Tried and dropped: reusing a read when a new frame's pixels nearly match the
+  frame last read. In Inventory the selected item's highlight pulses, so only 9
+  of 240 frames matched, and a review showed that frames within any workable
+  threshold can still read differently (one digit changing in a small window).
+  Nothing short of the stream's own "unchanged" is reused.
 
 Memory, and CPU with the reader disabled or buffering on, are not measured. Nor
 are the cost of capturing five frames a second and how often real frames arrive

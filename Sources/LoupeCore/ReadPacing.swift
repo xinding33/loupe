@@ -1,13 +1,12 @@
 import Foundation
 
-/// Decides, frame by frame, whether to run OCR. Frames arrive five times a second. One whose
-/// pixels match the frame last read gets that read's outcome again. A changed one is read at once
-/// while the reading is unsettled, and otherwise held until half a second after the last read, so
-/// a screen that keeps changing is still read only twice a second.
+/// Decides, frame by frame, whether to run OCR. Frames arrive five times a second. A new frame
+/// is read at once while the reading is unsettled, and otherwise held until half a second after
+/// the last read, so a settled screen is still read only twice a second. A frame the stream
+/// reports as a repeat of one already read gets that read's outcome again.
 ///
 /// Two limits keep a mistake small. A reading that never settles gets only a short burst of fast
-/// reads. And a still screen is read again every two seconds, so a change the pixel comparison
-/// missed can't leave an old reading up for longer than that.
+/// reads. And a screen that only repeats is read again every two seconds.
 public struct ReadPacing<Outcome: Equatable> {
   public enum Decision: Equatable {
     /// Read the latest frame.
@@ -22,7 +21,7 @@ public struct ReadPacing<Outcome: Equatable> {
 
   /// The longest a changed frame waits once the reading has settled.
   public static var interval: TimeInterval { 0.5 }
-  /// The longest a matching frame goes on taking the last read's outcome.
+  /// The longest repeats of a read frame go on taking its outcome.
   public static var refresh: TimeInterval { 2 }
   /// Reads in a row that may come sooner than `interval` while the reading is unsettled. A new
   /// card needs one and an Enhance panel two.
@@ -31,7 +30,7 @@ public struct ReadPacing<Outcome: Equatable> {
   static var slack: TimeInterval { 0.01 }
 
   private enum Screen { case none, read, unread }
-  /// Whether the latest frame has been read, or matches the frame that was.
+  /// Whether the latest frame has been read.
   private var screen = Screen.none
   private var lastRead: TimeInterval?
   private var lastOutcome: Outcome?
@@ -47,13 +46,9 @@ public struct ReadPacing<Outcome: Equatable> {
     return lastRead.map { $0 + Self.interval }
   }
 
-  /// A new frame. `reusable` when its pixels match the frame last read and that read's outcome
-  /// can be delivered again.
-  public mutating func frame(at time: TimeInterval, reusable: Bool) -> Decision {
-    if reusable, isFresh(at: time) {
-      screen = .read
-      return .reuse
-    }
+  /// A new frame. Streamed video never repeats exactly, and pixels that only look the same can
+  /// read differently, so a new frame is never answered from the last read.
+  public mutating func frame(at time: TimeInterval) -> Decision {
     screen = .unread
     return readIfDue(at: time)
   }

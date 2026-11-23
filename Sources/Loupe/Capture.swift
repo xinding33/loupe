@@ -21,6 +21,13 @@ struct CardReading: Sendable {
   }
 }
 
+/// A frame that couldn't be made ready for OCR. Unlike an `ArtifactError` it says nothing about
+/// what the frame shows, and the next attempt may succeed, so it is never reused.
+struct FramePreparationError: LocalizedError {
+  let message: String
+  var errorDescription: String? { message }
+}
+
 enum CardOCR {
   static func read(_ image: CGImage) throws -> CardReading {
     if let snapshot = try enhancementSnapshot(image), let heading = snapshot.heading {
@@ -168,18 +175,18 @@ enum CardOCR {
       width: Double(image.width) * area.width, height: Double(image.height) * area.height
     ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
     guard let crop = image.cropping(to: rect)
-    else { throw ArtifactError("Waiting for the Enhance stat table.") }
+    else { throw FramePreparationError(message: "Waiting for the Enhance stat table.") }
     let scale = targetWidth / Double(crop.width)
     guard
       let canvas = CGContext(
         data: nil, width: Int(Double(crop.width) * scale), height: Int(Double(crop.height) * scale),
         bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-    else { throw ArtifactError("Cannot prepare the Enhance stat table for OCR.") }
+    else { throw FramePreparationError(message: "Cannot prepare the Enhance stat table for OCR.") }
     canvas.interpolationQuality = .high
     canvas.draw(crop, in: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height))
     guard let tableImage = canvas.makeImage() else {
-      throw ArtifactError("Cannot prepare the Enhance stat table for OCR.")
+      throw FramePreparationError(message: "Cannot prepare the Enhance stat table for OCR.")
     }
     return try PreparedCardOCR.read(
       tableImage, crop: rect, captureSize: CGSize(width: image.width, height: image.height),
@@ -561,8 +568,6 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
       config.height = Int(filter.contentRect.height * Double(filter.pointPixelScale))
       // Five frames a second; `ReadPacing` keeps OCR to two reads a second once settled.
       config.minimumFrameInterval = CMTime(value: 1, timescale: 5)
-      // Frames are compared in this format before anything copies them.
-      config.pixelFormat = kCVPixelFormatType_32BGRA
       // The pipeline keeps the latest frame's buffer until the next one, so one more than the
       // default three leaves the stream the surfaces it needs while a read runs.
       config.queueDepth = 4
