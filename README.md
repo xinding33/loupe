@@ -145,6 +145,8 @@ The live reader targets one full artifact card, in Inventory or on a character's
 
 Each Enhance field needs two matching observations within the last two seconds, using at most five frames. A missed field can use that recent evidence while other fields remain readable. A changed field blocks a new result until confirmed. A changed level resets the evidence, so the old inactive row cannot carry into an upgrade. Window-size changes and leaving Enhance also reset it. The parser removes decorative punctuation but does not infer digits or repair ambiguous decimals. Lower-confidence text can confirm an exact previously verified card, but cannot establish changed stats.
 
+The reader looks at the shared window five times a second. A frame whose pixels match the last frame it read repeats that reading without OCR. A changed frame is read at once while the reading is still changing, so a new card is usually verified about half a second after it appears, and sooner on a still screen. Once the reading settles, a screen that keeps changing is read at most twice a second, and a still one every two seconds.
+
 A missed reading keeps the last verified result visible for up to three seconds, labeled **Rechecking**. Saving and automatic collection pause until two consecutive readings agree again. The timeout runs from the last verified reading, not the last received frame. A different parsed card immediately hides the old result. Capture stops clear it immediately. Return to Inventory if the reader loses context; ambiguous material previews do not produce new advice.
 
 Enhance reading can still fail when particles overlap text. Rechecking changes a small status label rather than replacing the recommendation heading. The diagnostic recorder below captures failures for local regression testing.
@@ -175,7 +177,7 @@ Writes are atomic. **Undo** under Saved inventory reverses the last inventory ch
 6. Click **Save local report...** and choose a new destination.
 7. Share that folder with an agent only after checking its contents.
 
-The buffer reuses existing OCR reads. It adds no capture or OCR loop and performs no continuous disk writes. Its limits are ten seconds and 24 MiB of accounted evidence, including metadata. Large crops can shorten the retained history; the controls show actual sample count, duration, and image bytes. These limits are not a promise about total app memory or measured overhead.
+The buffer reuses existing OCR reads. It adds no capture or OCR loop and performs no continuous disk writes. While it's on, a frame is never answered from the last reading: every result comes from OCR, read at once while the reading is changing and at most twice a second once it settles. Its limits are ten seconds and 24 MiB of accounted evidence, including metadata. Large crops can shorten the retained history; the controls show actual sample count, duration, and image bytes. These limits are not a promise about total app memory or measured overhead.
 
 Reporting freezes evidence before opening the preview and pauses collection. Closing the preview resumes opted-in collection only for an active capture session. Disabling the reader, changing sessions, or turning buffering off clears buffered images and unsaved previews. Already-authorized saves may finish; completed report folders are never automatically deleted.
 

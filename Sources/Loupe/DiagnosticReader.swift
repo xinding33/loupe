@@ -26,6 +26,12 @@ struct DiagnosticReader {
       imageBytes: buffer.samples.reduce(0) { $0 + $1.imageBytes }, issue: storageIssue)
   }
 
+  /// Whether a frame with the same pixels as the last read can take its outcome. Never while
+  /// buffering, so a report holds real OCR inputs.
+  var canReuse: Bool { !buffer.isEnabled && live.canReread }
+  /// How many frames went through Vision since the last reset.
+  var visionReads: Int { live.visionReads }
+
   mutating func setEnabled(_ value: Bool) { buffer.setEnabled(value) }
   mutating func resetOCR() {
     live = LiveCardOCR()
@@ -72,6 +78,12 @@ struct DiagnosticReader {
       storageIssue = error.localizedDescription
       return (result, nil)
     }
+  }
+
+  /// The last read's outcome for a frame with the same pixels, as reading it again would give
+  /// at `time`. Records no sample: it's used only while buffering is off.
+  mutating func reuse(at time: TimeInterval) -> Result<CardReading, Error> {
+    Result { try live.reread(at: time) }
   }
 
   mutating func finish(

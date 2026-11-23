@@ -7,8 +7,12 @@ The existing explicit 40-frame recorder is unchanged.
 
 ## Evidence ownership and limits
 
-`FrameReader` owns one `DiagnosticReader` on the existing serial OCR queue.
-That reader owns `LiveCardOCR` and `DiagnosticBuffer`. There is no second
+`FrameReader` owns one `FramePipeline`, and through it one `DiagnosticReader`,
+on the existing serial OCR queue. That reader owns `LiveCardOCR` and
+`DiagnosticBuffer`. While the buffer is enabled, the pipeline never answers a
+frame from the last read, so every delivered result has a sample with real OCR
+inputs: changed frames are read at once while the reading changes, and at most
+twice a second once it settles. There is no second
 capture/OCR loop, disk recorder, uploader, or diagnostic timer. The existing
 freshness timer requests expiration; incoming reads and freeze also expire old
 evidence.
