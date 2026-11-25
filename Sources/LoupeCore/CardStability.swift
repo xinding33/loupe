@@ -36,4 +36,10 @@ public struct CardStability {
     self.signature = signature
     isVerified = true
   }
+
+  /// Whether readers see the same state: the signature and whether it's verified. The
+  /// timestamps behind them change on every frame.
+  public func looksSame(as other: CardStability) -> Bool {
+    signature == other.signature && isVerified == other.isVerified
+  }
 }

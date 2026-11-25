@@ -6,23 +6,36 @@ import UniformTypeIdentifiers
 @MainActor
 final class Model: ObservableObject {
   @Published var inventory = Inventory()
-  @Published var current: Artifact?
+  @Published var current: Artifact? {
+    didSet { cachedShortlist = nil }
+  }
   @Published var potential: Potential?
-  @Published var characterMatches: [CharacterMatch] = []
+  @Published var characterMatches: [CharacterMatch] = [] {
+    didSet { cachedShortlist = nil }
+  }
   /// Keep / Level / Review / Fodder advice across every character match and the saved inventory.
-  @Published var verdict: Verdict?
+  @Published var verdict: Verdict? {
+    didSet { cachedShortlist = nil }
+  }
   @Published var assessmentMode: AssessmentMode = .characters {
     didSet {
       preferences.manualProfile = assessmentMode == .profile
+      if assessmentMode == .profile && allProfiles.isEmpty { fillProfileOverview() }
       refreshDiagnosticRecommendation()
     }
   }
   @Published var selectedCharacterID: String? {
-    didSet { refreshDiagnosticRecommendation() }
+    didSet {
+      cachedShortlist = nil
+      refreshDiagnosticRecommendation()
+    }
   }
   /// The chosen role of the selected character, when it holds several.
   @Published var selectedRoleID: String? {
-    didSet { refreshDiagnosticRecommendation() }
+    didSet {
+      cachedShortlist = nil
+      refreshDiagnosticRecommendation()
+    }
   }
   @Published private(set) var evaluationIssue: String?
   @Published var profileName = "Crit" {
@@ -69,7 +82,7 @@ final class Model: ObservableObject {
       updateOverlay?()
     }
   }
-  @Published var placementStatus = "Choose a game window to place the overlay."
+  @Published private(set) var placementStatus = "Choose a game window to place the overlay."
   @Published var shortcutStatus = ""
   @Published var expandShortcut =
     UserDefaults.standard.string(forKey: "expandShortcut") ?? "option+`"
@@ -79,10 +92,13 @@ final class Model: ObservableObject {
     UserDefaults.standard.string(forKey: "snapshotShortcut") ?? "option+shift+s"
   @Published var recordShortcut =
     UserDefaults.standard.string(forKey: "recordShortcut") ?? "option+shift+r"
+  /// The presets compared side by side, computed only for manual-profile mode, which shows them.
   @Published var allProfiles: [(name: String, result: Potential)] = []
   let capture: Capture
   let diagnostics: DiagnosticReportFlow
-  @Published private(set) var stability = CardStability()
+  /// Not `@Published`: its timestamps change on every frame, so `updateStability` announces only
+  /// a change in what views read.
+  private(set) var stability = CardStability()
   private let file: URL
   private let preferencesFile: URL
   private var preferences: Preferences {
@@ -95,6 +111,12 @@ final class Model: ObservableObject {
   }
   private var freshness: Timer?
   private var evaluation: Task<Void, Never>?
+  /// Fills the preset overview after a switch to manual-profile mode.
+  private(set) var overviewFill: Task<Void, Never>?
+  /// Views read the shortlist many times per render, so it's built once per change of its inputs.
+  private var cachedShortlist: CharacterShortlist?
+  /// How many times the shortlist has been built, for tests.
+  private(set) var shortlistBuilds = 0
   private var undoInventory: Inventory?
   private var persistenceAvailable = true
   private var enhancementContext: (pieceName: String, artifact: Artifact)?
@@ -166,15 +188,18 @@ final class Model: ObservableObject {
 
   private func startFreshnessTimer() {
     freshness = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-      Task { @MainActor in
-        guard let self, self.enabled else { return }
-        self.capture.expireDiagnostics()
-        guard self.stability.expire(at: Date()) else { return }
-        self.clearResult()
-        self.status = "No fresh card. Waiting for a readable artifact."
-        self.recordDiagnosticDisplay()
-      }
+      Task { @MainActor in self?.checkFreshness(at: Date()) }
     }
+  }
+
+  /// The freshness timer's tick: clears a card no frame has verified for a while.
+  func checkFreshness(at date: Date) {
+    guard enabled else { return }
+    capture.expireDiagnostics()
+    guard updateStability({ $0.expire(at: date) }) else { return }
+    clearResult()
+    status = "No fresh card. Waiting for a readable artifact."
+    recordDiagnosticDisplay()
   }
 
   var profile: Profile {
@@ -192,10 +217,14 @@ final class Model: ObservableObject {
   var upgradedCount: Int { inventory.artifacts.filter { $0.level == 20 }.count }
   var canSaveCurrent: Bool { enabled && current != nil && stability.isVerified }
   var characterShortlist: CharacterShortlist {
-    CharacterShortlist(
+    if let cachedShortlist { return cachedShortlist }
+    let shortlist = CharacterShortlist(
       matches: characterMatches, artifact: current, selectedCharacterID: selectedCharacterID,
       selectedRoleID: selectedRoleID, leadingCharacterID: verdict?.characterID,
       leadingRoleID: verdict?.roleID, standings: verdict?.standings ?? [:])
+    cachedShortlist = shortlist
+    shortlistBuilds += 1
+    return shortlist
   }
   var selectedMatch: CharacterMatch? { characterShortlist.selectedMatch }
   /// A character role compares with the saved pieces it would wear; a profile follows the picker.
@@ -235,7 +264,7 @@ final class Model: ObservableObject {
       decision = error.localizedDescription
       missedReading(error)
     case .success(let reading):
-      rawText = reading.text
+      if rawText != reading.text { rawText = reading.text }
       do {
         let artifact: Artifact
         if reading.isEnhancement {
@@ -254,21 +283,23 @@ final class Model: ObservableObject {
         }
         parsed = artifact
         decision = "Parsed; checking card stability"
-        stability.observe(artifact.signature, at: Date())
+        updateStability { $0.observe(artifact.signature, at: Date()) }
         guard stability.isVerified else {
           if stability.signature == nil { clearResult() }
-          status =
+          showStatus(
             current == nil
-            ? "Checking the next frame..." : "Rechecking the last verified card. Saving is paused."
+              ? "Checking the next frame..."
+              : "Rechecking the last verified card. Saving is paused."
+          )
           return
         }
         if reading.isEnhancement {
           enhancementContext?.artifact = artifact
-          status =
-            "Enhance verified against the last Inventory card. Odds update after rolls settle."
+          showStatus(
+            "Enhance verified against the last Inventory card. Odds update after rolls settle.")
         } else {
           enhancementContext = (CardParser.pieceName(reading.text), artifact)
-          status = "Live card verified across two frames. Ordinary-drop model only."
+          showStatus("Live card verified across two frames. Ordinary-drop model only.")
         }
         decision = "Parsed and verified across frames"
         if current?.signature == artifact.signature, let key {
@@ -291,31 +322,53 @@ final class Model: ObservableObject {
   private func clearResult() {
     evaluation?.cancel()
     evaluation = nil
-    current = nil
+    overviewFill?.cancel()
+    overviewFill = nil
     displayedDiagnosticSample = nil
     diagnosticRecommendation = nil
-    potential = nil
-    allProfiles = []
-    characterMatches = []
-    verdict = nil
-    evaluationIssue = nil
+    // Card-less frames clear twice a second, so only what's still showing is cleared.
+    if current != nil { current = nil }
+    if potential != nil { potential = nil }
+    if !allProfiles.isEmpty { allProfiles = [] }
+    if !characterMatches.isEmpty { characterMatches = [] }
+    if verdict != nil { verdict = nil }
+    if evaluationIssue != nil { evaluationIssue = nil }
   }
 
   private func resetLiveCard() {
     latestDiagnosticSample = nil
     readingGeneration = UUID()
-    stability = CardStability()
+    updateStability { $0 = CardStability() }
     rawText = ""
     clearResult()
   }
 
   private func missedReading(_ error: Error) {
-    stability.observe(nil, at: Date())
+    updateStability { $0.observe(nil, at: Date()) }
     if stability.signature == nil { clearResult() }
-    status =
+    showStatus(
       current == nil
-      ? error.localizedDescription
-      : "Rechecking the last verified card. Saving is paused. " + error.localizedDescription
+        ? error.localizedDescription
+        : "Rechecking the last verified card. Saving is paused. " + error.localizedDescription)
+  }
+
+  /// Applies a change to `stability`, announcing it only when what views read changes.
+  @discardableResult
+  private func updateStability<Value>(_ change: (inout CardStability) -> Value) -> Value {
+    var next = stability
+    let result = change(&next)
+    if !next.looksSame(as: stability) { objectWillChange.send() }
+    stability = next
+    return result
+  }
+
+  /// Frames arrive twice a second; repeating the same message mustn't redraw every view.
+  private func showStatus(_ message: String) {
+    if status != message { status = message }
+  }
+
+  func setPlacementStatus(_ message: String) {
+    if placementStatus != message { placementStatus = message }
   }
 
   func useText(_ text: String, confirmed: Bool) {
@@ -326,7 +379,7 @@ final class Model: ObservableObject {
       let artifact = try CardParser.parse(
         text, fiveStarsConfirmed: confirmed, rule: special ? .special : .ordinary)
       current = artifact
-      stability.useManual(artifact.signature)
+      updateStability { $0.useManual(artifact.signature) }
       rawText = text
       status = "Manual card. Live capture is stopped."
       issue = nil
@@ -345,6 +398,8 @@ final class Model: ObservableObject {
   @discardableResult
   func evaluate() -> Task<Void, Never>? {
     evaluation?.cancel()
+    overviewFill?.cancel()
+    overviewFill = nil
     potential = nil
     allProfiles = []
     characterMatches = []
@@ -359,30 +414,34 @@ final class Model: ObservableObject {
     let scope = scope
     let excluded = linkedID ?? pool.first { $0.signature == current.signature }?.id
     let diagnosticKey = latestDiagnosticSample
+    let includeOverview = assessmentMode == .profile
     let worker = Task.detached(priority: .userInitiated) {
       guard !Task.isCancelled else {
         return (
-          nil as Result<Potential, Error>?, [(String, Potential)](), [CharacterMatch](),
-          nil as Verdict?
+          nil as Result<Potential, Error>?, [(name: String, result: Potential)](),
+          [CharacterMatch](), nil as Verdict?
         )
       }
+      // One enumeration serves the profile, the presets, every role and the verdict. When it
+      // fails, each of them reports the failure as it would alone.
+      let outcomes = try? RollOutcomes(current)
       let result =
         Result {
           try Potential.evaluate(
-            current, profile: profile, inventory: pool, scope: scope, excluding: excluded)
+            current, profile: profile, inventory: pool, scope: scope, excluding: excluded,
+            outcomes: outcomes)
         }
-      let overview = Profile.presets.compactMap { preset -> (String, Potential)? in
-        guard !Task.isCancelled,
-          let result = try? Potential.evaluate(
-            current, profile: preset, inventory: pool, scope: scope, excluding: excluded)
-        else { return nil }
-        return (preset.id, result)
-      }
-      let matches = CharacterAssessment.evaluate(current, inventory: pool, excluding: excluded)
+      let overview =
+        includeOverview
+        ? Self.profileOverview(
+          current, inventory: pool, scope: scope, excluding: excluded, outcomes: outcomes) : []
+      let matches = CharacterAssessment.evaluate(
+        current, inventory: pool, excluding: excluded, outcomes: outcomes)
       let verdict =
         Task.isCancelled
         ? nil
-        : VerdictEngine.evaluate(current, matches: matches, inventory: pool, excluding: excluded)
+        : VerdictEngine.evaluate(
+          current, matches: matches, inventory: pool, excluding: excluded, outcomes: outcomes)
       return (Optional(result), overview, matches, verdict)
     }
     evaluation = Task {
@@ -399,7 +458,8 @@ final class Model: ObservableObject {
         potential = value
       case .failure(let error): evaluationIssue = error.localizedDescription
       }
-      allProfiles = overview
+      // An overview filled since this started, by switching to manual-profile mode, stays.
+      if includeOverview { allProfiles = overview }
       characterMatches = matches
       self.verdict = verdict
       refreshDiagnosticRecommendation()
@@ -408,6 +468,48 @@ final class Model: ObservableObject {
       }
     }
     return evaluation
+  }
+
+  nonisolated private static func profileOverview(
+    _ artifact: Artifact, inventory: [Artifact], scope: ComparisonScope, excluding: UUID?,
+    outcomes: RollOutcomes?
+  ) -> [(name: String, result: Potential)] {
+    Profile.presets.compactMap { preset in
+      guard !Task.isCancelled,
+        let result = try? Potential.evaluate(
+          artifact, profile: preset, inventory: inventory, scope: scope, excluding: excluding,
+          outcomes: outcomes)
+      else { return nil }
+      return (preset.id, result)
+    }
+  }
+
+  /// Character mode skips the preset overview, so switching to manual-profile mode fills it in
+  /// without touching the character results on screen.
+  private func fillProfileOverview() {
+    overviewFill?.cancel()
+    overviewFill = nil
+    guard enabled, let current else { return }
+    let generation = readingGeneration
+    let pool = inventory.artifacts
+    let scope = scope
+    let excluded = linkedID ?? pool.first { $0.signature == current.signature }?.id
+    let worker = Task.detached(priority: .userInitiated) {
+      Self.profileOverview(
+        current, inventory: pool, scope: scope, excluding: excluded,
+        outcomes: try? RollOutcomes(current))
+    }
+    overviewFill = Task {
+      let result = await withTaskCancellationHandler {
+        await worker.value
+      } onCancel: {
+        worker.cancel()
+      }
+      guard !Task.isCancelled, enabled, readingGeneration == generation,
+        assessmentMode == .profile, self.current?.signature == current.signature
+      else { return }
+      allProfiles = result
+    }
   }
 
   func saveCurrent(copy: Bool = false) {

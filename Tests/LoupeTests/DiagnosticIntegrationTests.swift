@@ -148,7 +148,7 @@ private final class DiagnosticFreezeGate {
 }
 
 @MainActor
-private func diagnosticEnhanceImage() throws -> CGImage {
+func diagnosticEnhanceImage() throws -> CGImage {
   let context = try #require(
     CGContext(
       data: nil, width: 1152, height: 768, bitsPerComponent: 8, bytesPerRow: 0,
@@ -235,7 +235,7 @@ private func diagnosticEnhanceImage() throws -> CGImage {
 }
 
 @MainActor
-@Test func diagnosticIntegrationInventoryRetainsOnlyItsExistingSelectedCardCrop() throws {
+func diagnosticInventoryImage() throws -> CGImage {
   let context = try #require(
     CGContext(
       data: nil, width: 1152, height: 768, bitsPerComponent: 8, bytesPerRow: 0,
@@ -257,7 +257,12 @@ private func diagnosticEnhanceImage() throws -> CGImage {
       ])
   }
   NSGraphicsContext.restoreGraphicsState()
-  let image = try #require(context.makeImage())
+  return try #require(context.makeImage())
+}
+
+@MainActor
+@Test func diagnosticIntegrationInventoryRetainsOnlyItsExistingSelectedCardCrop() throws {
+  let image = try diagnosticInventoryImage()
   var enabled = try DiagnosticReader(sessionID: UUID())
   enabled.setEnabled(true)
   var disabled = LiveCardOCR()

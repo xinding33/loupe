@@ -55,7 +55,8 @@ final class DiagnosticReportFlow: ObservableObject {
 
   func updateCoverage(_ value: DiagnosticCoverage, session: UUID) {
     guard session == sessionID, optedIn else { return }
-    guard case .idle = phase else { return }
+    // Each frame reports coverage more than once, usually unchanged.
+    guard case .idle = phase, coverage != value else { return }
     coverage = value
   }
 

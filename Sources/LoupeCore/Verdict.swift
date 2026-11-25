@@ -108,10 +108,11 @@ public struct VerdictPolicy: Sendable {
 /// `offSetFinishedBar`. Below it the role cannot level, keep or rescue the piece.
 public enum VerdictEngine {
   /// Decides from the artifact's character matches and the saved +20 inventory.
-  /// `excluding` removes the saved record of this same piece from comparisons.
+  /// `excluding` removes the saved record of this same piece from comparisons. `outcomes` is an
+  /// enumeration the caller already holds; one for another artifact is ignored.
   public static func evaluate(
     _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact],
-    excluding: UUID? = nil, policy: VerdictPolicy = .standard
+    excluding: UUID? = nil, policy: VerdictPolicy = .standard, outcomes: RollOutcomes? = nil
   ) -> Verdict {
     var standings: [String: RoleStanding] = [:]
     var verdict =
@@ -121,14 +122,14 @@ public enum VerdictEngine {
         standings: &standings)
       : ordinary(
         artifact, matches: matches, inventory: inventory, excluding: excluding, policy: policy,
-        standings: &standings)
+        outcomes: outcomes, standings: &standings)
     verdict.standings = standings
     return verdict
   }
 
   private static func ordinary(
     _ artifact: Artifact, matches: [CharacterMatch], inventory: [Artifact], excluding: UUID?,
-    policy: VerdictPolicy, standings: inout [String: RoleStanding]
+    policy: VerdictPolicy, outcomes: RollOutcomes?, standings: inout [String: RoleStanding]
   ) -> Verdict {
     let kind = "\(artifact.main.label) \(artifact.slot.plural)"
     guard !matches.isEmpty else {
@@ -145,7 +146,10 @@ public enum VerdictEngine {
     for role in roles where !role.clearsOffSetBar {
       standings[role.match.roleID] = .offSetBelowBar(role.offSetBar!)
     }
-    let outcomes = artifact.level == 20 ? nil : try? RollOutcomes(artifact)
+    let outcomes =
+      artifact.level == 20
+      ? nil
+      : outcomes.flatMap { $0.artifact == artifact ? $0 : nil } ?? (try? RollOutcomes(artifact))
     if artifact.level < 20 && outcomes == nil {
       return Verdict(
         kind: .review,
