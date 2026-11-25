@@ -413,7 +413,7 @@ final class Model: ObservableObject {
     let profile = profile
     let pool = inventory.artifacts
     let scope = scope
-    let excluded = linkedID ?? pool.first { $0.signature == current.signature }?.id
+    let excluded = linkedID ?? pool.first { $0.identity == current.identity }?.id
     let diagnosticKey = latestDiagnosticSample
     let includeOverview = assessmentMode == .profile
     let worker = Task.detached(priority: .userInitiated) {
@@ -494,7 +494,7 @@ final class Model: ObservableObject {
     let generation = readingGeneration
     let pool = inventory.artifacts
     let scope = scope
-    let excluded = linkedID ?? pool.first { $0.signature == current.signature }?.id
+    let excluded = linkedID ?? pool.first { $0.identity == current.identity }?.id
     let worker = Task.detached(priority: .userInitiated) {
       Self.profileOverview(
         current, inventory: pool, scope: scope, excluding: excluded,
@@ -684,7 +684,7 @@ final class Model: ObservableObject {
     let match = assessmentMode == .characters ? selectedMatch : nil
     let scoringProfile = assessmentMode == .characters ? match?.profile : profile
     if diagnostics.optedIn, let current, let result = displayedPotential, let scoringProfile {
-      let excluded = linkedID ?? inventory.artifacts.first { $0.signature == current.signature }?.id
+      let excluded = linkedID ?? inventory.artifacts.first { $0.identity == current.identity }?.id
       diagnosticRecommendation = DiagnosticRecommendation.evaluated(
         current, result: result, profile: scoringProfile,
         pool: inventory.artifacts, scope: displayedScope, excluded: excluded, match: match)

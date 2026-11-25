@@ -227,8 +227,13 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
       })
   }
 
-  public var signature: String {
-    "\(setKey)|\(slot.rawValue)|\(main.rawValue)|\(level)|\(rule.rawValue)|"
+  /// Everything read from the card, for read stability and "is this still the piece on screen".
+  public var signature: String { key(rule: rule.rawValue) }
+  /// What makes two records the same saved piece. The roll rule says how the remaining rolls
+  /// land, and a finished piece has none left, so it is the same piece under either rule.
+  public var identity: String { isFinished ? key(rule: "") : signature }
+  private func key(rule: String) -> String {
+    "\(setKey)|\(slot.rawValue)|\(main.rawValue)|\(level)|\(rule)|"
       + substats.sorted { $0.key.rawValue < $1.key.rawValue }.map {
         "\($0.key.rawValue):\($0.value)"
       }.joined(separator: ",") + "|\(unactivated.map { "\($0.key.rawValue):\($0.value)" } ?? "")"

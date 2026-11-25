@@ -89,14 +89,15 @@ public struct VerdictPolicy: Sendable {
 /// Verdicts follow the best roll grade among the piece's roles (`RollGrade`). A main-stat-only
 /// fit whose saved pool has room ranks below S and A and above B.
 /// - Unfinished: S levels to +20. A and B level to the next checkpoint, where the grade is read
-///   again, so EXP follows the rolls. C and D are fodder unless the saved pool is thin but not
-///   empty. Main-stat-only fits level while the pool has room. Supports, roles without both crit
+///   again, so EXP follows the rolls. D is fodder, and so is C unless it is a sands, goblet or
+///   circlet whose saved pool is thin but not empty; flowers and plumes drop too often for that.
+///   Main-stat-only fits level while the pool has room. Supports, roles without both crit
 ///   stats, mostly need their main stat, and a flower suits nearly every support, so a support's
 ///   grade levels a flower or plume only at S. A support's A or B levels a sands, goblet or
 ///   circlet one checkpoint while few of that main stat are saved, like a main-stat-only fit.
 /// - Finished: S and A are kept. B, or A or B for a support, is kept while it ranks among the
-///   saved pieces a role can use and reviewed when nothing is saved. C is reviewed only when that
-///   pool is thin but not empty, and D is fodder.
+///   saved pieces a role can use and reviewed when nothing is saved. A C sands, goblet or circlet
+///   is reviewed only when that pool is thin but not empty; other C pieces and D are fodder.
 /// A role is covered when enough saved +20 pieces of the same slot and main stat already beat the
 /// piece's best outcome for it. An on-set role counts only saved pieces of this set, which are
 /// what it would wear instead; an off-piece role counts every set. Covered roles do not decide
@@ -105,7 +106,7 @@ public struct VerdictPolicy: Sendable {
 /// or not. A covered B can still end as fodder.
 /// A 4+1 build rarely takes its off-piece in the flower or plume slot, so an off-set flower or
 /// plume counts for a role only at a higher grade, `VerdictPolicy.offSetUnfinishedBar` and
-/// `offSetFinishedBar`. Below it the role cannot level, keep or rescue the piece.
+/// `offSetFinishedBar`. Below it the role cannot level or keep the piece.
 public enum VerdictEngine {
   /// Decides from the artifact's character matches and the saved +20 inventory.
   /// `excluding` removes the saved record of this same piece from comparisons. `outcomes` is an
@@ -245,14 +246,18 @@ public enum VerdictEngine {
         open.filter {
           $0.isSupport && ($0.grade == .a || $0.grade == .b) && $0.saved.count < $0.backups
         })
-    // Any C role whose saved pool is thin can rescue the piece; supports only once it is
-    // finished, since their grade levels only at S. An empty pool usually means the bag was not
-    // scanned, so it does not make a C piece worth it.
-    let thin = strongest(
-      open.filter {
-        $0.grade == .c && !$0.saved.isEmpty && $0.saved.count < $0.backups
-          && (finished || !$0.isSupport)
-      })
+    // Any C role whose saved pool of sands, goblets or circlets is thin can rescue the piece;
+    // supports only once it is finished, since their grade levels only at S. Every flower and
+    // plume shares one main stat, so a thin pool of them soon fills with better drops. An empty
+    // pool usually means the bag was not scanned, so it does not make a C piece worth it.
+    let thin =
+      flowerOrPlume
+      ? nil
+      : strongest(
+        open.filter {
+          $0.grade == .c && !$0.saved.isEmpty && $0.saved.count < $0.backups
+            && (finished || !$0.isSupport)
+        })
     let mainFit = { (role: RoleContext) in
       "Main stat fills a gap: \(role.count(role.saved.count))"
     }
