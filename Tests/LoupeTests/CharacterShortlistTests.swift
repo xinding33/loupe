@@ -186,15 +186,15 @@ private func expandedMatches(_ artifact: Artifact) throws -> [CharacterMatch] {
     syntheticMatch("grace", artifact: artifact, setFit: .preferred, grade: .b),
     syntheticMatch("margaret", artifact: artifact, usefulStats: [.elementalMastery]),
   ]
-  // Ada's S comes from an off-set flower, which the verdict sets aside.
+  // Saved pieces Ada would wear beat her S, so the verdict sets her aside.
   let shortlist = CharacterShortlist(
     matches: matches, artifact: artifact, selectedCharacterID: nil,
-    standings: ["ada.synthetic": .rareOffPiece, "grace.synthetic": .open])
+    standings: ["ada.synthetic": .covered(3), "grace.synthetic": .open])
   #expect(
     shortlist.allMatches.map(\.characterID) == [
       "dorothy", "anna", "evelyn", "grace", "margaret", "ada",
     ])
-  #expect(shortlist.standing(matches[0]) == .rareOffPiece)
+  #expect(shortlist.standing(matches[0]) == .covered(3))
   // Roles missing from the standings are open.
   #expect(shortlist.standing(matches[1]) == .open)
 }
@@ -432,7 +432,7 @@ func shortlistFixedMainDoesNotCountAsCoreFit(slot: Slot) throws {
   #expect(standings == standings.sorted { $0 && !$1 })
   #expect(standings.filter { $0 }.count >= 3)
   let gorou = try #require(shortlist.allMatches.first { $0.characterID == "gorou" })
-  #expect(shortlist.standing(gorou) == .rareOffPiece)
+  #expect(shortlist.standing(gorou) == .offSetBelowBar(.s))
   #expect(
     RoleRowStatus(gorou, standing: shortlist.standing(gorou), artifact: model.current!).setAside)
 }

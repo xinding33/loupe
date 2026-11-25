@@ -1,6 +1,6 @@
 # Artifact grading: approach
 
-Date: 2026-10-22, grades and verdicts revised 2026-10-26
+Date: 2026-10-22, grades and verdicts revised 2026-10-26, verdicts revised 2026-11-24
 Status: direction agreed with the user. Steps 1 to 4 are implemented; the rest is planned.
 
 This page records the research behind the grading direction, the decisions the
@@ -205,9 +205,16 @@ the shortlist unless the user picked another. Defaults live in
 Since 2026-10-26 verdicts follow the best roll grade among the piece's roles.
 Ties go to the role likelier to wear the piece, then the rarer result: more
 drops to replace a finished piece, or a likelier A for an unfinished one. A
-role is set aside when its saved +20 pieces of this slot and main stat
-already include as many as its group can use (see below) that beat the
-piece's best outcome.
+role is covered when its saved +20 pieces of this slot and main stat already
+include as many as its group can use (see below) that beat the piece's best
+outcome. Covered roles do not decide the verdict.
+
+**Spares (2026-11-24).** Saved pieces never make a good piece fodder. When the
+uncovered roles would make it fodder and a covered role grades it S, or A for
+a damage role, the piece is kept as a spare: "A · spare; 1 saved Golden
+Troupe HP flower scores higher". An unfinished spare is kept, not leveled,
+since leveling cannot beat what is saved. A covered B, C or D can still end
+as fodder.
 
 **Set and slot.** An on-set role compares only with saved pieces of this set,
 which its four-piece build would wear instead; its group is the on-set roles
@@ -215,10 +222,16 @@ with the same profile. An off-piece role compares with every set. A 4+1
 build's one off-set piece is usually the goblet, sometimes the sands or
 circlet, and rarely the flower or plume, so `CharacterMatch.wearRank` orders
 preferred set, then alternative set or off-set goblet, then off-set sands or
-circlet, then off-set flower or plume. An off-set flower or plume is set aside
-outright (`RoleStanding.rareOffPiece`). 2+2 builds are not modeled. The verdict
-publishes each role's standing, and the shortlist lists open roles first,
-then by grade, wear rank and rarity, dimming the rest. Four-star pieces mark a
+circlet, then off-set flower or plume. From 2026-10-26 to 2026-11-23 an
+off-set flower or plume was set aside outright. Since 2026-11-24 it counts at
+a higher bar, `VerdictPolicy.offSetUnfinishedBar` and `offSetFinishedBar`,
+both S by default: an S levels an unfinished piece to +20 and keeps a finished
+one. Off-set flowers and plumes are rarer than off-set goblets, not useless. Below the bar the role counts for nothing: it
+cannot level the piece, fill a gap or rescue a thin pool
+(`RoleStanding.offSetBelowBar`). 2+2 builds are not modeled. The verdict
+publishes each role's standing, and the shortlist lists the verdict's role
+first, which can be a covered role kept as a spare, then open roles, by grade,
+wear rank and rarity, dimming the rest. Four-star pieces mark a
 role covered once enough copies are saved and none has fewer useful lines for
 it.
 
@@ -236,14 +249,22 @@ An empty pool does not rescue a C piece, since it usually means an unscanned
 bag.
 
 **Many roles, one piece.** A grade is per role, about 1 in 5 pieces A or
-better, but there is no ownership filter and a flower suits all of them.
+better, but there is no ownership filter and a flower suits all of them. The
+owner decided against one on 2026-11-23: they want to keep good pieces for
+characters they may own later, and with only 12 archetypes it would remove
+few roles.
 Granting S and A a straight Level to +20 for any role would have sent 43% of
 new flowers to +20. A first draft that let supports' A and B count leveled 96%
 of flowers to at least +4. So:
 
 - A and B level one checkpoint at a time, where the grade is read again.
-- Supports, roles without both crit stats, level a piece only at S. A finished
-  support A or B follows the B rule.
+- Supports, roles without both crit stats, level a flower or plume only at S.
+  A finished support A or B follows the B rule.
+- Since 2026-11-24 a support's A or B levels a sands, goblet or circlet one
+  checkpoint while fewer of that main stat are saved than its group can use,
+  like a main-stat-only fit. Supports mostly need the main stat, and those
+  slots have many main stats. Once the pool is full, only S levels. A support's
+  A ranks above a main-stat-only fit and its B below, after a damage role's B.
 
 The 2026-10-22 keeper rules below are kept for reference; the replacement
 estimate still appears in Keep reasons.
@@ -299,7 +320,36 @@ domain drops per row:
 
 About 1% of new flowers level straight to +20; everything else levels a
 checkpoint at a time. Keep stays high on flowers because each damage
-archetype's S and A count. An ownership filter would bring both down.
+archetype's S and A count. An ownership filter would bring both down; it was
+decided against on 2026-11-23 (see above).
+
+Measured on 2026-11-24 with a new harness, so the rows are not comparable with
+the tables above: 1,500 random five-star domain drops per slot, sets drawn
+from those the roster uses, every archetype role. Each drop is graded at +0
+and again after random upgrades to +20. Shares are Keep / Level / Review /
+Fodder at +0 and Keep / Review / Fodder at +20.
+
+| Saved inventory | Rules | Flower | Plume | Sands | Goblet | Circlet |
+| --- | --- | --- | --- | --- | --- | --- |
+| None | 2026-10-26 | 0/29/0/71; 22/22/56 | 0/29/0/71; 23/20/57 | 0/58/0/42; 50/18/33 | 0/45/0/55; 37/15/48 | 0/36/0/64; 37/21/42 |
+| None | 2026-11-24 | 0/29/0/71; 26/21/53 | 0/29/0/71; 26/20/54 | 0/71/0/29; 50/18/33 | 0/56/0/44; 37/15/48 | 0/57/0/43; 37/21/42 |
+
+With 30 random +20 pieces saved per slot, the old rules gave flowers
+0/37/0/63; 34/16/50, sands 0/47/0/53; 42/5/52, goblets 0/38/0/62; 39/6/56 and
+circlets 0/28/0/72; 37/11/52. The new rules give flowers 0/37/0/63; 38/15/47,
+sands 0/50/0/50; 44/5/51, goblets 0/39/0/61; 39/6/55 and circlets
+0/36/0/64; 38/11/51. Plumes follow flowers.
+
+Supports' A and B raise leveling on sands, goblets and circlets. Spares add a
+few points of finished Keep once pieces are saved. Off-set S flowers and
+plumes add about four points of finished Keep.
+
+Both off-set bars were measured at A as well. A finished bar at A keeps a
+finished flower for an A from any damage archetype of any set: finished
+flowers end 48/34/18 with nothing saved and 65/11/24 with 30 random saved, so
+about half of all finished flowers are kept. An unfinished bar at A levels an
+off-set A one checkpoint: +0 flowers and plumes level at 48% with nothing
+saved and 52% with 30 random saved. Both stay at S.
 
 Not implemented: role-free dominance, reshape candidates, chance against the
 equipped piece, and an off-piece margin over the best on-set piece. The
@@ -339,8 +389,7 @@ review report. The output is local-only.
    [archetypes](archetypes.md) rather than one reviewed build each.
    Damage-derived weights for close calls remain open.
 
-Open questions: an ownership filter, perhaps from the characters in a GOOD
-import, so verdicts count only the user's roles; verdict defaults tuned on a
-real scanned inventory;
+Open questions: verdict defaults tuned on a real scanned inventory, including
+the off-set bars; an ownership filter was decided against on 2026-11-23;
 whether the inventory card's equipped-by line can be read reliably; how to
 model reshaped and Transmuter pieces, which the ordinary model excludes.
