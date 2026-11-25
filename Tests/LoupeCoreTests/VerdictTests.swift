@@ -110,7 +110,7 @@ struct VerdictTests {
     #expect(Self.verdict(junk).reason == "D for every role")
   }
 
-  @Test func aSupportsGradeLevelsOnlyAtS() throws {
+  @Test func aSupportsGradeLevelsAFlowerOnlyAtS() throws {
     // EM and ER on a four-line start: A for an EM support, D for an ATK crit role.
     let em = try Artifact(
       setName: "Test", slot: .flower, main: .hp, level: 0,
@@ -122,7 +122,14 @@ struct VerdictTests {
     let verdict = Self.verdict(em, [Self.crit, support])
     #expect(verdict.kind == .fodder)
     #expect(verdict.characterID == "support")
-    #expect(verdict.reason == "A for a support; supports level only at S")
+    #expect(verdict.reason == "A for a support; supports level flowers only at S")
+    // Off-set, that A is below the bar, so the crit role's D is named and scoped.
+    let offSet = Self.role(
+      "support", useful: [.elementalMastery], secondary: [.energyRecharge], fit: nil)
+    let scoped = Self.verdict(em, [Self.crit, offSet])
+    #expect(scoped.kind == .fodder)
+    #expect(scoped.characterID == "crit")
+    #expect(scoped.reason == "D for on-set and damage roles; off-set flowers need S")
     // Finished, the same support grade asks for a comparison rather than discarding it.
     let finished = try Artifact(
       setName: "Test", slot: .flower, main: .hp, level: 20,
@@ -136,6 +143,48 @@ struct VerdictTests {
     #expect(review.reason.hasSuffix("for a support · no saved +20 Test HP flowers to compare yet"))
   }
 
+  @Test func aSupportsAOrBLevelsASandsWhileFewAreSaved() throws {
+    // ER and ATK% on an EM sands: A for an ER support, D for an ATK crit role.
+    let sands = try Artifact(
+      setName: "Test", slot: .sands, main: .elementalMastery, level: 0,
+      substats: [
+        Substat(.energyRecharge, 6.48), Substat(.atkPercent, 5.83), Substat(.def, 23.15),
+        Substat(.hp, 298.75),
+      ])
+    let support = Self.role("support", useful: [.energyRecharge], secondary: [.atkPercent])
+    let level = Self.verdict(sands, [Self.crit, support])
+    #expect(level.grade == .a)
+    #expect(level.title == "Level to +4")
+    #expect(level.characterID == "support")
+    #expect(level.reason == "A for a support · 0 saved Test Elemental Mastery sands")
+    // One weaker saved sands fills the pool of a lone support.
+    let weaker = try Artifact(
+      setName: "Test", slot: .sands, main: .elementalMastery, level: 20,
+      substats: [
+        Substat(.energyRecharge, 6.48), Substat(.def, 138.9), Substat(.hp, 298.75),
+        Substat(.atk, 19.45),
+      ])
+    let full = Self.verdict(sands, [Self.crit, support], inventory: [weaker])
+    #expect(full.standings["support.synthetic"] == .open)
+    #expect(full.kind == .fodder)
+    #expect(full.reason == "A for a support; 1 saved Test Elemental Mastery sands is enough")
+    // A B levels too, but a main-stat gap ranks above it and gives the reason.
+    let low = try Artifact(
+      setName: "Test", slot: .sands, main: .elementalMastery, level: 0,
+      substats: [
+        Substat(.energyRecharge, 4.53), Substat(.critRate, 2.72), Substat(.def, 16.2),
+        Substat(.hp, 209.13),
+      ])
+    let b = Self.verdict(low, [support])
+    #expect(b.grade == .b)
+    #expect(b.title == "Level to +4")
+    #expect(b.reason == "B for a support · 0 saved Test Elemental Mastery sands")
+    let em = Self.role("em", useful: [.elementalMastery])
+    let gap = Self.verdict(low, [support, em])
+    #expect(gap.characterID == "em")
+    #expect(gap.reason == "Main stat fills a gap: 0 saved Test Elemental Mastery sands")
+  }
+
   @Test func aThinButScannedPoolRescuesACPiece() throws {
     let oneCrit = try Artifact(
       setName: "Test", slot: .plume, main: .atk, level: 0,
@@ -146,7 +195,7 @@ struct VerdictTests {
     let weak = try Self.plume(cr: 1)
     let level = Self.verdict(oneCrit, [Self.crit, twin], inventory: [weak])
     #expect(level.title == "Level to +4")
-    #expect(level.reason == "C · only 1 saved Test ATK plumes")
+    #expect(level.reason == "C · only 1 saved Test ATK plume")
     // An empty pool usually means an unscanned bag.
     #expect(Self.verdict(oneCrit, [Self.crit, twin]).kind == .fodder)
   }
@@ -170,7 +219,7 @@ struct VerdictTests {
     #expect(matches.contains { $0.grades?.grade == .c && $0.usefulStats == [.hpPercent] })
     let verdict = VerdictEngine.evaluate(circlet, matches: matches, inventory: [weaker])
     #expect(verdict.kind == .review)
-    #expect(verdict.reason == "C · only 1 saved Healing Bonus circlets")
+    #expect(verdict.reason == "C · only 1 saved Healing Bonus circlet")
   }
 
   @Test func savedPiecesBeyondTheBestOutcomeMakeItFodder() throws {
@@ -185,6 +234,38 @@ struct VerdictTests {
     // The candidate's own saved record is not a comparison.
     let own = Self.verdict(starter, inventory: [strong], excluding: strong.id)
     #expect(own.kind == .level)
+  }
+
+  @Test func aCoveredUnfinishedAIsKeptAsASpare() throws {
+    let doubleCrit = try Artifact(
+      setName: "Test", slot: .plume, main: .atk, level: 0,
+      substats: [Substat(.critRate, 3.9), Substat(.atkPercent, 5.3), Substat(.critDamage, 7.8)],
+      unactivated: Substat(.hp, 269))
+    let strong = try Self.plume(cr: 4, cd: 3, atk: 1)
+    let spare = Self.verdict(doubleCrit, inventory: [strong])
+    #expect(spare.standings == ["crit.synthetic": .covered(1)])
+    #expect(spare.kind == .keep)
+    #expect(spare.grade == .a)
+    #expect(spare.reason == "A · spare; 1 saved Test ATK plume beats its best outcome")
+    // With nothing saved a role is never covered, whatever the policy.
+    var none = VerdictPolicy()
+    none.maxBackups = 0
+    let open = Self.verdict(doubleCrit, policy: none)
+    #expect(open.standings == ["crit.synthetic": .open])
+    #expect(open.title == "Level to +4")
+  }
+
+  @Test func aSpareIsKeptForItsOnSetRoleNotAnOffSetOne() throws {
+    let useful: [Stat] = [.atkPercent, .critRate, .critDamage]
+    let offPiece = Self.role("off", useful: useful, secondary: [.energyRecharge], fit: nil)
+    let piece = try Self.plume(cr: 3, cd: 1)
+    let strong = try Self.plume(cr: 4, cd: 3, atk: 1)
+    let spare = Self.verdict(piece, [offPiece, Self.crit], inventory: [strong])
+    #expect(
+      spare.standings == ["off.synthetic": .offSetBelowBar(.s), "crit.synthetic": .covered(1)])
+    #expect(spare.kind == .keep)
+    #expect(spare.characterID == "crit")
+    #expect(spare.reason == "A · spare; 1 saved Test ATK plume scores higher")
   }
 
   @Test func finishedSAndAAreKeptWithTheirReplacementOdds() throws {
@@ -208,13 +289,20 @@ struct VerdictTests {
     let weaker = try Self.plume(cr: 1)
     let stronger = try Self.plume(cr: 3, cd: 1)
     #expect(
-      Self.verdict(piece, inventory: [weaker]).reason == "B · beats all 1 saved Test ATK plumes")
+      Self.verdict(piece, inventory: [weaker]).reason == "B · beats the 1 saved Test ATK plume")
     #expect(
       Self.verdict(piece, inventory: [try piece.withID(UUID())]).reason
-        == "B · tied for best of 1 saved Test ATK plumes")
+        == "B · tied with the 1 saved Test ATK plume")
+    // Saved pieces never make an A fodder, but a covered B can still be.
     let fodder = Self.verdict(piece, inventory: [stronger])
     #expect(fodder.kind == .fodder)
     #expect(fodder.reason == "Enough saved Test ATK plumes beat it for every role")
+    // Beside a role that grades it lower, the covered B gives the reason.
+    let em = Self.role("em", useful: [.elementalMastery])
+    let mixed = Self.verdict(piece, [Self.crit, em], inventory: [stronger])
+    #expect(mixed.kind == .fodder)
+    #expect(mixed.characterID == "crit")
+    #expect(mixed.reason == "B · 1 saved Test ATK plume beats it")
   }
 
   @Test func rolesSharingAProfileShareTheirBackups() throws {
@@ -256,11 +344,11 @@ struct VerdictTests {
     #expect(verdict.kind == .review)
     #expect(verdict.reason.contains("fourth stat"))
     #expect(verdict.chanceOfAOrBetter == nil)
-    // Set and slot still set aside an off-set plume without a forecast.
+    // Set and slot still set aside an off-set plume without a forecast, which has no grade.
     let offPiece = Self.role("off", useful: [.atkPercent, .critRate, .critDamage], fit: nil)
     let mixed = Self.verdict(incomplete, [Self.crit, offPiece])
     #expect(mixed.kind == .review)
-    #expect(mixed.standings == ["off.synthetic": .rareOffPiece])
+    #expect(mixed.standings == ["off.synthetic": .offSetBelowBar(.s)])
   }
 
   /// A finished Pyro DMG goblet with maximum rolls on the named lines.
@@ -293,31 +381,91 @@ struct VerdictTests {
     #expect(onSet.kind == .keep)
     #expect(onSet.grade == .a)
     #expect(onSet.standings == ["crit.synthetic": .open])
-    // Saved pieces of its own set still cover it.
+    // Saved pieces of its own set still cover it, but they never make an A fodder.
     let own = try (0..<3).map { _ in try Self.plume(cr: 4, cd: 3) }
     let covered = Self.verdict(piece, inventory: own)
-    #expect(covered.kind == .fodder)
     #expect(covered.standings == ["crit.synthetic": .covered(3)])
-    #expect(covered.reason == "Enough saved Test ATK plumes beat it for every role")
+    #expect(covered.kind == .keep)
+    #expect(covered.grade == .a)
+    #expect(covered.reason == "A · spare; 3 saved Test ATK plumes score higher")
   }
 
-  @Test func offSetFlowersAndPlumesNeverDriveTheVerdict() throws {
-    let piece = try Self.plume(cr: 4, cd: 3)
-    let offPiece = Self.role("off", useful: [.atkPercent, .critRate, .critDamage], fit: nil)
-    let alone = Self.verdict(piece, [offPiece])
-    #expect(alone.kind == .fodder)
-    #expect(alone.standings == ["off.synthetic": .rareOffPiece])
-    #expect(alone.reason == "No role runs Test; off-set plumes are rarely worn")
-    // The on-set role leads, though the off-piece grades the same.
-    let onSet = Self.role("set", useful: [.atkPercent, .critRate, .critDamage])
-    let mixed = Self.verdict(piece, [offPiece, onSet])
-    #expect(mixed.characterID == "set")
-    #expect(mixed.standings["off.synthetic"] == .rareOffPiece)
-    // With the on-set role covered, the reason names the set.
-    let own = try (0..<3).map { _ in try Self.plume(cr: 4, cd: 3, atk: 1) }
+  @Test func offSetFlowersAndPlumesCountAtAHigherBar() throws {
+    let useful: [Stat] = [.atkPercent, .critRate, .critDamage]
+    let offPiece = Self.role("off", useful: useful, secondary: [.energyRecharge], fit: nil)
+    // Finished, only S counts, and it keeps the piece.
+    let finishedS = Self.verdict(try Self.plume(cr: 4, cd: 3, atk: 1), [offPiece])
+    #expect(finishedS.grade == .s)
+    #expect(finishedS.kind == .keep)
+    #expect(finishedS.standings == ["off.synthetic": .open])
+    #expect(finishedS.reason.hasPrefix("S off-set · "))
+    let finishedA = Self.verdict(try Self.plume(cr: 3, cd: 1), [offPiece])
+    #expect(finishedA.kind == .fodder)
+    #expect(finishedA.standings == ["off.synthetic": .offSetBelowBar(.s)])
+    #expect(finishedA.reason == "A as an off-set plume; needs S")
+    // With the finished bar at A, an A keeps the piece and a B does not.
+    var lower = VerdictPolicy()
+    lower.offSetFinishedBar = .a
+    let a = Self.verdict(try Self.plume(cr: 3, cd: 1), [offPiece], policy: lower)
+    #expect(a.grade == .a)
+    #expect(a.kind == .keep)
+    #expect(a.standings == ["off.synthetic": .open])
+    #expect(a.reason.hasPrefix("A off-set · "))
+    let b = Self.verdict(try Self.plume(cr: 2, atk: 1), [offPiece], policy: lower)
+    #expect(b.kind == .fodder)
+    #expect(b.standings == ["off.synthetic": .offSetBelowBar(.a)])
+    #expect(b.reason == "B as an off-set plume; needs A or better")
+    // Unfinished, only S counts, and it levels to +20.
+    let perfect = try Artifact(
+      setName: "Test", slot: .plume, main: .atk, level: 0,
+      substats: [
+        Substat(.critRate, 2.72), Substat(.atkPercent, 4.08), Substat(.critDamage, 5.44),
+        Substat(.energyRecharge, 4.53),
+      ])
+    let s = Self.verdict(perfect, [offPiece])
+    #expect(s.title == "Level to +20")
+    #expect(s.reason == "S off-set · could be one of your best")
+    let doubleCrit = try Artifact(
+      setName: "Test", slot: .plume, main: .atk, level: 0,
+      substats: [Substat(.critRate, 3.9), Substat(.atkPercent, 5.3), Substat(.critDamage, 7.8)],
+      unactivated: Substat(.hp, 269))
+    let unfinishedA = Self.verdict(doubleCrit, [offPiece])
+    #expect(unfinishedA.kind == .fodder)
+    #expect(unfinishedA.standings == ["off.synthetic": .offSetBelowBar(.s)])
+    #expect(unfinishedA.reason == "A as an off-set plume; needs S")
+    // The bars are policy.
+    var policy = VerdictPolicy()
+    policy.offSetUnfinishedBar = .a
+    #expect(Self.verdict(doubleCrit, [offPiece], policy: policy).title == "Level to +4")
+    // The on-set role leads, though the off-piece grades the same and clears its bar.
+    let onSet = Self.role("set", useful: useful)
     #expect(
-      Self.verdict(piece, [offPiece, onSet], inventory: own).reason
-        == "Enough saved Test ATK plumes beat it for every role on this set")
+      Self.verdict(try Self.plume(cr: 3, cd: 1), [offPiece, onSet], policy: lower).characterID
+        == "set")
+  }
+
+  @Test func anOffSetPlumeBelowTheBarFillsNoGapOrThinPool() throws {
+    // A flat-ATK role fits a plume by main stat only.
+    let flat = Self.role("flat", useful: [.atk])
+    let offFlat = Self.role("offflat", useful: [.atk], fit: nil)
+    let piece = try Self.plume(cr: 1)
+    #expect(Self.verdict(piece, [flat]).reason == "Main stat fills a gap: 0 saved Test ATK plumes")
+    let gap = Self.verdict(piece, [offFlat])
+    #expect(gap.kind == .fodder)
+    #expect(gap.standings == ["offflat.synthetic": .offSetBelowBar(.s)])
+    #expect(gap.reason == "Off-set plumes count only at S")
+    // A C with one weaker saved plume levels on-set, not off-set.
+    let oneCrit = try Artifact(
+      setName: "Test", slot: .plume, main: .atk, level: 0,
+      substats: [Substat(.critRate, 2.72), Substat(.hp, 209.13), Substat(.def, 16.2)],
+      unactivated: Substat(.elementalMastery, 16.32))
+    let useful: [Stat] = [.atkPercent, .critRate, .critDamage]
+    let pair = [
+      Self.role("off", useful: useful, fit: nil), Self.role("off2", useful: useful, fit: nil),
+    ]
+    let thin = Self.verdict(oneCrit, pair, inventory: [try Self.plume(cr: 1)])
+    #expect(thin.kind == .fodder)
+    #expect(thin.reason == "C at best for every role")
   }
 
   @Test func offPiecesRankByHowOftenTheirSlotIsTheOffPiece() throws {
@@ -376,8 +524,9 @@ struct VerdictTests {
     func standing(_ id: String) throws -> RoleStanding? {
       verdict.standings[try #require(matches.first { $0.characterID == id }).roleID]
     }
-    #expect(try standing("gorou") == .rareOffPiece)
-    #expect(try standing("itto") == .rareOffPiece)
+    #expect(try standing("gorou") == .offSetBelowBar(.s))
+    // Off-set Itto grades it below S too.
+    #expect(try standing("itto") == .offSetBelowBar(.s))
     #expect(try standing("chasca") == .open)
   }
 
