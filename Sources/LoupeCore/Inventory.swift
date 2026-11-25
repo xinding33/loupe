@@ -7,7 +7,7 @@ public struct Inventory: Codable, Sendable {
     _ artifact: Artifact, allowIdenticalCopy: Bool = false
   ) -> UUID {
     if !allowIdenticalCopy,
-      let existing = artifacts.first(where: { $0.signature == artifact.signature })
+      let existing = artifacts.first(where: { $0.identity == artifact.identity })
     {
       return existing.id
     }
@@ -23,10 +23,10 @@ public struct Inventory: Codable, Sendable {
   public mutating func remove(_ id: UUID) { artifacts.removeAll { $0.id == id } }
 
   public mutating func merge(_ incoming: [Artifact]) throws {
-    var available = Dictionary(grouping: artifacts, by: \.signature).mapValues(\.count)
+    var available = Dictionary(grouping: artifacts, by: \.identity).mapValues(\.count)
     for artifact in incoming {
-      if available[artifact.signature, default: 0] > 0 {
-        available[artifact.signature, default: 0] -= 1
+      if available[artifact.identity, default: 0] > 0 {
+        available[artifact.identity, default: 0] -= 1
       } else {
         artifacts.append(try artifact.withID(UUID()))
       }

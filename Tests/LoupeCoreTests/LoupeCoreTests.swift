@@ -328,6 +328,28 @@ func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
   #expect(Set(inventory.artifacts.map(\.id)).count == 2)
 }
 
+@Test func aFinishedPieceIsOneRecordUnderEitherRollRule() throws {
+  // The rule decides only whether an unfinished piece has a forecast.
+  var inventory = Inventory()
+  let id = inventory.save(try flower(level: 20, crit: 23.3))
+  #expect(inventory.save(try flower(level: 20, crit: 23.3, rule: .special)) == id)
+  #expect(inventory.artifacts.count == 1)
+  try inventory.merge([try flower(level: 20, crit: 23.3, rule: .special)])
+  #expect(inventory.artifacts.count == 1)
+  #expect(inventory.artifacts[0].rule == .ordinary)
+  inventory.save(try flower(level: 20, crit: 23.3, rule: .special), allowIdenticalCopy: true)
+  #expect(inventory.artifacts.count == 2)
+  // An unfinished piece's rule is part of what it is.
+  let ordinary = inventory.save(try flower(level: 0, crit: 3.9))
+  #expect(inventory.save(try flower(level: 0, crit: 3.9, rule: .special)) != ordinary)
+  #expect(inventory.artifacts.count == 4)
+  try inventory.merge([
+    try flower(level: 4, crit: 7.8), try flower(level: 4, crit: 7.8, rule: .special),
+  ])
+  try inventory.merge([try flower(level: 4, crit: 7.8, rule: .special)])
+  #expect(inventory.artifacts.count == 6)
+}
+
 @Test func matchingSetDoesNotCompareDifferentSlotsOrMainStats() throws {
   let candidate = try CardParser.parse(card, fiveStarsConfirmed: true)
   let other = try flower(level: 20, crit: 23.3, set: candidate.setName)
@@ -452,12 +474,13 @@ func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
   #expect(throws: ArtifactError.self) { try fourLine.upgraded(to: unchanged) }
 }
 
-private func flower(level: Int, crit: Double, atk: Double = 19.5, set: String = "Deepwood Memories")
-  throws -> Artifact
-{
+private func flower(
+  level: Int, crit: Double, atk: Double = 19.5, set: String = "Deepwood Memories",
+  rule: RollRule = .ordinary
+) throws -> Artifact {
   try Artifact(
     setName: set, slot: .flower, main: .hp, level: level,
     substats: [
       Substat(.critRate, crit), Substat(.atk, atk), Substat(.def, 23.2), Substat(.hpPercent, 5.8),
-    ])
+    ], rule: rule)
 }

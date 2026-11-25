@@ -59,6 +59,20 @@ private let assessmentFlower = """
 }
 
 @MainActor
+@Test func aFinishedPieceSavedUnderTheOtherRollRuleIsNotItsOwnRival() async throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
+  defer { try? FileManager.default.removeItem(at: folder) }
+  defer { model.setEnabled(false) }
+  model.inventory.save(
+    try CardParser.parse(assessmentFlower, fiveStarsConfirmed: true, rule: .special))
+  model.useText(assessmentFlower, confirmed: true)
+  #expect(model.current?.rule == .ordinary)
+  await model.evaluate()?.value
+  #expect(model.displayedPotential?.comparisonCount == 0)
+}
+
+@MainActor
 @Test func assessmentDisableRejectsPendingCharacterResults() async throws {
   let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
   let model = Model(inventoryFile: folder.appending(path: "inventory.json"))
