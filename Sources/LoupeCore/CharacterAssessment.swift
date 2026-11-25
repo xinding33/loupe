@@ -31,7 +31,8 @@ public struct CharacterMatch: Sendable, Identifiable {
     }
   }
 
-  /// An off-set flower or plume: worth listing, never worth keeping a piece for.
+  /// An off-set flower or plume: a 4+1 build rarely wears one, so verdicts count it only at a
+  /// higher grade (`VerdictPolicy.offSetUnfinishedBar` and `offSetFinishedBar`).
   public func isRareOffPiece(_ slot: Slot) -> Bool {
     setFit == .offPiece && (slot == .flower || slot == .plume)
   }

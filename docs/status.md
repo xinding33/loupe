@@ -117,9 +117,11 @@ In suggested order. The first two need the game running.
    skipped tests, so live-reader regressions are covered only by synthetic
    images.
 4. Grading: every role has a roll grade, and verdicts follow it. Next: a
-   whole-bag scan, and an ownership filter so verdicts count only the user's
-   characters; without one, Keep stays high on flowers. Verdict defaults still
-   need tuning on a real inventory. See [grading approach](grading-approach.md).
+   whole-bag scan. Keep stays high on flowers, since there is no ownership
+   filter; the owner decided against one on 2026-11-23 to keep good pieces for
+   characters they may own later. Verdict defaults, including the off-set
+   bars, still need tuning on a real inventory. See
+   [grading approach](grading-approach.md).
 5. Character coverage: every character has archetype roles; 15 were reviewed
    one by one. Archetype assignments for characters from 5.0 onward rest on
    one or two guides each, and "Somnia" and the Cryo Traveler are unassigned.
