@@ -256,13 +256,17 @@ struct RoleRowStatus {
       let pool = match.scope == .sameSet ? "\(artifact.setName) " : ""
       (label, help, setAside) = (
         "Covered",
-        "\(count) saved \(pool)\(artifact.main.label) \(artifact.slot.plural) already cover "
-          + "this role.", true
+        count == 1
+          ? "1 saved \(pool)\(artifact.main.label) \(artifact.slot.rawValue) already covers "
+            + "this role."
+          : "\(count) saved \(pool)\(artifact.main.label) \(artifact.slot.plural) already "
+            + "cover this role.", true
       )
-    case .rareOffPiece:
+    case .offSetBelowBar(let bar):
       (label, help, setAside) = (
         match.setFit.shortLabel,
-        "A 4+1 build rarely wears its off-set piece in the \(artifact.slot.rawValue) slot.", true
+        "A 4+1 build rarely wears its off-set piece in the \(artifact.slot.rawValue) slot, so "
+          + "this role counts it only at \(bar.atOrAbove).", true
       )
     }
   }
@@ -270,9 +274,10 @@ struct RoleRowStatus {
   /// The potential-users caption: grades rank the list, and they are rarity, not damage.
   static let orderCaption = "By grade, not damage"
   static let orderHelp =
-    "Open roles first, then by roll grade, then on-set before off-piece. Dimmed roles are set "
+    "The verdict's role first, then open roles, by roll grade, then on-set before off-piece. "
+    + "Dimmed roles are set "
     + "aside: enough saved pieces they would wear beat this one, or it is an off-set flower or "
-    + "plume. "
+    + "plume below the grade that slot needs. "
 }
 
 /// Median, P90, and best-possible +20 outcomes for one stated role or profile.
