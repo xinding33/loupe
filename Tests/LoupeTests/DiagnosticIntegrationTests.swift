@@ -234,8 +234,9 @@ func diagnosticEnhanceImage() throws -> CGImage {
   #expect(reader.coverage.imageBytes == 0)
 }
 
+/// `replacing` swaps whole lines, such as one substat for another value.
 @MainActor
-func diagnosticInventoryImage() throws -> CGImage {
+func diagnosticInventoryImage(replacing replacements: [String: String] = [:]) throws -> CGImage {
   let context = try #require(
     CGContext(
       data: nil, width: 1152, height: 768, bitsPerComponent: 8, bytesPerRow: 0,
@@ -250,7 +251,7 @@ func diagnosticInventoryImage() throws -> CGImage {
     "DEF+16", "Elemental Mastery+19", "CRIT DMG+6.2% (unactivated)", "Synthetic Set:",
   ]
   for (index, line) in lines.enumerated() {
-    (line as NSString).draw(
+    ((replacements[line] ?? line) as NSString).draw(
       at: NSPoint(x: 650, y: 700 - index * 35),
       withAttributes: [
         .font: NSFont.systemFont(ofSize: 16, weight: .semibold), .foregroundColor: NSColor.white,

@@ -326,7 +326,7 @@ final class Model: ObservableObject {
     overviewFill = nil
     displayedDiagnosticSample = nil
     diagnosticRecommendation = nil
-    // Card-less frames clear twice a second, so only what's still showing is cleared.
+    // Card-less frames clear several times a second, so only what's still showing is cleared.
     if current != nil { current = nil }
     if potential != nil { potential = nil }
     if !allProfiles.isEmpty { allProfiles = [] }
@@ -362,7 +362,8 @@ final class Model: ObservableObject {
     return result
   }
 
-  /// Frames arrive twice a second; repeating the same message mustn't redraw every view.
+  /// Frames arrive up to five times a second; repeating the same message mustn't redraw every
+  /// view.
   private func showStatus(_ message: String) {
     if status != message { status = message }
   }
@@ -651,7 +652,10 @@ final class Model: ObservableObject {
       pipelineVersion: "prepared-enhance-v1",
       settings: [
         "profile": profileName, "scope": scope.rawValue, "specialRolls": String(special),
-        "scanMode": String(scanMode), "sampleRate": "2", "bufferSeconds": "10", "bufferMiB": "24",
+        "scanMode": String(scanMode),
+        "sampleRate":
+          "5 frames/s captured; a changed frame is read at once while the reading changes, else at most 2 reads/s",
+        "bufferSeconds": "10", "bufferMiB": "24",
         "overlayExpanded": String(overlayExpanded),
         "assessmentMode": assessmentMode.rawValue,
         "characterDataset": CharacterAssessment.datasetVersion,

@@ -91,7 +91,26 @@ card-less screens) and a real 145-piece inventory, run outside the game:
   the cadence through a 300 ms main-thread stall; it has not been re-measured
   in the game.
 
-Memory, and CPU with the reader disabled or buffering on, are not measured.
+- Sampling changed on 2026-11-23, approved by the user: capture delivers five
+  frames a second. A new frame is read at once while the reading is changing,
+  otherwise half a second after the last read, so a settled screen is still
+  read twice a second. Simulated, a new card is verified 0.54 s after it
+  appears, against 0.83 s before. A reading that never settles gets four fast
+  reads and then the usual two a second.
+- A frame the stream reports as a repeat of one already read takes that read's
+  outcome without Vision, and is read again every two seconds; Enhance fields
+  go through confirmation again. Driven through the new pipeline at their
+  0.5 s spacing, all 240 recorded frames gave the same outcome as reading every
+  frame.
+- Tried and dropped: reusing a read when a new frame's pixels nearly match the
+  frame last read. In Inventory the selected item's highlight pulses, so only 9
+  of 240 frames matched, and a review showed that frames within any workable
+  threshold can still read differently (one digit changing in a small window).
+  Nothing short of the stream's own "unchanged" is reused.
+
+Memory, and CPU with the reader disabled or buffering on, are not measured. Nor
+are the cost of capturing five frames a second and how often real frames arrive
+idle.
 
 ## Live checks so far
 
@@ -139,8 +158,7 @@ In suggested order. The first two need the game running.
    preview and save, and disabling or changing sessions during a preview.
 2. Performance: memory, and CPU with the reader disabled and with buffering,
    measured in the game. Reading and grading costs are above. Buffering stays
-   off at launch and sampling stays at two reads per second until this is
-   measured.
+   off at launch.
 3. Recorded fixtures: no recorded Enhance sequence is available to the two
    skipped tests, so live-reader regressions are covered only by synthetic
    images.
@@ -165,8 +183,9 @@ letters became roll grades (`RollGrade`) with weighted rolls, and verdicts
 follow them.
 
 Deferred by decision: crafted and Dust probability models, full-build damage
-optimization, automatic character ownership syncing, cloud reports, and
-adaptive OCR scheduling. No automatic upgrade, salvage, or discard actions.
+optimization, automatic character ownership syncing, and cloud reports. No
+automatic upgrade, salvage, or discard actions. Adaptive OCR scheduling, also
+deferred until then, was approved on 2026-11-23; see Performance.
 
 ## Reading the other documents
 

@@ -56,11 +56,15 @@ enum CaptureFiles {
 final class FrameRecording: @unchecked Sendable {
   /// About two minutes at two frames a second; a full-window PNG can be several megabytes.
   static let limit = 240
+  /// Capture delivers five frames a second, more than a recording needs.
+  static let interval: TimeInterval = 0.5
   let folder: URL
   /// Reports a recording that filled up or failed, on the capture queue.
   let ended: @Sendable (FrameRecording, String) -> Void
   private(set) var count = 0
   private var outcome: String?
+  /// When the next frame is due.
+  private var next: TimeInterval?
 
   init(folder: URL, ended: @escaping @Sendable (FrameRecording, String) -> Void) {
     self.folder = folder
@@ -84,11 +88,19 @@ final class FrameRecording: @unchecked Sendable {
     throw ArtifactError("Cannot create a recording folder.")
   }
 
+  /// Whether a frame at `time` should be kept, about half a second after the last one.
+  func wants(at time: TimeInterval) -> Bool {
+    // Frame times jitter around the stream's interval.
+    next.map { time >= $0 - 0.05 } ?? true
+  }
+
   /// Returns true once the recording is full.
-  func append(_ image: CGImage) throws -> Bool {
+  func append(_ image: CGImage, at time: TimeInterval) throws -> Bool {
     let file = folder.appending(path: String(format: "%03d.png", count))
     try CaptureFiles.png(image).write(to: file, options: .withoutOverwriting)
     count += 1
+    let due = (next ?? time) + Self.interval
+    next = due < time ? time + Self.interval : due
     return count == Self.limit
   }
 

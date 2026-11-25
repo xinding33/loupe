@@ -1,5 +1,4 @@
 import AppKit
-import CoreImage
 import LoupeCore
 @preconcurrency import ScreenCaptureKit
 import Vision
@@ -20,6 +19,13 @@ struct CardReading: Sendable {
     }
     return artifact
   }
+}
+
+/// A frame that couldn't be made ready for OCR. Unlike an `ArtifactError` it says nothing about
+/// what the frame shows, and the next attempt may succeed, so it is never reused.
+struct FramePreparationError: LocalizedError {
+  let message: String
+  var errorDescription: String? { message }
 }
 
 enum CardOCR {
@@ -169,18 +175,18 @@ enum CardOCR {
       width: Double(image.width) * area.width, height: Double(image.height) * area.height
     ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
     guard let crop = image.cropping(to: rect)
-    else { throw ArtifactError("Waiting for the Enhance stat table.") }
+    else { throw FramePreparationError(message: "Waiting for the Enhance stat table.") }
     let scale = targetWidth / Double(crop.width)
     guard
       let canvas = CGContext(
         data: nil, width: Int(Double(crop.width) * scale), height: Int(Double(crop.height) * scale),
         bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-    else { throw ArtifactError("Cannot prepare the Enhance stat table for OCR.") }
+    else { throw FramePreparationError(message: "Cannot prepare the Enhance stat table for OCR.") }
     canvas.interpolationQuality = .high
     canvas.draw(crop, in: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height))
     guard let tableImage = canvas.makeImage() else {
-      throw ArtifactError("Cannot prepare the Enhance stat table for OCR.")
+      throw FramePreparationError(message: "Cannot prepare the Enhance stat table for OCR.")
     }
     return try PreparedCardOCR.read(
       tableImage, crop: rect, captureSize: CGSize(width: image.width, height: image.height),
@@ -230,30 +236,31 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
     @Sendable (Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage) -> Void
   let sessionID: UUID
   let gate = FrameGate()
-  private let context = CIContext()
-  private var latest: CGImage?
-  var ocr: DiagnosticReader
+  private let queue: DispatchQueue
+  var pipeline: FramePipeline
   var recording: FrameRecording?
   /// Takes the next frame, or nil if capture ends first.
   var snapshot: ((CGImage?) -> Void)?
+  /// The held frame's deadline that a timer is set for.
+  private var timer: TimeInterval?
   init(
-    sessionID: UUID, diagnosticsEnabled: Bool,
+    sessionID: UUID, diagnosticsEnabled: Bool, queue: DispatchQueue,
     receive:
       @escaping @Sendable (Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage) ->
       Void
   ) throws {
     self.sessionID = sessionID
+    self.queue = queue
     self.receive = receive
-    ocr = try DiagnosticReader(sessionID: sessionID)
+    var ocr = try DiagnosticReader(sessionID: sessionID)
     ocr.setEnabled(diagnosticsEnabled)
+    pipeline = FramePipeline(ocr: ocr)
   }
   func clear() {
-    latest = nil
     recording = nil
     snapshot?(nil)
     snapshot = nil
-    ocr.clear()
-    context.clearCaches()
+    pipeline.clear()
   }
   func stream(
     _ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
@@ -264,32 +271,25 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
         sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
       let status = attachments.first?[.status] as? Int
     else { return }
-    let image: CGImage
-    if status == SCFrameStatus.idle.rawValue, let latest {
-      image = latest
-    } else if status == SCFrameStatus.complete.rawValue,
-      let buffer = CMSampleBufferGetImageBuffer(sampleBuffer)
-    {
-      let source = CIImage(cvPixelBuffer: buffer)
-      guard let copy = context.createCGImage(source, from: source.extent) else { return }
-      image = copy
-    } else {
-      latest = nil
-      ocr.resetOCR()
+    let time = ProcessInfo.processInfo.systemUptime
+    let complete = status == SCFrameStatus.complete.rawValue
+    if complete, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+      pipeline.show(buffer)
+    } else if status != SCFrameStatus.idle.rawValue || !pipeline.hasFrame {
+      pipeline.reset()
       return
     }
     guard gate.isActive else {
       clear()
       return
     }
-    latest = image
-    if let snapshot {
+    if let snapshot, let image = pipeline.image() {
       self.snapshot = nil
       snapshot(image)
     }
-    if let recording {
+    if let recording, recording.wants(at: time), let image = pipeline.image() {
       do {
-        if try recording.append(image) {
+        if try recording.append(image, at: time) {
           self.recording = nil
           recording.ended(recording, recording.finish())
         }
@@ -302,8 +302,26 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
       clear()
       return
     }
-    let output = ocr.read(image, at: ProcessInfo.processInfo.systemUptime)
-    if gate.isActive { receive(output.result, output.key, ocr.coverage) } else { clear() }
+    deliver(complete ? pipeline.complete(at: time) : pipeline.idle(at: time))
+  }
+
+  private func deliver(_ delivery: FrameDelivery?) {
+    if let delivery {
+      guard gate.isActive else {
+        clear()
+        return
+      }
+      receive(delivery.result, delivery.key, delivery.coverage)
+    }
+    // A held frame is read on time even if the stream goes quiet.
+    guard let deadline = pipeline.deadline, deadline != timer else { return }
+    timer = deadline
+    let delay = max(0, deadline - ProcessInfo.processInfo.systemUptime)
+    queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+      guard let self, gate.isActive else { return }
+      timer = nil
+      deliver(pipeline.tick(at: ProcessInfo.processInfo.systemUptime))
+    }
   }
 }
 
@@ -457,8 +475,8 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
     let token = runtime.generation
     queue.async { [weak self] in
       guard reader.gate.isActive else { return }
-      update(&reader.ocr)
-      let coverage = reader.ocr.coverage
+      update(&reader.pipeline.ocr)
+      let coverage = reader.pipeline.ocr.coverage
       Task { @MainActor in
         guard let self, self.enabled, self.runtime.accepts(token) else { return }
         self.diagnosticCoverage?(reader.sessionID, coverage)
@@ -481,7 +499,9 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
           return
         }
         continuation.resume(
-          with: Result { try reader.ocr.freeze(at: ProcessInfo.processInfo.systemUptime) })
+          with: Result {
+            try reader.pipeline.ocr.freeze(at: ProcessInfo.processInfo.systemUptime)
+          })
       }
     }
     guard enabled, runtime.accepts(token), self.reader === reader else {
@@ -546,13 +566,16 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
       let config = SCStreamConfiguration()
       config.width = Int(filter.contentRect.width * Double(filter.pointPixelScale))
       config.height = Int(filter.contentRect.height * Double(filter.pointPixelScale))
-      config.minimumFrameInterval = CMTime(value: 1, timescale: 2)
-      config.queueDepth = 3
+      // Five frames a second; `ReadPacing` keeps OCR to two reads a second once settled.
+      config.minimumFrameInterval = CMTime(value: 1, timescale: 5)
+      // The pipeline keeps the latest frame's buffer until the next one, so one more than the
+      // default three leaves the stream the surfaces it needs while a read runs.
+      config.queueDepth = 4
       config.showsCursor = false
       config.capturesAudio = false
       let sessionID = UUID()
       let reader = try FrameReader(
-        sessionID: sessionID, diagnosticsEnabled: self.diagnosticsEnabled
+        sessionID: sessionID, diagnosticsEnabled: self.diagnosticsEnabled, queue: self.queue
       ) {
         [weak self] result, sample, coverage in
         Task { @MainActor in

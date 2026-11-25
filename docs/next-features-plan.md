@@ -32,7 +32,8 @@ The preceding build passed the basic live checks listed below.
   renders and the limited live checks above cover this interface.
 - Whole-roster coverage, further calibration, monitor-move/report checks,
   and live performance measurement remain pending. Buffering stays off
-  at launch and enabled sampling remains two reads per second.
+  at launch. Sampling was two reads per second until 2026-11-23; see
+  [status](status.md) for the current pacing.
 
 The work order below records the original proposal, including the now-replaced
 unknown-fourth-stat branch. No automatic upgrade or discard actions were added.
@@ -256,5 +257,6 @@ The approved implementation used separate probability, character, and replay
 threads. Shared Model and Views integration remained with the parent thread.
 
 Defer full-build damage optimization, automatic character ownership syncing,
-crafted/Dust probability models, cloud reports, and adaptive OCR scheduling.
+crafted/Dust probability models, cloud reports, and adaptive OCR scheduling
+(approved on 2026-11-23; see [status](status.md)).
 Preserve manual profiles for uses outside reviewed character coverage.
