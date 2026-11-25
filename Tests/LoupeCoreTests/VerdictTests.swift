@@ -185,19 +185,59 @@ struct VerdictTests {
     #expect(gap.reason == "Main stat fills a gap: 0 saved Test Elemental Mastery sands")
   }
 
-  @Test func aThinButScannedPoolRescuesACPiece() throws {
+  @Test func aThinButScannedPoolRescuesACGoblet() throws {
     let oneCrit = try Artifact(
-      setName: "Test", slot: .plume, main: .atk, level: 0,
+      setName: "Test", slot: .goblet, main: .pyroDamage, level: 0,
       substats: [Substat(.critRate, 2.72), Substat(.hp, 209.13), Substat(.def, 16.2)],
       unactivated: Substat(.elementalMastery, 16.32))
     let twin = Self.role(
       "twin", useful: [.atkPercent, .critRate, .critDamage], secondary: [.energyRecharge])
-    let weak = try Self.plume(cr: 1)
+    let weak = try Artifact(
+      setName: "Test", slot: .goblet, main: .pyroDamage, level: 20,
+      substats: [
+        Substat(.critRate, 3.89), Substat(.hp, 298.75 * 6), Substat(.def, 23.15),
+        Substat(.elementalMastery, 16.32),
+      ])
     let level = Self.verdict(oneCrit, [Self.crit, twin], inventory: [weak])
+    #expect(level.grade == .c)
     #expect(level.title == "Level to +4")
-    #expect(level.reason == "C · only 1 saved Test ATK plume")
+    #expect(level.reason == "C · only 1 saved Test Pyro Dmg Bonus goblet")
     // An empty pool usually means an unscanned bag.
     #expect(Self.verdict(oneCrit, [Self.crit, twin]).kind == .fodder)
+  }
+
+  @Test func aThinPoolRescuesNoCFlowerOrPlume() throws {
+    // Every flower and plume shares one main stat, so a thin pool of them soon fills.
+    let twin = Self.role(
+      "twin", useful: [.atkPercent, .critRate, .critDamage], secondary: [.energyRecharge])
+    let plume = try Artifact(
+      setName: "Test", slot: .plume, main: .atk, level: 0,
+      substats: [Substat(.critRate, 2.72), Substat(.hp, 209.13), Substat(.def, 16.2)],
+      unactivated: Substat(.elementalMastery, 16.32))
+    let unfinished = Self.verdict(plume, [Self.crit, twin], inventory: [try Self.plume(cr: 1)])
+    #expect(unfinished.grade == .c)
+    #expect(unfinished.kind == .fodder)
+    #expect(unfinished.reason == "C at best for every role")
+    let flower = try Artifact(
+      setName: "Test", slot: .flower, main: .hp, level: 0,
+      substats: [Substat(.critRate, 2.72), Substat(.def, 16.2), Substat(.elementalMastery, 16.32)],
+      unactivated: Substat(.defPercent, 5.1))
+    let weakFlower = try Artifact(
+      setName: "Test", slot: .flower, main: .hp, level: 20,
+      substats: [
+        Substat(.critRate, 3.89), Substat(.def, 138.9), Substat(.elementalMastery, 16.32),
+        Substat(.defPercent, 5.1),
+      ])
+    let flowerVerdict = Self.verdict(flower, [Self.crit, twin], inventory: [weakFlower])
+    #expect(flowerVerdict.grade == .c)
+    #expect(flowerVerdict.kind == .fodder)
+    #expect(flowerVerdict.reason == "C at best for every role")
+    // Finished, the same thin pool asks for no review.
+    let finished = try Self.plume(cr: 2)
+    let review = Self.verdict(finished, [Self.crit, twin], inventory: [try Self.plume(cr: 1)])
+    #expect(review.grade == .c)
+    #expect(review.kind == .fodder)
+    #expect(review.reason == "C at best for every role")
   }
 
   @Test func anyThinCRoleRescuesAFinishedPiece() throws {
@@ -444,7 +484,7 @@ struct VerdictTests {
         == "set")
   }
 
-  @Test func anOffSetPlumeBelowTheBarFillsNoGapOrThinPool() throws {
+  @Test func anOffSetPlumeBelowTheBarFillsNoGap() throws {
     // A flat-ATK role fits a plume by main stat only.
     let flat = Self.role("flat", useful: [.atk])
     let offFlat = Self.role("offflat", useful: [.atk], fit: nil)
@@ -454,18 +494,6 @@ struct VerdictTests {
     #expect(gap.kind == .fodder)
     #expect(gap.standings == ["offflat.synthetic": .offSetBelowBar(.s)])
     #expect(gap.reason == "Off-set plumes count only at S")
-    // A C with one weaker saved plume levels on-set, not off-set.
-    let oneCrit = try Artifact(
-      setName: "Test", slot: .plume, main: .atk, level: 0,
-      substats: [Substat(.critRate, 2.72), Substat(.hp, 209.13), Substat(.def, 16.2)],
-      unactivated: Substat(.elementalMastery, 16.32))
-    let useful: [Stat] = [.atkPercent, .critRate, .critDamage]
-    let pair = [
-      Self.role("off", useful: useful, fit: nil), Self.role("off2", useful: useful, fit: nil),
-    ]
-    let thin = Self.verdict(oneCrit, pair, inventory: [try Self.plume(cr: 1)])
-    #expect(thin.kind == .fodder)
-    #expect(thin.reason == "C at best for every role")
   }
 
   @Test func offPiecesRankByHowOftenTheirSlotIsTheOffPiece() throws {

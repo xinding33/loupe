@@ -226,9 +226,9 @@ circlet, then off-set flower or plume. From 2026-10-26 to 2026-11-23 an
 off-set flower or plume was set aside outright. Since 2026-11-24 it counts at
 a higher bar, `VerdictPolicy.offSetUnfinishedBar` and `offSetFinishedBar`,
 both S by default: an S levels an unfinished piece to +20 and keeps a finished
-one. Off-set flowers and plumes are rarer than off-set goblets, not useless. Below the bar the role counts for nothing: it
-cannot level the piece, fill a gap or rescue a thin pool
-(`RoleStanding.offSetBelowBar`). 2+2 builds are not modeled. The verdict
+one. Off-set flowers and plumes are rarer than off-set goblets, not useless.
+Below the bar the role counts for nothing: it cannot level the piece or fill a
+gap (`RoleStanding.offSetBelowBar`). 2+2 builds are not modeled. The verdict
 publishes each role's standing, and the shortlist lists the verdict's role
 first, which can be a covered role kept as a spare, then open roles, by grade,
 wear rank and rarity, dimming the rest. Four-star pieces mark a
@@ -240,13 +240,15 @@ it.
 | S | Level to +20 | Keep |
 | A | Level to the next checkpoint | Keep |
 | B | Level to the next checkpoint | Keep while it ranks among the saved pieces the group can use; Review with none saved |
-| C | Fodder, or level to the next checkpoint with one or two saved pieces of its kind | Fodder, or Review with one or two saved |
+| C | Fodder; a sands, goblet or circlet levels to the next checkpoint for a damage role whose saved pool is thin: not empty, and smaller than its group can use | Fodder; a sands, goblet or circlet goes to Review when any role's saved pool is thin |
 | D | Fodder | Fodder |
 
 A main-stat-only fit, a role whose core stats cannot appear as substats, levels
 or keeps the piece while its saved pool has room; it ranks below A and above B.
 An empty pool does not rescue a C piece, since it usually means an unscanned
-bag.
+bag. Since 2026-11-25 a thin pool rescues only a C sands, goblet or circlet:
+every flower and plume has the same main stat, so they drop constantly and a
+thin pool of them soon fills with better pieces.
 
 **Many roles, one piece.** A grade is per role, about 1 in 5 pieces A or
 better, but there is no ownership filter and a flower suits all of them. The
@@ -338,7 +340,10 @@ With 30 random +20 pieces saved per slot, the old rules gave flowers
 0/37/0/63; 34/16/50, sands 0/47/0/53; 42/5/52, goblets 0/38/0/62; 39/6/56 and
 circlets 0/28/0/72; 37/11/52. The new rules give flowers 0/37/0/63; 38/15/47,
 sands 0/50/0/50; 44/5/51, goblets 0/39/0/61; 39/6/55 and circlets
-0/36/0/64; 38/11/51. Plumes follow flowers.
+0/36/0/64; 38/11/51. Plumes follow flowers. Since 2026-11-25 a thin pool no
+longer rescues C flowers and plumes, so their Level and Review shares with
+pieces saved are lower than shown and have not been re-measured; rows with
+nothing saved are unaffected.
 
 Supports' A and B raise leveling on sands, goblets and circlets. Spares add a
 few points of finished Keep once pieces are saved. Off-set S flowers and
