@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var model: Model!
   private var autoPress: AutoPress!
   private let updates = Updates()
+  private let wishes = WishExport()
   private var menus: Menus!
   private let hud = HUD()
 
@@ -40,7 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
-    menus = Menus(model: model, autoPress: autoPress, updates: updates) { [weak self] in
+    wishes.status = { [weak self] in self?.model.status = $0 }
+    wishes.issue = { [weak self] in self?.model.issue = $0 }
+    wishes.banner = { [hud] in hud.show($0) }
+    menus = Menus(model: model, autoPress: autoPress, updates: updates, wishes: wishes) {
+      [weak self] in
       self?.showMain()
     }
 
@@ -74,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     updates.isBusy = { [weak self] in
       guard let self else { return false }
-      return model.isBusy || autoPress.session.isOn
+      return model.isBusy || autoPress.session.isOn || wishes.isRunning
     }
     updates.start()
     NSApplication.shared.activate(ignoringOtherApps: true)

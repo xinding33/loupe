@@ -60,6 +60,17 @@ Auto-press needs **Accessibility** access to press keys and to use a mouse butto
 
 Key presses are `CGEvent`s posted only while the chosen app is frontmost, checked with Accessibility just before each press. They run on their own thread, so a busy window doesn't delay them. If that check can't get an answer, nothing is pressed and a banner says so. A keyboard toggle is a Carbon hot key registered only while that app is in front, so it never takes the key from other apps. A mouse-button toggle is an event tap. Both swallow the toggle, so the game never sees it. The toggle can't be the key being pressed or one of the overlay's shortcuts. Auto-press works whether or not the reader is enabled. Don't run Mash at the same time: both would answer the same toggle.
 
+## Wish history
+
+**File > Export Wish History…** saves your wish history as a [UIGF v4](https://uigf.org) file, which wish trackers such as Paimon.moe and Stardb import. It works with the game running on this Mac, for example under Yaagl.
+
+1. In the game, open **Wish**, then **History**, and let it load. That saves a link to your history, valid for about a day, in the game's web cache.
+2. Choose **Export Wish History…** and where to save the file.
+
+Loupe finds the game folder from Yaagl's settings. Otherwise it asks once for the folder with `GenshinImpact_Data` in it. If more than one copy of the game is found, it uses the one whose cache was written most recently. It downloads the history from HoYoverse with that link, banner by banner, which takes about 20 seconds the first time; the link goes only to HoYoverse's servers and isn't saved.
+
+HoYoverse returns only your recent pulls, not your whole history, so Loupe keeps every pull it has downloaded in `~/Library/Application Support/Loupe/wishes.json` and adds new ones on each export. Each export has them all. Export every few months to keep the history complete. If that file can't be read, the export stops and leaves it alone. The game doesn't give item IDs, so `item_id` is empty; a tracker that requires it won't import the file.
+
 ## Build the inventory baseline
 
 Start with upgraded artifacts, not the whole bag:
@@ -157,7 +168,7 @@ A **Fodder** verdict covers the archetypes each character is assigned. A piece m
 
 ## Data and privacy
 
-Only the window selected in the sharing picker is captured. Vision OCR runs on this Mac. The only network request is the daily update check, which asks GitHub for the latest release and sends nothing about you or your artifacts. Diagnostic buffering is off at each launch. Without opt-in buffering or explicit recording, normal reading retains no diagnostic images. Recognized inventory records are plain JSON at:
+Only the window selected in the sharing picker is captured. Vision OCR runs on this Mac. Loupe makes two kinds of network request. The daily update check asks GitHub for the latest release and sends nothing about you or your artifacts. [Exporting wish history](#wish-history), only when you choose it, sends the game's history link to HoYoverse's wish history API, the same request the game makes; the link isn't saved or logged. Diagnostic buffering is off at each launch. Without opt-in buffering or explicit recording, normal reading retains no diagnostic images. Recognized inventory records are plain JSON at:
 
 ```text
 ~/Library/Application Support/Loupe/inventory.json
