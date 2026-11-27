@@ -10,7 +10,7 @@ final class AutoPresser: @unchecked Sendable {
     let keyCode: CGKeyCode
     let interval: TimeInterval
     let hold: TimeInterval
-    let bundleID: String
+    let target: AutoPressTarget
   }
 
   /// Whether the target app receives key events right now.
@@ -22,8 +22,8 @@ final class AutoPresser: @unchecked Sendable {
 
   /// Posts a key-down (`true`) or key-up (`false`).
   typealias Post = @Sendable (CGKeyCode, Bool) -> Void
-  /// Where the app with this bundle identifier stands.
-  typealias FocusCheck = @Sendable (String) -> Focus
+  /// Where the target app stands.
+  typealias FocusCheck = @Sendable (AutoPressTarget) -> Focus
 
   /// How long focus must stay unconfirmed before `onUnconfirmed` is told.
   static let unconfirmedDelay: TimeInterval = 1
@@ -66,7 +66,7 @@ final class AutoPresser: @unchecked Sendable {
   func start(_ settings: AutoPressSettings) {
     let wanted = Configuration(
       keyCode: settings.pressedKeyCode, interval: settings.pressInterval,
-      hold: settings.holdDuration, bundleID: settings.target.bundleID)
+      hold: settings.holdDuration, target: settings.target)
     lock.withLock {
       guard timer == nil || wanted != configuration else { return }
       stopLocked()
@@ -104,7 +104,7 @@ final class AutoPresser: @unchecked Sendable {
 
   private func press(_ configuration: Configuration, generation: Int) {
     // Asked at press time, outside the lock so a slow answer can't hold up `stop`.
-    let focus = focus(configuration.bundleID)
+    let focus = focus(configuration.target)
     let report: (@Sendable () -> Void)? = lock.withLock {
       guard generation == self.generation else { return nil }
       guard focus == .target else {
@@ -158,10 +158,15 @@ final class AutoPresser: @unchecked Sendable {
   /// `NSWorkspace` to agree, as the press check always did. Off the main thread `NSWorkspace`
   /// only catches up when the main run loop turns, so on its own it could still name the target
   /// for as long as the main thread is busy after a switch away. Fails closed.
-  @Sendable static func focus(_ bundleID: String) -> Focus {
-    guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleID else {
+  ///
+  /// An app is checked by bundle identifier both times. An instance is checked by pid and start
+  /// time both times, so a process that took over the pid while Accessibility was answering
+  /// isn't taken for the game.
+  @Sendable static func focus(_ target: AutoPressTarget) -> Focus {
+    guard let front = NSWorkspace.shared.frontmostApplication, target.matches(front) else {
       return .other
     }
+    let frontPID = front.processIdentifier
     let system = AXUIElementCreateSystemWide()
     // The answer normally takes microseconds. A slow one must not stall the presses behind it
     // for the default timeout of several seconds.
@@ -174,7 +179,9 @@ final class AutoPresser: @unchecked Sendable {
     else { return .unconfirmed }
     var pid: pid_t = 0
     guard AXUIElementGetPid(focused as! AXUIElement, &pid) == .success else { return .unconfirmed }
-    return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == bundleID
-      ? .target : .other
+    let confirmed = target.confirms(
+      focusedPID: pid, frontPID: frontPID, start: { ProcessStart.of(pid) },
+      focusedBundleID: { NSRunningApplication(processIdentifier: pid)?.bundleIdentifier })
+    return confirmed ? .target : .other
   }
 }

@@ -49,8 +49,16 @@ final class AutoPress: ObservableObject {
 
   var keyName: String { autoPressKeyName(settings.pressedKeyCode) }
 
+  /// Checks whether an instance target is still running, so call it on the panel's refresh.
   func status(at date: Date) -> String {
-    session.status(targetFrontmost: targetFrontmost, at: date, settings, keyName: keyName)
+    session.status(
+      targetFrontmost: targetFrontmost, targetRunning: settings.target.isRunning, at: date,
+      settings, keyName: keyName)
+  }
+
+  /// What picking a single running instance means, or nil for an app.
+  var instanceNote: String? {
+    settings.target.instanceNote(running: settings.target.isRunning)
   }
 
   /// Turns auto-press on or off. Turning on asks for Accessibility first and stays off without it.
@@ -142,14 +150,15 @@ final class AutoPress: ObservableObject {
 
   /// Brings the presser, toggle and auto-off timer in line with the current state.
   private func apply() {
-    let frontmost =
-      NSWorkspace.shared.frontmostApplication?.bundleIdentifier == settings.target.bundleID
-    if frontmost != targetFrontmost { targetFrontmost = frontmost }
     let now = Date()
     if session.isExpired(at: now, settings) {
       session.turnOff()
       hud.show("Auto-press off (timer)")
     }
+    // Before anything below reads process state, so turning off takes effect at once.
+    if !session.isOn { presser.stop() }
+    let frontmost = settings.target.matches(NSWorkspace.shared.frontmostApplication)
+    if frontmost != targetFrontmost { targetFrontmost = frontmost }
 
     monitor.update(trigger: settings.trigger, active: frontmost)
     if monitor.issue != triggerIssue { triggerIssue = monitor.issue }

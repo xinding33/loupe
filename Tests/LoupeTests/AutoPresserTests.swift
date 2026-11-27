@@ -17,7 +17,7 @@ private final class FakeKeyboard: @unchecked Sendable {
   private var recorded: [Event] = []
   private var focus = AutoPresser.Focus.target
   private var checkDelay: TimeInterval = 0
-  private var asked: Set<String> = []
+  private var asked: Set<AutoPressTarget> = []
   /// Signalled on each key-down.
   let pressed = DispatchSemaphore(value: 0)
   /// Signalled on each focus check, once it has answered.
@@ -26,8 +26,8 @@ private final class FakeKeyboard: @unchecked Sendable {
   let reported = DispatchSemaphore(value: 0)
 
   var events: [Event] { lock.withLock { recorded } }
-  /// The bundle identifiers the presser asked about.
-  var askedFor: Set<String> { lock.withLock { asked } }
+  /// The targets the presser asked about.
+  var askedFor: Set<AutoPressTarget> { lock.withLock { asked } }
   var downs: [Event] { events.filter(\.down) }
   func setFocus(_ value: AutoPresser.Focus) { lock.withLock { focus = value } }
   /// Makes every focus check take this long, as a slow Accessibility answer would.
@@ -42,11 +42,11 @@ private final class FakeKeyboard: @unchecked Sendable {
         }
         if down { pressed.signal() }
       },
-      focus: { [self] bundleID in
+      focus: { [self] target in
         let delay = lock.withLock { checkDelay }
         if delay > 0 { Thread.sleep(forTimeInterval: delay) }
         let answer = lock.withLock {
-          asked.insert(bundleID)
+          asked.insert(target)
           return focus
         }
         checked.signal()
@@ -69,9 +69,11 @@ private final class FakeKeyboard: @unchecked Sendable {
   }
 }
 
+private let testTarget = AutoPressTarget(bundleID: "invalid.loupe.tests", name: "Test target")
+
 private func settings(pressesPerSecond: Int) -> AutoPressSettings {
   var settings = AutoPressSettings()
-  settings.target = AutoPressTarget(bundleID: "invalid.loupe.tests", name: "Test target")
+  settings.target = testTarget
   settings.pressesPerSecond = pressesPerSecond
   return settings
 }
@@ -86,7 +88,7 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
   presser.stop()
   #expect(keyboard.downs.count >= 4)
   #expect(keyboard.isBalanced)
-  #expect(keyboard.askedFor == ["invalid.loupe.tests"])
+  #expect(keyboard.askedFor == [testTarget])
 }
 
 @Test func autoPressStopReleasesTheHeldKeyAndPressesNothingAfter() throws {
@@ -115,7 +117,7 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
   presser.start(settings(pressesPerSecond: 20))
   #expect(keyboard.waitForChecks(3))
   #expect(keyboard.events.isEmpty)
-  #expect(keyboard.askedFor == ["invalid.loupe.tests"])
+  #expect(keyboard.askedFor == [testTarget])
 
   // Once the target leaves the front, the press under way may land; none follows it.
   keyboard.setFocus(.target)
@@ -156,4 +158,32 @@ private func settings(pressesPerSecond: Int) -> AutoPressSettings {
   #expect(keyboard.reported.wait(timeout: .now()) == .timedOut)
   #expect(keyboard.events.isEmpty)
   presser.stop()
+}
+
+@Test func instanceTargetMatchesOnlyTheRunItWasPickedFrom() throws {
+  let helper = Process()
+  helper.executableURL = URL(fileURLWithPath: "/bin/sleep")
+  helper.arguments = ["30"]
+  try helper.run()
+  defer { if helper.isRunning { helper.terminate() } }
+  let pid = helper.processIdentifier
+  let start = try #require(ProcessStart.of(pid))
+  let target = try #require(
+    AutoPressTarget(bundleID: nil, pid: pid, start: { ProcessStart.of(pid) }, name: "sleep"))
+  #expect(target.matches(bundleID: nil, pid: pid) { ProcessStart.of(pid) })
+  #expect(target.isRunning)
+
+  let micro = start.microseconds == 0 ? 1 : start.microseconds - 1
+  let reused = AutoPressTarget(
+    pid: pid, start: ProcessStart(seconds: start.seconds, microseconds: micro), name: "sleep")
+  #expect(!reused.matches(bundleID: nil, pid: pid) { ProcessStart.of(pid) })
+  #expect(!reused.isRunning)
+
+  helper.terminate()
+  helper.waitUntilExit()
+  #expect(ProcessStart.of(pid) == nil)
+  #expect(!target.matches(bundleID: nil, pid: pid) { ProcessStart.of(pid) })
+  #expect(!target.isRunning)
+  #expect(ProcessStart.of(-1) == nil)
+  #expect(ProcessStart.of(0) == nil)
 }
