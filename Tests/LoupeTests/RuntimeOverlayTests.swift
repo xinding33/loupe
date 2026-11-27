@@ -234,6 +234,37 @@ private let runtimeCard = """
   #expect(!OverlayPlacement.hits(CGPoint(x: 50, y: 490), regions: [], height: 600))
 }
 
+@Test func runtimeOverlayLevelStaysAboveTheSharedWindow() {
+  func level(_ layer: Int?) -> Int {
+    OverlayPlacement.panelLevel(sharedWindowLayer: layer, capturing: true).rawValue
+  }
+  let floating = NSWindow.Level.floating.rawValue
+  #expect(level(0) == floating)
+  #expect(level(nil) == floating)
+  #expect(level(-20) == floating)
+  #expect(level(floating) == floating + 1)
+  let status = NSWindow.Level.statusBar.rawValue
+  #expect(level(status + 1) == status + 2)
+  let shielding = Int(CGShieldingWindowLevel())
+  #expect(level(shielding) == shielding + 1)
+  for layer in [shielding + 1, shielding + 2, Int(Int32.max), Int.max] {
+    #expect(level(layer) == shielding + 1)
+  }
+  #expect(OverlayPlacement.highestPanelLevel.rawValue == shielding + 1)
+}
+
+@Test func runtimeOverlayFallsBackToFloatingOnceTheWindowIsNoLongerCaptured() {
+  for layer in [nil, 0, NSWindow.Level.statusBar.rawValue + 1, Int(CGShieldingWindowLevel())] {
+    #expect(OverlayPlacement.panelLevel(sharedWindowLayer: layer, capturing: false) == .floating)
+  }
+}
+
+@MainActor
+@Test func runtimeAutoPressBannerStaysAboveTheOverlay() {
+  #expect(HUD.level.rawValue == Int(CGShieldingWindowLevel()) + 2)
+  #expect(HUD.level > OverlayPlacement.panelLevel(sharedWindowLayer: Int.max, capturing: true))
+}
+
 @Test func runtimeShortcutDefaultsAndInvalidInputs() throws {
   let expand = try OverlayShortcut("option+`")
   #expect(expand.keyCode == UInt32(kVK_ANSI_Grave))

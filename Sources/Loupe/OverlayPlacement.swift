@@ -39,6 +39,25 @@ struct OverlayPlacement: Equatable {
     return regions.contains { $0.contains(flipped) }
   }
 
+  /// The highest level the overlay takes: one above the shielding level, where SDL puts a
+  /// focused full-screen game. The auto-press banner sits one above this, so the overlay never
+  /// covers it.
+  static let highestPanelLevel = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
+
+  /// Floating over a normal window, and one level above a shared window that sits higher, as a
+  /// full-screen game can raise itself while it's in front. It follows the window only while it's
+  /// being captured: a stream that ended with an error leaves the window selected, and the
+  /// overlay mustn't stay raised over a game it no longer reads. A missing layer leaves it
+  /// floating.
+  /// A window at or above `highestPanelLevel` ties with the overlay rather than outranking it,
+  /// since going higher would cover the auto-press banner.
+  static func panelLevel(sharedWindowLayer layer: Int?, capturing: Bool) -> NSWindow.Level {
+    guard capturing, let layer else { return .floating }
+    let highest = highestPanelLevel.rawValue
+    let above = layer >= highest ? highest : layer + 1
+    return NSWindow.Level(rawValue: max(NSWindow.Level.floating.rawValue, above))
+  }
+
   static func appKitFrame(_ quartz: CGRect, primaryTop: CGFloat) -> CGRect {
     CGRect(x: quartz.minX, y: primaryTop - quartz.maxY, width: quartz.width, height: quartz.height)
   }
@@ -134,8 +153,9 @@ final class OverlayController {
     let screens = NSScreen.screens
     guard let id = model.capture.selectedWindowID,
       let primary = screens.first,
-      let info = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]],
-      let bounds = info.first?[kCGWindowBounds as String] as? [String: Any],
+      let info = (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]])?
+        .first,
+      let bounds = info[kCGWindowBounds as String] as? [String: Any],
       let quartz = CGRect(dictionaryRepresentation: bounds as CFDictionary)
     else {
       placement = nil
@@ -178,6 +198,10 @@ final class OverlayController {
     if previousGeometry != model.diagnosticPlacement {
       model.recordDiagnosticDisplay()
     }
+    let level = OverlayPlacement.panelLevel(
+      sharedWindowLayer: (info[kCGWindowLayer as String] as? NSNumber)?.intValue,
+      capturing: model.capture.isCapturing)
+    for window in [panel, controls] where window.level != level { window.level = level }
     let frame = next.panelFrame
     let handleHeight = min(28.0, frame.height)
     controls.setFrame(
