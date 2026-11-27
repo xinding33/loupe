@@ -4,7 +4,6 @@
 # API key, as in CI), or else the notarytool keychain profile named by NOTARY_PROFILE.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application}"
 APP_BUILD=release ARCHS="arm64 x86_64" bash scripts/build.sh
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' dist/Loupe.app/Contents/Info.plist)"
 

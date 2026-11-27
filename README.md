@@ -24,7 +24,7 @@ Artifact Lens, Loupe's earlier name, kept its data elsewhere. On first launch Lo
 
 ## Run
 
-1. Click **Choose game window**.
+1. Click **Choose game window**. If the game runs locally under Wine, through Yaagl for example, first set **Display Mode** in the game's Graphics settings to a windowed size smaller than the screen. A window that fills the screen is treated as full screen and minimizes as soon as the picker takes focus, so it can't be selected.
 2. Select the game window in the macOS sharing picker. With GeForce NOW it's **Genshin Impact on GeForce NOW**.
 3. Select one five-star artifact in Inventory or on a character's Artifacts screen.
 4. Wait for **Live card verified across two frames**.
@@ -54,7 +54,7 @@ Auto-press repeatedly presses a key while a chosen app is in front. Sending inpu
 2. It presses only while the chosen app is in front. Switch away and it pauses; come back and it carries on.
 3. It turns itself off after 10 minutes unless you change that.
 
-The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. **Choose…** next to the app lists GeForce NOW, the apps running now, and **Other App…** for one that isn't running. A game with no app bundle, one running under Wine for example, can be picked from that list while it's running if macOS shows it as a regular app. It has to be picked again each time the game starts. The **Controls** menu has **Auto-Press On**.
+The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. **Choose…** next to the app lists GeForce NOW, the apps running now, and **Other App…** for one that isn't running. A game with no app bundle, one running under Wine for example, can be picked from that list while it's running if macOS shows it as a regular app. Under Yaagl it's usually listed as **wine**. It has to be picked again each time the game starts. The **Controls** menu has **Auto-Press On**.
 
 Auto-press needs **Accessibility** access to press keys and to use a mouse button as its toggle. It asks the first time you turn it on; until then the panel shows **Open Accessibility settings** and auto-press stays off. It notices the grant without a restart.
 
