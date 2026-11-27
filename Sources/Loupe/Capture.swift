@@ -527,7 +527,7 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
     picker.defaultConfiguration = config
     picker.isActive = true
     picker.present(using: .window)
-    status?("Select the GeForce NOW game window in the macOS picker.")
+    status?("Select the game window in the macOS picker.")
   }
 
   func setEnabled(_ value: Bool) {

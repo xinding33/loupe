@@ -56,7 +56,7 @@ final class Model: ObservableObject {
       evaluate()
     }
   }
-  @Published var status = "Choose the GeForce NOW window to start. Screens stay on this Mac."
+  @Published var status = "Choose the game window to start. Screens stay on this Mac."
   @Published var issue: String?
   @Published var rawText = ""
   @Published var recordingStatus =

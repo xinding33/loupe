@@ -7,6 +7,9 @@ final class HUD {
   private let label = NSTextField(labelWithString: "")
   private lazy var panel = makePanel()
   private var hideWork: DispatchWorkItem?
+  /// Above a full-screen game, which SDL raises to the shielding level, and above the overlay,
+  /// which follows the game up to `OverlayPlacement.highestPanelLevel`.
+  static let level = NSWindow.Level(rawValue: OverlayPlacement.highestPanelLevel.rawValue + 1)
 
   func show(_ text: String) {
     label.stringValue = text
@@ -46,8 +49,7 @@ final class HUD {
     let panel = NSPanel(
       contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
       defer: true)
-    // SDL raises a focused full-screen game window to the shielding level, so sit above that.
-    panel.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) + 1)
+    panel.level = Self.level
     panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
     panel.isOpaque = false
     panel.backgroundColor = .clear

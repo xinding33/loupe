@@ -48,8 +48,19 @@ struct AutoPressPanel: View {
           HStack(spacing: 6) {
             Text(autoPress.settings.target.name).font(.caption).lineLimit(1)
               .truncationMode(.middle)
-            Button("Choose…", action: chooseApplication)
+            TargetChooser(
+              current: autoPress.settings.target,
+              choose: { autoPress.settings.target = $0 }, chooseOther: chooseApplication
+            )
+            .fixedSize()
           }
+        }
+      }
+      if autoPress.settings.target.isInstance {
+        // Notices the instance quitting on the status line's refresh.
+        TimelineView(.periodic(from: .now, by: 15)) { _ in
+          Text(autoPress.instanceNote ?? "").font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
       Stepper(
@@ -94,6 +105,90 @@ struct AutoPressPanel: View {
       ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
       ?? url.deletingPathExtension().lastPathComponent
     autoPress.settings.target = AutoPressTarget(bundleID: bundleID, name: name)
+  }
+}
+
+/// A "Choose…" pull-down: GeForce NOW, which is always there to go back to, the apps running now
+/// and a picker for one that isn't. The list is built each time it opens, so a game started
+/// after Loupe is in it. A process with no app bundle, such as a game under Wine, can be picked
+/// only from the running apps, and then only for that run.
+private struct TargetChooser: NSViewRepresentable {
+  let current: AutoPressTarget
+  let choose: (AutoPressTarget) -> Void
+  let chooseOther: () -> Void
+
+  func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+  func makeNSView(context: Context) -> NSPopUpButton {
+    let button = NSPopUpButton(frame: .zero, pullsDown: true)
+    // A pull-down's first item is its title.
+    button.addItem(withTitle: "Choose…")
+    button.menu?.delegate = context.coordinator
+    updateNSView(button, context: context)
+    return button
+  }
+
+  func updateNSView(_ button: NSPopUpButton, context: Context) {
+    context.coordinator.chooser = self
+    let size = NSControl.ControlSize(context.environment.controlSize)
+    guard button.controlSize != size else { return }
+    button.controlSize = size
+    button.font = .systemFont(ofSize: NSFont.systemFontSize(for: size))
+  }
+
+  @MainActor
+  final class Coordinator: NSObject, NSMenuDelegate {
+    var chooser: TargetChooser
+    private var targets: [AutoPressTarget] = []
+
+    init(_ chooser: TargetChooser) { self.chooser = chooser }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+      let current = chooser.current
+      let own = NSRunningApplication.current.processIdentifier
+      // An app object can outlive its process, whose pid may by then belong to another.
+      let running = NSWorkspace.shared.runningApplications
+        .filter {
+          $0.activationPolicy == .regular && $0.processIdentifier != own && !$0.isTerminated
+        }
+        .compactMap(AutoPressTarget.init(running:))
+      // A picked game that has quit can't be chosen again, so it isn't offered. The panel's note
+      // says it has quit.
+      targets = AutoPressTarget.choices(current: current, running: running)
+        .filter(\.isRunning)
+      let titles = AutoPressTarget.titles(targets)
+      while menu.items.count > 1 { menu.removeItem(at: menu.items.count - 1) }
+      for (index, target) in targets.enumerated() {
+        let item = NSMenuItem(title: titles[index], action: #selector(pick), keyEquivalent: "")
+        item.target = self
+        item.tag = index
+        item.state = target.sameIdentity(as: current) ? .on : .off
+        menu.addItem(item)
+        if index == 0, targets.count > 1 { menu.addItem(.separator()) }
+      }
+      menu.addItem(.separator())
+      let other = NSMenuItem(title: "Other App…", action: #selector(other), keyEquivalent: "")
+      other.target = self
+      menu.addItem(other)
+    }
+
+    @objc private func pick(_ item: NSMenuItem) {
+      guard targets.indices.contains(item.tag) else { return }
+      chooser.choose(targets[item.tag])
+    }
+
+    @objc private func other() { chooser.chooseOther() }
+  }
+}
+
+extension NSControl.ControlSize {
+  fileprivate init(_ size: SwiftUI.ControlSize) {
+    switch size {
+    case .mini: self = .mini
+    case .small: self = .small
+    case .large: self = .large
+    default: self = .regular
+    }
   }
 }
 

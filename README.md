@@ -1,8 +1,8 @@
 # Loupe
 
-A macOS overlay that tells you which Genshin Impact artifacts to keep, level or feed, while you play through GeForce NOW.
+A macOS overlay that tells you which Genshin Impact artifacts to keep, level or feed, while you play. It's tested with the game streamed through GeForce NOW.
 
-Loupe reads the game window you share with it, recognizes four- and five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while GeForce NOW is in front, for skipping dialogue; it stays off until you turn it on.
+Loupe reads the game window you share with it, recognizes four- and five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while the game is in front, for skipping dialogue; it stays off until you turn it on.
 
 Loupe is a fan-made tool. It isn't affiliated with or endorsed by HoYoverse or NVIDIA.
 
@@ -25,7 +25,7 @@ Artifact Lens, Loupe's earlier name, kept its data elsewhere. On first launch Lo
 ## Run
 
 1. Click **Choose game window**.
-2. Select **Genshin Impact on GeForce NOW** in the macOS sharing picker.
+2. Select the game window in the macOS sharing picker. With GeForce NOW it's **Genshin Impact on GeForce NOW**.
 3. Select one five-star artifact in Inventory or on a character's Artifacts screen.
 4. Wait for **Live card verified across two frames**.
 
@@ -50,11 +50,11 @@ Enable again to reuse the selected window if sharing permission remains valid. O
 
 Auto-press repeatedly presses a key while a chosen app is in front. Sending inputs to an online game may break its terms of service; use it at your own risk. It comes from [Mash](https://github.com/xinding33/mash) and starts with **F** in **NVIDIA GeForce NOW**, several times a second, which talks, picks up items and skips dialogue in Genshin Impact.
 
-1. Turn on **Press F repeatedly** under Auto-press in the main window, or press the toggle (`` ` `` to start with) while GeForce NOW is in front. A banner shows **Auto-press on** or **Auto-press off**, since the menu bar is hidden in full screen.
-2. It presses only while GeForce NOW is in front. Switch away and it pauses; come back and it carries on.
+1. Turn on **Press F repeatedly** under Auto-press in the main window, or press the toggle (`` ` `` to start with) while the chosen app is in front. A banner shows **Auto-press on** or **Auto-press off**, since the menu bar is hidden in full screen.
+2. It presses only while the chosen app is in front. Switch away and it pauses; come back and it carries on.
 3. It turns itself off after 10 minutes unless you change that.
 
-The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. The **Controls** menu has **Auto-Press On**.
+The Auto-press panel sets the key, the toggle (a key, a key combination or an extra mouse button), the app, presses per second and the timer. **Choose…** next to the app lists GeForce NOW, the apps running now, and **Other App…** for one that isn't running. A game with no app bundle, one running under Wine for example, can be picked from that list while it's running if macOS shows it as a regular app. It has to be picked again each time the game starts. The **Controls** menu has **Auto-Press On**.
 
 Auto-press needs **Accessibility** access to press keys and to use a mouse button as its toggle. It asks the first time you turn it on; until then the panel shows **Open Accessibility settings** and auto-press stays off. It notices the grant without a restart.
 
