@@ -9,14 +9,19 @@ final class Menus: NSObject, NSMenuItemValidation {
   private let model: Model
   private let autoPress: AutoPress
   private let updates: Updates
+  private let wishes: WishExport
   private let showMainWindow: () -> Void
   private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
   private var observers: Set<AnyCancellable> = []
 
-  init(model: Model, autoPress: AutoPress, updates: Updates, showMain: @escaping () -> Void) {
+  init(
+    model: Model, autoPress: AutoPress, updates: Updates, wishes: WishExport,
+    showMain: @escaping () -> Void
+  ) {
     self.model = model
     self.autoPress = autoPress
     self.updates = updates
+    self.wishes = wishes
     showMainWindow = showMain
     super.init()
     NSApp.mainMenu = mainMenu()
@@ -89,6 +94,8 @@ final class Menus: NSObject, NSMenuItemValidation {
     let file = submenu("File", in: main)
     add("Import Inventory…", to: file, action: #selector(importInventory))
     add("Export Inventory…", to: file, action: #selector(exportInventory))
+    file.addItem(.separator())
+    add("Export Wish History…", to: file, action: #selector(exportWishes))
     file.addItem(.separator())
     add("Close", to: file, action: #selector(NSWindow.performClose(_:)), key: "w")
 
@@ -167,6 +174,7 @@ final class Menus: NSObject, NSMenuItemValidation {
     case #selector(toggleExpanded): item.state = model.overlayExpanded ? .on : .off
     case #selector(toggleAutoPress): item.state = autoPress.session.isOn ? .on : .off
     case #selector(reportIssue): return model.diagnostics.canRequest
+    case #selector(exportWishes): return !wishes.isRunning
     case #selector(toggleAutomaticUpdates):
       item.state = updates.automatic && updates.canInstall ? .on : .off
       item.toolTip =
@@ -187,6 +195,10 @@ final class Menus: NSObject, NSMenuItemValidation {
   @objc private func toggleAutoPress() { autoPress.toggle() }
   @objc private func importInventory() { model.importInventory() }
   @objc private func exportInventory() { model.exportInventory() }
+  @objc private func exportWishes() {
+    showMainWindow()
+    wishes.export()
+  }
   @objc private func reportIssue() { model.reportIssue() }
   @objc private func checkForUpdates() { updates.checkNow() }
   @objc private func toggleAutomaticUpdates() { updates.automatic.toggle() }
