@@ -14,7 +14,13 @@ VERSION="${VERSION:-0.0.0}"
 BUILD="${APP_BUILD:-development}"
 # A stable identity keeps Screen Recording and Accessibility grants across rebuilds. Ad hoc
 # signatures change every build, so macOS treats each build as a new app.
-IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -n 1)}"
+# The default is the certificate's hash, not its name: a renewed certificate keeps the old one's
+# name, and codesign refuses a name two certificates share. Both carry the same team, which is what
+# the grants hang off.
+IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/^ *[0-9]*) \([0-9A-F]\{40\}\) "Developer ID Application: .*/\1/p' | head -n 1)}"
+# A release that finds no Developer ID falls back to the name, so codesign can still find one this
+# lookup missed, and fails rather than shipping an ad hoc build.
+if [ "$BUILD" = release ]; then IDENTITY="${IDENTITY:-Developer ID Application}"; fi
 IDENTITY="${IDENTITY:--}"
 # Identifies the exact sources in diagnostic reports, so a replay can name the build it ran.
 FINGERPRINT="sha256-$( { find Sources -type f -name '*.swift' -exec shasum -a 256 {} \; ; shasum -a 256 Package.swift scripts/Info.plist scripts/build.sh; } | LC_ALL=C sort | shasum -a 256 | cut -d ' ' -f 1)"
