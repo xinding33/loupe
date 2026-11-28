@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let shortcutBackend = CarbonShortcutBackend()
   private var model: Model!
   private var autoPress: AutoPress!
+  private var scanner: InventoryScanner!
   private let updates = Updates()
   private let wishes = WishExport()
   private var menus: Menus!
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     model = Model()
     model.banner = { [hud] in hud.show($0) }
     autoPress = AutoPress(hud: hud)
+    scanner = InventoryScanner(model: model)
     autoPress.overlayShortcuts = { [weak self] in
       guard let self else { return [] }
       return [
@@ -30,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     window.title = "Loupe"
     window.contentView = NSHostingView(
-      rootView: Dashboard(model: model, autoPress: autoPress))
+      rootView: Dashboard(model: model, autoPress: autoPress, scanner: scanner))
     window.isReleasedWhenClosed = false
     window.isExcludedFromWindowsMenu = true
     window.tabbingMode = .disallowed
@@ -44,7 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     wishes.status = { [weak self] in self?.model.status = $0 }
     wishes.issue = { [weak self] in self?.model.issue = $0 }
     wishes.banner = { [hud] in hud.show($0) }
-    menus = Menus(model: model, autoPress: autoPress, updates: updates, wishes: wishes) {
+    menus = Menus(
+      model: model, autoPress: autoPress, scanner: scanner, updates: updates, wishes: wishes
+    ) {
       [weak self] in
       self?.showMain()
     }
@@ -91,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     window.makeKeyAndOrderFront(nil)
   }
   func applicationWillTerminate(_ notification: Notification) {
+    scanner.stop("Loupe quit.")
     model.setEnabled(false)
     autoPress.shutdown()
     shortcutBackend.close()

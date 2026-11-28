@@ -227,6 +227,48 @@ import Testing
     #expect(throws: ArtifactError.self) { try CardParser.parse(text, fiveStarsConfirmed: false) }
   }
 
+  @Test func aCardOfAnyRarityIsToldApartByItsStatsAndLevel() throws {
+    let threeStar = """
+      Instructor's Pocket Watch
+      Sands of Eon
+      Elemental Mastery
+      84
+      +12
+      Energy Recharge+9.3%
+      HP+2.8%
+      Instructor:
+      """
+    let card = try #require(CardParser.glance(threeStar, stars: 3))
+    #expect(card.level == 12)
+    let other = try #require(
+      CardParser.glance(
+        threeStar.replacingOccurrences(of: "HP+2.8%", with: "HP+3.3%"), stars: 3))
+    #expect(other.key != card.key)
+    // Vision reads the apostrophe either way.
+    let curly = threeStar.replacingOccurrences(of: "'", with: "\u{2019}")
+    #expect(CardParser.glance(curly, stars: 3)?.key == card.key)
+    #expect(CardParser.glance("Instructor's Pocket Watch", stars: 3) == nil)
+    // A +12 isn't a two-star piece: its stars were miscounted.
+    #expect(CardParser.glance(threeStar, stars: 2) == nil)
+    #expect(
+      CardParser.glance(threeStar.replacingOccurrences(of: "+12", with: "+20"), stars: 3) == nil)
+  }
+
+  @Test func aOneStarCardWithNoSubstatsIsToldApart() throws {
+    let oneStar = """
+      Adventurer's Flower
+      Flower of Life
+      HP
+      129
+      +1
+      Adventurer:
+      """
+    let card = try #require(CardParser.glance(oneStar, stars: 1))
+    #expect(card.level == 1)
+    #expect(
+      CardParser.glance(oneStar.replacingOccurrences(of: "+1", with: "+0"), stars: 1)?.level == 0)
+  }
+
   @Test func goodImportsKeepFourStarsAndSkipLowerRarities() throws {
     let json = """
       {"format": "GOOD", "artifacts": [

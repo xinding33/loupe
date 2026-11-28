@@ -8,6 +8,7 @@ import LoupeCore
 final class Menus: NSObject, NSMenuItemValidation {
   private let model: Model
   private let autoPress: AutoPress
+  private let scanner: InventoryScanner
   private let updates: Updates
   private let wishes: WishExport
   private let showMainWindow: () -> Void
@@ -15,11 +16,12 @@ final class Menus: NSObject, NSMenuItemValidation {
   private var observers: Set<AnyCancellable> = []
 
   init(
-    model: Model, autoPress: AutoPress, updates: Updates, wishes: WishExport,
-    showMain: @escaping () -> Void
+    model: Model, autoPress: AutoPress, scanner: InventoryScanner, updates: Updates,
+    wishes: WishExport, showMain: @escaping () -> Void
   ) {
     self.model = model
     self.autoPress = autoPress
+    self.scanner = scanner
     self.updates = updates
     self.wishes = wishes
     showMainWindow = showMain
@@ -60,6 +62,7 @@ final class Menus: NSObject, NSMenuItemValidation {
     menu.addItem(.separator())
     add("Save Snapshot", to: menu, action: #selector(saveSnapshot))
     add("Record Game Window", to: menu, action: #selector(toggleRecording))
+    add("Scan Inventory", to: menu, action: #selector(toggleScan))
     menu.addItem(.separator())
     add("Report Issue…", to: menu, action: #selector(reportIssue))
     add("Check for Updates…", to: menu, action: #selector(checkForUpdates))
@@ -116,6 +119,7 @@ final class Menus: NSObject, NSMenuItemValidation {
     controls.addItem(.separator())
     add("Save Snapshot", to: controls, action: #selector(saveSnapshot))
     add("Record Game Window", to: controls, action: #selector(toggleRecording))
+    add("Scan Inventory", to: controls, action: #selector(toggleScan))
     controls.addItem(.separator())
     add("Auto-Press On", to: controls, action: #selector(toggleAutoPress))
 
@@ -173,6 +177,9 @@ final class Menus: NSObject, NSMenuItemValidation {
     case #selector(toggleEnabled): item.state = model.enabled ? .on : .off
     case #selector(toggleExpanded): item.state = model.overlayExpanded ? .on : .off
     case #selector(toggleAutoPress): item.state = autoPress.session.isOn ? .on : .off
+    case #selector(toggleScan):
+      item.title = scanner.isActive ? "Stop Inventory Scan" : "Scan Inventory"
+      return scanner.isActive || model.enabled
     case #selector(reportIssue): return model.diagnostics.canRequest
     case #selector(exportWishes): return !wishes.isRunning
     case #selector(toggleAutomaticUpdates):
@@ -193,6 +200,7 @@ final class Menus: NSObject, NSMenuItemValidation {
   @objc private func saveSnapshot() { model.saveSnapshot() }
   @objc private func toggleRecording() { model.toggleRecording() }
   @objc private func toggleAutoPress() { autoPress.toggle() }
+  @objc private func toggleScan() { scanner.toggle() }
   @objc private func importInventory() { model.importInventory() }
   @objc private func exportInventory() { model.exportInventory() }
   @objc private func exportWishes() {

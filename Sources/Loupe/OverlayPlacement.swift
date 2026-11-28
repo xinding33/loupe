@@ -58,6 +58,13 @@ struct OverlayPlacement: Equatable {
     return NSWindow.Level(rawValue: max(NSWindow.Level.floating.rawValue, above))
   }
 
+  /// Whether the overlay shows: only while the app that owns the shared window, the game or
+  /// the app streaming it, is in front.
+  static func showsOverGame(windowOwner: pid_t?, frontmost: pid_t?) -> Bool {
+    guard let windowOwner, let frontmost else { return false }
+    return windowOwner == frontmost
+  }
+
   static func appKitFrame(_ quartz: CGRect, primaryTop: CGFloat) -> CGRect {
     CGRect(x: quartz.minX, y: primaryTop - quartz.maxY, width: quartz.width, height: quartz.height)
   }
@@ -90,6 +97,7 @@ final class OverlayController {
   private let defaults: UserDefaults
   private var offset: CGPoint
   private var dragOrigin: CGPoint?
+  private var activation: NSObjectProtocol?
   private(set) var placement: OverlayPlacement?
 
   init(model: Model, defaults: UserDefaults = .standard) {
@@ -110,6 +118,12 @@ final class OverlayController {
         drag: { [weak self] delta, finished in self?.drag(delta, finished: finished) }))
     model.updateOverlay = { [weak self] in self?.update() }
     model.resetOverlayPlacement = { [weak self] in self?.resetPlacement() }
+    // Show or hide as soon as the game comes to the front or leaves it, not at the next tick.
+    activation = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshPlacement() }
+    }
     update()
   }
 
@@ -150,6 +164,12 @@ final class OverlayController {
   private func refreshPlacement() {
     defer { syncPointerTracking() }
     guard model.enabled else { return }
+    // A scan clicks across the game window, so nothing of Loupe's may be in the way.
+    if model.isScanning {
+      panel.orderOut(nil)
+      controls.orderOut(nil)
+      return
+    }
     let screens = NSScreen.screens
     guard let id = model.capture.selectedWindowID,
       let primary = screens.first,
@@ -197,6 +217,16 @@ final class OverlayController {
       overlay: next.panelFrame, scale: next.display.scale)
     if previousGeometry != model.diagnosticPlacement {
       model.recordDiagnosticDisplay()
+    }
+    guard
+      OverlayPlacement.showsOverGame(
+        windowOwner: (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+        frontmost: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+    else {
+      panel.orderOut(nil)
+      controls.orderOut(nil)
+      model.setPlacementStatus("Shows over the game while the game is in front.")
+      return
     }
     let level = OverlayPlacement.panelLevel(
       sharedWindowLayer: (info[kCGWindowLayer as String] as? NSNumber)?.intValue,

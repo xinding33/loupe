@@ -10,6 +10,7 @@ func percent(_ value: Double) -> String {
 struct Dashboard: View {
   @ObservedObject var model: Model
   let autoPress: AutoPress
+  let scanner: InventoryScanner
   @State private var textEditor = false
   @State private var guide = false
 
@@ -19,7 +20,8 @@ struct Dashboard: View {
       Divider()
       HStack(spacing: 0) {
         ScrollView {
-          Sidebar(model: model, autoPress: autoPress, textEditor: $textEditor).padding(14)
+          Sidebar(model: model, autoPress: autoPress, scanner: scanner, textEditor: $textEditor)
+            .padding(14)
         }
         .frame(width: 290)
         .background(Color.black.opacity(0.12))
@@ -151,6 +153,7 @@ struct Dashboard: View {
 private struct Sidebar: View {
   @ObservedObject var model: Model
   let autoPress: AutoPress
+  let scanner: InventoryScanner
   @Binding var textEditor: Bool
 
   var body: some View {
@@ -193,7 +196,7 @@ private struct Sidebar: View {
           "Collect cards as I browse",
           isOn: Binding(get: { model.scanMode }, set: { model.setCollectCards($0) })
         )
-        .disabled(!model.enabled)
+        .disabled(!model.enabled || model.isScanning)
         Toggle("Crafted / guaranteed rolls", isOn: $model.special)
           .help("Mark crafted pieces before reading. Reshaping odds are not modeled.")
         Text("Ordinary five-star drops only.").font(.caption).foregroundStyle(.secondary)
@@ -203,6 +206,7 @@ private struct Sidebar: View {
         .disabled(!model.enabled)
       }
       .toggleStyle(.switch).controlSize(.small)
+      ScanPanel(scanner: scanner, model: model)
       Panel(title: "Overlay", systemImage: "rectangle.inset.topright.filled") {
         Toggle("Expanded", isOn: $model.overlayExpanded).toggleStyle(.switch).controlSize(.small)
         Button("Reset placement", systemImage: "arrow.uturn.backward") {
@@ -453,11 +457,12 @@ struct InventoryView: View {
           .help("Undo the last inventory edit this session.")
       }
       .controlSize(.small)
+      if let report = model.lastScan { ScanReview(model: model, report: report) }
       InventoryCoverageView(artifacts: model.inventory.artifacts, current: model.current)
       TextField("Filter set, slot, main stat, or +20", text: $model.search)
         .textFieldStyle(.roundedBorder)
       Text(
-        "To track an upgrade, link its record, then save after each checkpoint. Identical cards are deduplicated; use Save copy for real duplicates."
+        "To track an upgrade, link its record, then save after each checkpoint. Identical cards are deduplicated; use Save copy for real duplicates, or Scan Inventory, which counts them."
       )
       .font(.caption).foregroundStyle(.secondary)
       LazyVStack(alignment: .leading, spacing: 6) {
@@ -531,12 +536,11 @@ struct CardTextEditor: View {
 struct ScanGuide: View {
   @Environment(\.dismiss) private var dismiss
   private let steps: [(String, String)] = [
-    ("line.3.horizontal.decrease.circle", "In Genshin Inventory, filter to five-star artifacts."),
-    ("arrow.up.arrow.down", "Sort by level. Start with +20 pieces, including equipped ones."),
+    ("arrow.up.arrow.down", "In Genshin Inventory, sort artifacts by level, highest first."),
     ("macwindow", "Choose the game window in the macOS sharing picker."),
     (
       "tray.and.arrow.down",
-      "Turn on Collect cards as I browse. Select each piece and wait for Verified."
+      "Click Scan Inventory and switch to the game, or turn on Collect cards as I browse and select each piece."
     ),
     (
       "checkmark.circle",
@@ -563,7 +567,7 @@ struct ScanGuide: View {
       }
       Label {
         Text(
-          "No automated clicks, upgrades, or salvage. Only the selected window is read, on this Mac. Opt-in diagnostics keep crops in memory until you save a report; snapshots and recordings save full-window frames. Both may include UID or chat. Nothing is uploaded."
+          "Only Scan Inventory clicks in the game, to select tiles and scroll; nothing upgrades or salvages. Only the selected window is read, on this Mac. Opt-in diagnostics keep crops in memory until you save a report; snapshots and recordings save full-window frames. Both may include UID or chat. Nothing is uploaded."
         )
       } icon: {
         Image(systemName: "lock.shield")
@@ -580,5 +584,112 @@ struct ScanGuide: View {
       }
     }
     .padding(28).frame(width: 600)
+  }
+}
+
+/// Starts and stops an inventory scan, and says how it's going.
+private struct ScanPanel: View {
+  @ObservedObject var scanner: InventoryScanner
+  @ObservedObject var model: Model
+
+  var body: some View {
+    Panel(title: "Scan inventory", systemImage: "square.grid.3x3") {
+      Text(
+        "Clicks each levelled piece in the game's Inventory, from the top, and saves the four- and five-star ones. Sort by level first; the scan ends at the first +0 piece. Move the mouse or press a key to stop."
+      )
+      .font(.caption).foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      Button(
+        scanner.isActive ? "Stop scan" : "Scan Inventory",
+        systemImage: scanner.isActive ? "stop.circle" : "play.circle"
+      ) { scanner.toggle() }
+      .disabled(!scanner.isActive && !model.enabled)
+      if !scanner.progress.isEmpty {
+        Text(scanner.progress).font(.caption).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .controlSize(.small)
+  }
+}
+
+/// What the last scan changed, and the records it couldn't decide about.
+private struct ScanReview: View {
+  @ObservedObject var model: Model
+  let report: ScanReport
+
+  /// The listed records still as the scan left them.
+  private func records(_ ids: [UUID]) -> [Artifact] {
+    ids.compactMap { id in
+      model.inventory.artifacts.first { $0.id == id && report.cards[id] == $0.signature }
+    }
+  }
+
+  var body: some View {
+    let unseen = records(report.merge.unseen)
+    let ambiguous = report.merge.ambiguous.compactMap { item in
+      records([item.added]).first.map { ($0, records(item.earlier)) }
+    }.filter { !$0.1.isEmpty }
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label("Last scan", systemImage: "square.grid.3x3").font(.callout.bold())
+        Spacer()
+        Button("Dismiss", systemImage: "xmark") { model.lastScan = nil }
+          .labelStyle(.iconOnly).buttonStyle(.plain)
+      }
+      Text(report.summary).font(.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if !ambiguous.isEmpty {
+        DisclosureGroup("\(ambiguous.count) new pieces could be a levelled saved piece") {
+          Text(
+            "Each was added. Remove the saved record it came from, if one is listed; the others are still in your bag."
+          )
+          .font(.caption2).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          ForEach(ambiguous, id: \.0.id) { added, earlier in
+            VStack(alignment: .leading, spacing: 4) {
+              Text("New: " + Self.describe(added)).font(.caption)
+              ForEach(earlier) { record in
+                HStack {
+                  Text("Saved: " + Self.describe(record)).font(.caption)
+                    .foregroundStyle(.secondary)
+                  Spacer()
+                  Button("Remove", systemImage: "trash", role: .destructive) {
+                    model.remove(record)
+                  }
+                  .labelStyle(.iconOnly).help("Remove this saved record")
+                }
+              }
+            }
+            .padding(.top, 4)
+          }
+        }
+        .font(.caption)
+      }
+      if !unseen.isEmpty {
+        DisclosureGroup("\(unseen.count) saved pieces weren't in the game") {
+          Text(
+            "The scan covered their level and set but didn't find them: salvaged, fed, or levelled into a piece it couldn't match."
+          )
+          .font(.caption2).foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          ForEach(unseen) { record in
+            Text(Self.describe(record)).font(.caption).foregroundStyle(.secondary)
+          }
+          Button("Remove these \(unseen.count)", systemImage: "trash", role: .destructive) {
+            model.remove(unseen.map(\.id))
+          }
+          .help("Undo puts them back.")
+        }
+        .font(.caption)
+      }
+    }
+    .controlSize(.small)
+    .padding(10)
+    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+  }
+
+  static func describe(_ artifact: Artifact) -> String {
+    "+\(artifact.level) \(artifact.setName) \(artifact.slot.label) · \(artifact.main.label)"
   }
 }

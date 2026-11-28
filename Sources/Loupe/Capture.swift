@@ -231,9 +231,15 @@ enum CardOCR {
   }
 }
 
+/// Set once, only on the capture queue.
+private final class Flag: @unchecked Sendable {
+  var isSet = false
+}
+
 private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
   let receive:
-    @Sendable (Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage) -> Void
+    @Sendable (Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage, TimeInterval)
+      -> Void
   let sessionID: UUID
   let gate = FrameGate()
   private let queue: DispatchQueue
@@ -246,8 +252,9 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
   init(
     sessionID: UUID, diagnosticsEnabled: Bool, queue: DispatchQueue,
     receive:
-      @escaping @Sendable (Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage) ->
-      Void
+      @escaping @Sendable (
+        Result<CardReading, Error>, DiagnosticSampleKey?, DiagnosticCoverage, TimeInterval
+      ) -> Void
   ) throws {
     self.sessionID = sessionID
     self.queue = queue
@@ -274,7 +281,7 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
     let time = ProcessInfo.processInfo.systemUptime
     let complete = status == SCFrameStatus.complete.rawValue
     if complete, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-      pipeline.show(buffer)
+      pipeline.show(buffer, at: time)
     } else if status != SCFrameStatus.idle.rawValue || !pipeline.hasFrame {
       pipeline.reset()
       return
@@ -311,7 +318,7 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
         clear()
         return
       }
-      receive(delivery.result, delivery.key, delivery.coverage)
+      receive(delivery.result, delivery.key, delivery.coverage, delivery.frameTime)
     }
     // A held frame is read on time even if the stream goes quiet.
     guard let deadline = pipeline.deadline, deadline != timer else { return }
@@ -340,6 +347,10 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
   private(set) var enabled = false
   private var diagnosticsEnabled = false
   private(set) var currentSample: DiagnosticSampleKey?
+  /// When the frame behind the reading being delivered arrived, on the system uptime clock.
+  private(set) var currentFrameTime: TimeInterval?
+  /// The capture session readings come from. A new one starts with each stream.
+  private(set) var sessionID: UUID?
   var diagnosticSessionStarted: ((UUID) -> Void)?
   var diagnosticCoverage: ((UUID, DiagnosticCoverage) -> Void)?
   private let queue = DispatchQueue(label: "Loupe.OCR", qos: .userInitiated)
@@ -419,6 +430,35 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
         // A recording started since then owns the status.
         guard self.activeRecording == nil else { return }
         self.recordingStatus?(message, false)
+      }
+    }
+  }
+
+  /// Hands over the next frame of the shared window, or nil if capture ends or no frame comes
+  /// within `timeout`, as when the stream goes quiet.
+  func nextFrame(timeout: TimeInterval = 1) async -> CGImage? {
+    guard enabled, let reader, reader.gate.isActive else { return nil }
+    let queue = queue
+    return await withCheckedContinuation { (continuation: CheckedContinuation<CGImage?, Never>) in
+      queue.async {
+        guard reader.gate.isActive else {
+          continuation.resume(returning: nil)
+          return
+        }
+        // The frame and the timeout both run on the capture queue; whichever is first answers.
+        let answered = Flag()
+        let earlier = reader.snapshot
+        reader.snapshot = { image in
+          earlier?(image)
+          guard !answered.isSet else { return }
+          answered.isSet = true
+          continuation.resume(returning: image)
+        }
+        queue.asyncAfter(deadline: .now() + timeout) {
+          guard !answered.isSet else { return }
+          answered.isSet = true
+          continuation.resume(returning: nil)
+        }
       }
     }
   }
@@ -551,6 +591,8 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
 
   private func replace(_ filter: SCContentFilter?) {
     currentSample = nil
+    currentFrameTime = nil
+    sessionID = nil
     stopRecording()
     didStop?()
     reader = nil
@@ -577,10 +619,11 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
       let reader = try FrameReader(
         sessionID: sessionID, diagnosticsEnabled: self.diagnosticsEnabled, queue: self.queue
       ) {
-        [weak self] result, sample, coverage in
+        [weak self] result, sample, coverage, frameTime in
         Task { @MainActor in
           guard let self, self.enabled, self.runtime.accepts(token) else { return }
           self.currentSample = sample
+          self.currentFrameTime = frameTime
           self.receive?(result)
           self.diagnosticCoverage?(sessionID, coverage)
         }
@@ -589,6 +632,7 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
       try stream.addStreamOutput(
         reader, type: .screen, sampleHandlerQueue: self.queue)
       self.reader = reader
+      self.sessionID = sessionID
       self.diagnosticSessionStarted?(sessionID)
       let connection = StreamConnection(stream: stream, reader: reader, queue: self.queue)
       self.currentConnection = connection

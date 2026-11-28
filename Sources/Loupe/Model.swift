@@ -74,6 +74,15 @@ final class Model: ObservableObject {
     }
   }
   @Published var linkedID: UUID?
+  /// An inventory scan is clicking through the game. Collection pauses and the overlay hides.
+  @Published private(set) var isScanning = false
+  /// A scan turned collection off for the rest of this launch.
+  private var collectionPausedByScan = false
+  /// What the last inventory scan added, for the review list under Saved inventory.
+  @Published var lastScan: ScanReport?
+  /// Each Inventory card parsed while scanning, nil for a frame with none, before it's verified,
+  /// with when its frame arrived.
+  var cardObserver: ((InventorySweep.Card?, TimeInterval) -> Void)?
   @Published var search = ""
   @Published private(set) var enabled = true
   @Published var overlayExpanded = false {
@@ -250,6 +259,7 @@ final class Model: ObservableObject {
   private func receive(_ result: Result<CardReading, Error>) {
     guard enabled else { return }
     let key = capture.currentSample
+    let frameTime = capture.currentFrameTime ?? ProcessInfo.processInfo.systemUptime
     latestDiagnosticSample = key
     var parsed: Artifact?
     var decision = "OCR did not produce a confirmed reading"
@@ -262,6 +272,7 @@ final class Model: ObservableObject {
     switch result {
     case .failure(let error):
       decision = error.localizedDescription
+      cardObserver?(nil, frameTime)
       missedReading(error)
     case .success(let reading):
       if rawText != reading.text { rawText = reading.text }
@@ -282,6 +293,7 @@ final class Model: ObservableObject {
             rule: special ? .special : .ordinary)
         }
         parsed = artifact
+        cardObserver?(reading.isEnhancement ? nil : .read(artifact), frameTime)
         decision = "Parsed; checking card stability"
         updateStability { $0.observe(artifact.signature, at: Date()) }
         guard stability.isVerified else {
@@ -311,12 +323,25 @@ final class Model: ObservableObject {
           displayedDiagnosticSample = key?.id
           evaluate()
         }
-        if scanMode && (!reading.isEnhancement || linkedID != nil) { saveCurrent() }
+        if scanMode && !isScanning && (!reading.isEnhancement || linkedID != nil) {
+          saveCurrent()
+        }
       } catch {
         decision = error.localizedDescription
+        if parsed == nil { cardObserver?(Self.otherCard(result), frameTime) }
         missedReading(error)
       }
     }
+  }
+
+  /// An Inventory card of a rarity Loupe doesn't grade, one to three stars, for the scan to
+  /// pass over. A level past what its stars allow means a five-star miscounted: not passed.
+  private static func otherCard(_ result: Result<CardReading, Error>) -> InventorySweep.Card? {
+    guard case .success(let reading) = result, !reading.isEnhancement,
+      (1...3).contains(reading.stars), reading.confidence >= 0.65,
+      let card = CardParser.glance(reading.text, stars: reading.stars)
+    else { return nil }
+    return .other(key: card.key, level: card.level)
   }
 
   private func clearResult() {
@@ -531,10 +556,59 @@ final class Model: ObservableObject {
       scanMode = false
     }
   }
+  /// Pauses collection and hides the overlay while a scan clicks through the game.
+  func beginScan() {
+    isScanning = true
+    linkedID = nil
+    // Until the user turns it on again or relaunches: after the scan the game still shows the
+    // piece it stopped at, which collection would save in an edit of its own, ahead of the
+    // scan's Undo. Turning the reader off and on keeps it off.
+    scanMode = false
+    collectionPausedByScan = true
+    updateOverlay?()
+  }
+
+  /// Saves what a scan read, all in one change that Undo reverses. Nil for a scan that read
+  /// nothing.
+  func finishScan(_ sweep: InventorySweep?) {
+    isScanning = false
+    updateOverlay?()
+    guard let sweep else { return }
+    var next = inventory
+    let merge = next.mergeSweep(sweep.artifacts, covered: sweep.coveredLevels)
+    do {
+      if next.artifacts != inventory.artifacts {
+        try persist(next)
+        evaluate()
+      }
+      let listed = merge.unseen + merge.ambiguous.flatMap { [$0.added] + $0.earlier }
+      lastScan = ScanReport(
+        merge: merge, ending: sweep.ending, missed: sweep.missed.count,
+        passed: sweep.others.count,
+        cards: Dictionary(
+          next.artifacts.filter { listed.contains($0.id) }.map { ($0.id, $0.signature) },
+          uniquingKeysWith: { first, _ in first }))
+    } catch {
+      issue = "The scan's pieces weren't saved. \(error.localizedDescription)"
+    }
+  }
+
+  /// Removes saved records together, as one change.
+  func remove(_ ids: [UUID]) {
+    var next = inventory
+    for id in ids { next.remove(id) }
+    do {
+      try persist(next)
+      if let linkedID, ids.contains(linkedID) { self.linkedID = nil }
+      evaluate()
+    } catch { issue = error.localizedDescription }
+  }
+
   /// The Collect cards toggle, which is remembered for the next launch.
   func setCollectCards(_ value: Bool) {
     scanMode = value
     preferences.collectCards = value
+    collectionPausedByScan = false
   }
   func link(_ artifact: Artifact) {
     scanMode = false
@@ -712,7 +786,7 @@ final class Model: ObservableObject {
     guard enabled != value else { return }
     enabled = value
     enhancementContext = nil
-    scanMode = value && preferences.collectCards
+    scanMode = value && preferences.collectCards && !collectionPausedByScan
     linkedID = nil
     resetLiveCard()
     clearDiagnostics?()

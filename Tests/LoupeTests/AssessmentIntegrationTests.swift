@@ -189,7 +189,9 @@ private let assessmentFlower = """
     settings.target = AutoPressTarget(bundleID: "invalid.loupe.tests", name: "GeForce NOW")
     defaults.set(try JSONEncoder().encode(settings), forKey: AutoPress.defaultsKey)
     let host = NSHostingView(
-      rootView: Dashboard(model: model, autoPress: AutoPress(defaults: defaults)))
+      rootView: Dashboard(
+        model: model, autoPress: AutoPress(defaults: defaults),
+        scanner: InventoryScanner(model: model)))
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1080, height: 1000), styleMask: [.borderless],
       backing: .buffered, defer: false)
