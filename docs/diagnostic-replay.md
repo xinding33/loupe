@@ -10,8 +10,8 @@ report directory and optional context file. Nothing is uploaded.
 Use the executable inside a packaged app, not `open -a`:
 
 ```sh
-dist/Loupe.app/Contents/MacOS/Loupe replay --help
-dist/Loupe.app/Contents/MacOS/Loupe replay /absolute/report-directory --context /absolute/context.json
+"dist/Loupe Dev.app/Contents/MacOS/Loupe" replay --help
+"dist/Loupe Dev.app/Contents/MacOS/Loupe" replay /absolute/report-directory --context /absolute/context.json
 ```
 
 The report directory must contain an existing schema-2 `manifest.json` and its
@@ -61,7 +61,7 @@ A legal but incorrect context can still fail the real Enhance parser.
 Omit `--context` to inspect fresh OCR alone. No implicit context is loaded:
 
 ```sh
-dist/Loupe.app/Contents/MacOS/Loupe replay /absolute/report-directory
+"dist/Loupe Dev.app/Contents/MacOS/Loupe" replay /absolute/report-directory
 ```
 
 No arguments starts the normal desktop app. Use `--help` when inspecting an

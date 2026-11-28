@@ -114,10 +114,27 @@ enum CardOCR {
     let isLevel = { (line: TextRegion) in
       line.text.range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
     }
+    // A level found by a second pass, whose confidence doesn't count against the card: Vision
+    // is unsure of a lone tag, and the substats' rolls must fit the level anyway.
+    var secondPass: CGRect?
     if !lines.contains(where: isLevel),
       let level = try recoveredLevel(image, lines: lines, left: left).first(where: isLevel)
     {
       lines = (lines + [level]).sorted { $0.bounds.midY > $1.bounds.midY }
+      secondPass = level.bounds
+    }
+    // A one-digit tag, "+4", is often too small to find in the whole window, and enlarging it
+    // loses it; the card's column on its own, at full size, has it.
+    if !lines.contains(where: isLevel),
+      let level = try recognize(
+        image, in: CGRect(x: left, y: 0, width: right - left, height: 1),
+        targetWidth: (right - left) * Double(image.width), kind: .inventoryCard, diagnostics: nil
+      ).map({
+        TextRegion(text: CardParser.tidied($0.text), bounds: $0.bounds, confidence: $0.confidence)
+      }).first(where: isLevel)
+    {
+      lines = (lines + [level]).sorted { $0.bounds.midY > $1.bounds.midY }
+      secondPass = level.bounds
     }
     guard
       let level = lines.first(where: isLevel)?.bounds,
@@ -132,8 +149,8 @@ enum CardOCR {
     let text = lines.map(\.text).joined(separator: "\n")
     // Judge only the lines the parser reads; Vision often reads the rarity stars as junk text.
     let judged =
-      CardParser.parsedLines(text).map { $0.map { lines[$0] } }
-      ?? lines.filter { $0.bounds.minY >= level.minY - 0.23 }
+      (CardParser.parsedLines(text).map { $0.map { lines[$0] } }
+      ?? lines.filter { $0.bounds.minY >= level.minY - 0.23 }).filter { $0.bounds != secondPass }
     return CardReading(
       text: text, stars: stars, confidence: judged.map(\.confidence).min() ?? 0)
   }
@@ -247,6 +264,8 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
   var recording: FrameRecording?
   /// Takes the next frame, or nil if capture ends first.
   var snapshot: ((CGImage?) -> Void)?
+  /// While an inventory scan reads its own frames, the live reader doesn't read any.
+  var livePaused = false
   /// The held frame's deadline that a timer is set for.
   private var timer: TimeInterval?
   init(
@@ -309,6 +328,7 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
       clear()
       return
     }
+    guard !livePaused else { return }
     deliver(complete ? pipeline.complete(at: time) : pipeline.idle(at: time))
   }
 
@@ -325,7 +345,7 @@ private final class FrameReader: NSObject, SCStreamOutput, @unchecked Sendable {
     timer = deadline
     let delay = max(0, deadline - ProcessInfo.processInfo.systemUptime)
     queue.asyncAfter(deadline: .now() + delay) { [weak self] in
-      guard let self, gate.isActive else { return }
+      guard let self, gate.isActive, !livePaused else { return }
       timer = nil
       deliver(pipeline.tick(at: ProcessInfo.processInfo.systemUptime))
     }
@@ -339,6 +359,7 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
   private var selectedFilter: SCContentFilter?
   private(set) var selectedWindowID: CGWindowID?
   private var currentConnection: StreamConnection?
+  private var streamConfiguration: SCStreamConfiguration?
   private var currentStream: SCStream? { currentConnection?.stream }
   /// Whether a game window is being captured.
   var isCapturing: Bool { currentConnection != nil }
@@ -432,6 +453,15 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
         self.recordingStatus?(message, false)
       }
     }
+  }
+
+  /// For an inventory scan: twenty frames a second, read by the scan alone. Off restores five
+  /// frames a second for the live reader.
+  func setScanning(_ on: Bool) {
+    guard let reader, let stream = currentStream, let config = streamConfiguration else { return }
+    queue.async { reader.livePaused = on }
+    config.minimumFrameInterval = CMTime(value: 1, timescale: on ? 20 : 5)
+    stream.updateConfiguration(config) { _ in }
   }
 
   /// Hands over the next frame of the shared window, or nil if capture ends or no frame comes
@@ -597,6 +627,7 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
     didStop?()
     reader = nil
     currentConnection = nil
+    streamConfiguration = nil
     guard let filter else {
       runtime.replace(with: nil)
       return
@@ -632,6 +663,7 @@ final class Capture: NSObject, SCContentSharingPickerObserver, SCStreamDelegate 
       try stream.addStreamOutput(
         reader, type: .screen, sampleHandlerQueue: self.queue)
       self.reader = reader
+      self.streamConfiguration = config
       self.sessionID = sessionID
       self.diagnosticSessionStarted?(sessionID)
       let connection = StreamConnection(stream: stream, reader: reader, queue: self.queue)

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Builds dist/Loupe.app and dist/Loupe.zip.
+# Builds dist/Loupe.app and dist/Loupe.zip, or for a development build dist/Loupe Dev.app and
+# dist/Loupe Dev.zip.
 #
 #   APP_VERSION        version to stamp (releases pass it from the tag; default: latest tag, else 0.0.0)
 #   SIGN_IDENTITY      codesign identity (default: this Mac's Developer ID if it has one, else ad hoc)
@@ -32,14 +33,21 @@ FLAGS+=(${SWIFT_BUILD_FLAGS:-})
 swift build "${FLAGS[@]}"
 BIN_DIR="$(swift build "${FLAGS[@]}" --show-bin-path)"
 
+# A development build goes by another name, so it isn't mistaken for an installed release in the
+# Dock, the menu bar or Finder. The bundle identifier stays, so grants, settings and the inventory
+# carry over.
+if [ "$BUILD" = release ]; then NAME=Loupe; else NAME="Loupe Dev"; fi
+
 rm -rf dist
-APP="$PWD/dist/Loupe.app"
+APP="$PWD/dist/$NAME.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Loupe" "$APP/Contents/MacOS/Loupe"
 cp scripts/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace LoupeBuild -string "$BUILD" "$APP/Contents/Info.plist"
+plutil -replace CFBundleName -string "$NAME" "$APP/Contents/Info.plist"
+plutil -replace CFBundleDisplayName -string "$NAME" "$APP/Contents/Info.plist"
 plutil -replace LoupeBuildFingerprint -string "$FINGERPRINT" "$APP/Contents/Info.plist"
 if [ -f LICENSE ]; then cp LICENSE "$APP/Contents/Resources/LICENSE"; fi
 swift scripts/make-icon.swift "$APP/Contents/Resources/AppIcon.icns"
@@ -53,5 +61,5 @@ else
   codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$APP"
 fi
 codesign --verify --strict "$APP"
-ditto -c -k --sequesterRsrc --keepParent "$APP" "$PWD/dist/Loupe.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$PWD/dist/$NAME.zip"
 printf 'Built: %s (%s, %s, signed by %s)\n' "$APP" "$VERSION" "$BUILD" "$IDENTITY"

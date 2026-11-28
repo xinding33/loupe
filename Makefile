@@ -12,6 +12,6 @@ format:
 check:
 	xcrun swift-format lint --strict -r Sources Tests Package.swift
 	swift test $(SWIFT_FLAGS)
-# dist/Loupe.app, signed with this Mac's Developer ID when it has one. See scripts/build.sh.
+# dist/Loupe Dev.app, signed with this Mac's Developer ID when it has one. See scripts/build.sh.
 app:
 	SWIFT_BUILD_FLAGS="$(SWIFT_FLAGS)" bash scripts/build.sh

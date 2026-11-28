@@ -254,6 +254,83 @@ import Testing
       CardParser.glance(threeStar.replacingOccurrences(of: "+12", with: "+20"), stars: 3) == nil)
   }
 
+  @Test func aMisreadLevelCanBeSetFromTheTileLabel() throws {
+    let card = """
+      Instructor's Pocket Watch
+      Sands of Eon
+      Elemental Mastery
+      139
+      +10
+      Energy Recharge+12.4%
+      HP+3.7%
+      DEF+15
+      CRIT Rate+2.8%
+      Instructor:
+      """
+    // Four upgrades' worth of rolls can't be +10: Vision read the 6 as a 0.
+    #expect(throws: ArtifactError.self) { try CardParser.parse(card, stars: 4) }
+    let fixed = try #require(CardParser.withLevel(card, 16))
+    #expect(try CardParser.parse(fixed, stars: 4).level == 16)
+    #expect(CardParser.withLevel(fixed, 16) == nil)
+    #expect(CardParser.withLevel("No card here", 16) == nil)
+  }
+
+  @Test func aScannedCardsRarityComesFromItsRollsWhenTheStarCountIsOff() throws {
+    // A four-star's CRIT Rate of 2.2, counted as five stars.
+    let fourStar = """
+      Instructor's Cap
+      Circlet of Logos
+      HP
+      27.7%
+      +12
+      CRIT Rate+2.2%
+      ATK+25
+      Energy Recharge+4.1%
+      CRIT DMG+10.0%
+      Instructor:
+      """
+    #expect(throws: ArtifactError.self) { try CardParser.parse(fourStar, stars: 5) }
+    let read = try CardParser.parseScanned(fourStar, stars: 5, label: 12)
+    #expect(read.artifact.rarity == 4)
+    #expect(read.note == "4 stars, 5 counted")
+    // A five-star counted as six.
+    let fiveStar = """
+      Golden Bird's Shedding
+      Plume of Death
+      ATK
+      258
+      +16
+      CRIT DMG+7.8%
+      CRIT Rate+7.8%
+      HP+8.7%
+      DEF+56
+      Golden Troupe:
+      """
+    #expect(try CardParser.parseScanned(fiveStar, stars: 6, label: nil).artifact.rarity == 5)
+    #expect(try CardParser.parseScanned(fiveStar, stars: 5, label: nil).note.isEmpty)
+    #expect(throws: ArtifactError.self) {
+      try CardParser.parseScanned("Not a card", stars: 5, label: nil)
+    }
+  }
+
+  @Test func aNoncharacterBeforeASubstatIsTrimmed() throws {
+    // Vision returns U+FFFE for the bullet of some lines.
+    let card = """
+      Golden Bird's Shedding
+      Plume of Death
+      ATK
+      258
+      +16
+      CRIT DMG+7.8%
+      CRIT Rate+7.8%
+      HP+8.7%
+      \u{FFFE} DEF+56
+      Golden Troupe:
+      """
+    let artifact = try CardParser.parse(card, stars: 5)
+    #expect(artifact.substats.contains { $0.key == .def && $0.value == 56 })
+  }
+
   @Test func aOneStarCardWithNoSubstatsIsToldApart() throws {
     let oneStar = """
       Adventurer's Flower

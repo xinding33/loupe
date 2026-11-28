@@ -46,6 +46,56 @@ public enum CardParser {
     return (key.joined(separator: "|"), card.level)
   }
 
+  /// A card read by an inventory scan, where nobody confirms the stars or the level. Parsed
+  /// with the stars counted, four or five, then the other: the count can be off, and the
+  /// rolls decide, since a four-star's are four fifths of a five-star's. A card that fits both
+  /// is taken as counted, or not at all when the count was neither. A card that doesn't parse
+  /// at the level read on it is tried at `label`, the level read under its tile, which its
+  /// rolls must fit. `note` says what was taken from elsewhere.
+  public static func parseScanned(_ text: String, stars counted: Int, label: Int?) throws -> (
+    artifact: Artifact, note: String
+  ) {
+    func parsed(_ stars: Int) -> (Artifact, String)? {
+      if let artifact = try? parse(text, stars: stars) { return (artifact, "") }
+      guard let label, let relabelled = withLevel(text, label),
+        let artifact = try? parse(relabelled, stars: stars)
+      else { return nil }
+      return (artifact, "level taken from the tile")
+    }
+    let order = counted == 4 ? [4, 5] : [5, 4]
+    let fits = order.compactMap { stars in parsed(stars).map { (stars, $0.0, $0.1) } }
+    guard
+      let (stars, artifact, note) = fits.count == 1
+        ? fits.first : fits.first(where: { $0.0 == counted })
+    else {
+      if fits.count == 2 { throw ArtifactError("The card fits four and five stars.") }
+      // Why it fails as the likelier rarity.
+      _ = try parse(text, stars: order[0])
+      throw ArtifactError("The card doesn't parse.")
+    }
+    let recount = stars == counted ? "" : "\(stars) stars, \(counted) counted"
+    return (artifact, [note, recount].filter { !$0.isEmpty }.joined(separator: "; "))
+  }
+
+  /// `text` with its level line, the first "+N" line after the slot, set to `level`: for a card
+  /// whose level Vision misread, as "+16" for "+10", where the level is known from elsewhere.
+  /// Nil when there's no level line or it already says `level`.
+  public static func withLevel(_ text: String, _ level: Int) -> String? {
+    var lines = text.components(separatedBy: .newlines)
+    guard
+      let slot = lines.firstIndex(where: { line in
+        slotNames.contains { tidied(line).localizedCaseInsensitiveContains($0.0) }
+      }),
+      let index = lines.indices.first(where: {
+        $0 > slot
+          && tidied(lines[$0]).range(of: #"^\+\s*\d{1,2}$"#, options: .regularExpression) != nil
+      }),
+      Int(lines[index].filter(\.isNumber)) != level
+    else { return nil }
+    lines[index] = "+\(level)"
+    return lines.joined(separator: "\n")
+  }
+
   /// Indices of the newline-separated lines that `parse` reads, or nil when it cannot place them.
   /// Only these lines should decide OCR confidence: Vision reads decorations such as the
   /// rarity stars as low-confidence text.
@@ -72,8 +122,10 @@ public enum CardParser {
   /// Latinizes a line and trims the bullets, sparkles and stray dots Vision reads at its ends,
   /// as in "•15.2%" or "Serenade:(4) *". Keeps "+", "%", "(" and ":", which carry meaning.
   public static func tidied(_ line: String) -> String {
+    // Vision also returns a noncharacter, U+FFFE, for some bullets.
     latinized(line).trimmingCharacters(
-      in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "•·*.,-_'\"`~")))
+      in: .whitespacesAndNewlines.union(.illegalCharacters).union(.controlCharacters)
+        .union(CharacterSet(charactersIn: "•·*.,-_'\"`~\u{FFFD}\u{FFFE}\u{FFFF}")))
   }
 
   private static let lookalikes: [Unicode.Scalar: Unicode.Scalar] = {
