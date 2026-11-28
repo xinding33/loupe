@@ -252,15 +252,25 @@ extension InventoryStitch {
       result!.finish(.lostTrack("Couldn't find the Inventory grid."))
       return
     }
+    // A row that looks like the list's end, read but not added until a scroll down that
+    // doesn't move the list bears it out.
+    var pending: (row: [Tile], cards: [Card])?
     for (index, row) in screen.rows.enumerated() {
       let outcome = try await read(
         row, fullRowBelow: hasFullRow(screen.rows[(index + 1)...]), of: game, into: &result)
       if outcome == .ended { return }
-      if outcome == .notTheEnd {
-        // What's left is for the next screen; the scroll goes by the rows that were rows.
-        screen.rows = Array(screen.rows[..<index])
-        break
+      if outcome == .added { continue }
+      if case .lastRow(let cards) = outcome {
+        // A list that doesn't scroll shows all of itself.
+        guard down != nil else {
+          end(row, cards, into: &result)
+          return
+        }
+        pending = (row, cards)
       }
+      // What's left is for the next screen; the scroll goes by the rows that were rows.
+      screen.rows = Array(screen.rows[..<index])
+      break
     }
     guard let down else {
       result!.finish(.endOfList, endSeen: false)
@@ -278,22 +288,32 @@ extension InventoryStitch {
       // Only turns that moved the list count toward where it should be.
       var moved = try await game.scroll(down * lines)
       var turned = moved ? lines : 0
-      // A list that doesn't move may still be loading: wait, longer each time.
-      for wait in [2.0, 4.0, 6.0] where !moved {
+      // A list that doesn't move may still be loading: wait, longer each time. Not as long
+      // under a row that looks like the end: a list that stays put bears that out.
+      for wait in pending == nil ? [2.0, 4.0, 6.0] : [2.0] where !moved {
         game.log("didn't move; waiting \(Int(wait))s")
         try await game.pause(wait)
         moved = try await game.scroll(down * lines)
         if moved { turned += lines }
       }
       guard moved else {
-        result!.finish(.endOfList)
+        if let pending {
+          end(pending.row, pending.cards, into: &result)
+        } else {
+          result!.finish(.endOfList)
+        }
         return
+      }
+      if pending != nil {
+        game.log("the list moved on below what looked like its end; reading on")
+        pending = nil
       }
 
       // Find the first row shown among the rows read; past them all, scroll back a scroll's
       // worth and look again. Any row read will do, so backing up too far does no harm.
       var placed: Int?
       var next = screen
+      var tookBack = false
       for attempt in 0..<6 {
         guard let shown = try await game.screen(), let firstRow = shown.rows.first else {
           result!.finish(.lostTrack("The Inventory grid is no longer on screen."))
@@ -308,6 +328,7 @@ extension InventoryStitch {
         guard attempt < 5 else { break }
         _ = try await game.scroll(-down * lines)
         turned -= lines
+        tookBack = true
       }
       guard let placed else {
         result!.finish(.lostTrack("Couldn't find its place in the list after scrolling."))
@@ -317,6 +338,12 @@ extension InventoryStitch {
         // Within reason of the last measure: a scroll the game took late can't throw it off.
         let measured = Double(turned) / Double(placed - top)
         linesPerRow = min(2 * linesPerRow, max(0.5 * linesPerRow, measured))
+      }
+      if tookBack {
+        // The scroll went past every row read, so it moved more rows than those below `top`:
+        // fewer lines next time, or it would only go past them again.
+        let most = Double(lines) / Double(max(1, result!.rows - top))
+        linesPerRow = max(1, min(linesPerRow, 0.8 * most))
       }
       top = placed
       screen = next
@@ -336,6 +363,10 @@ extension InventoryStitch {
         case .notTheEnd:
           screen.rows = Array(screen.rows[..<offset])
           break rows
+        case .lastRow(let cards):
+          pending = (row, cards)
+          screen.rows = Array(screen.rows[..<offset])
+          break rows
         }
       }
       idle = added ? 0 : idle + 1
@@ -346,11 +377,11 @@ extension InventoryStitch {
     }
   }
 
-  /// Which row read `row` is, clicking as few of its tiles as settle it. Two first, then one at
-  /// a time, checked against the rows within two of `expected`: it's settled when just one of
-  /// those agrees, on two tiles or more, and none disagrees. Rows further off would have to
-  /// share two identical pieces in the same places to pass for it. Otherwise the whole row is
-  /// read and checked against every row read.
+  /// Which row read `row` is, clicking as few of its tiles as settle it. Three first, then one
+  /// at a time, checked against the rows within two of `expected`: it's settled when just one
+  /// of those agrees, on three tiles or more, and none disagrees. A row further off, or one not
+  /// read yet, would have to share three identical pieces in the same places to pass for it.
+  /// Otherwise the whole row is read and checked against every row read.
   @MainActor private static func locate(
     _ row: [Tile], near expected: Int, in stitch: InventoryStitch,
     game: some InventoryStitchGame
@@ -375,12 +406,14 @@ extension InventoryStitch {
     }
     var clicked = 0
     while clicked < tiles.count {
-      let batch = min(clicked == 0 ? 2 : 1, tiles.count - clicked)
+      let batch = min(clicked == 0 ? 3 : 1, tiles.count - clicked)
       let cards = try await game.read(Array(tiles[clicked..<(clicked + batch)]))
       for (offset, card) in cards.enumerated() { seen[clicked + offset] = card }
       clicked += batch
       let fits = nearby.filter { agreeing($0) != nil }
-      if fits.count == 1, let only = fits.first, (agreeing(only) ?? 0) >= 2 { return only }
+      if fits.count == 1, let only = fits.first, (agreeing(only) ?? 0) >= min(3, tiles.count) {
+        return only
+      }
       if fits.isEmpty { break }
     }
     if clicked < tiles.count {
@@ -391,25 +424,37 @@ extension InventoryStitch {
   }
 
   /// What came of reading a row.
-  private enum RowOutcome {
+  private enum RowOutcome: Equatable {
     case added
     /// At a piece below the minimum, or at the end of the list.
     case ended
     /// Vacant tiles in a row that can't be the list's last, so nothing was added.
     case notTheEnd
+    /// Vacant tiles in a row that looks like the list's last, with the cards of its others,
+    /// not added yet: vacant tiles misjudged in the lowest row shown would look the same.
+    case lastRow([Card])
+  }
+
+  /// Adds the list's last row and ends the scan, the end seen.
+  private static func end(_ row: [Tile], _ cards: [Card], into result: inout InventoryStitch?) {
+    for (tile, card) in zip(row.filter { !$0.vacant }, cards) {
+      guard result!.add(card, label: tile.label) else { return }
+    }
+    result!.finish(.endOfList, endSeen: true)
   }
 
   private static func hasFullRow(_ rows: ArraySlice<[Tile]>) -> Bool {
     rows.contains { !$0.contains(where: \.vacant) }
   }
 
-  /// Reads a row into the stitch: to a piece below the minimum, or to a vacant tile, the end of
-  /// the list. `fullRowBelow` when the screen shows a row with no vacant tile under it.
+  /// Reads a row into the stitch, to a piece below the minimum. `fullRowBelow` when the screen
+  /// shows a row with no vacant tile under it.
   ///
   /// The list fills its last row from the left, and no full row follows it. A row with vacant
   /// tiles anywhere else, or with a full row below it, or none of whose other tiles has a card
   /// to read, isn't the end: something pale under the grid fell on the rows' spacing, or a tile
   /// was misjudged. That row is left for the next screen, unadded, rather than end the scan.
+  /// One that could be the end is handed back to be borne out.
   @MainActor private static func read(
     _ row: [Tile], fullRowBelow: Bool, of game: some InventoryStitchGame,
     into result: inout InventoryStitch?
@@ -427,13 +472,10 @@ extension InventoryStitch {
             + "cards read \(cardsRead)); left for the next screen")
         return .notTheEnd
       }
+      return .lastRow(cards)
     }
     for (tile, card) in zip(tiles, cards) {
       guard result!.add(card, label: tile.label) else { return .ended }
-    }
-    if ends {
-      result!.finish(.endOfList, endSeen: true)
-      return .ended
     }
     return .added
   }

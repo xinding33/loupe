@@ -375,8 +375,10 @@ final class InventoryScanner: ObservableObject {
   }
 
   /// The grid's picture once it holds still: two frames in a row with nothing moved, and the
-  /// frame.
-  private func settled(_ view: ScanView) async -> (image: CGImage, picture: GrayImage)? {
+  /// frame; `still` false when it kept moving for three seconds, and this is its last frame.
+  private func settled(_ view: ScanView) async -> (
+    image: CGImage, picture: GrayImage, still: Bool
+  )? {
     try? await Task.sleep(for: .milliseconds(300))
     guard var image = await model.capture.nextFrame(), var picture = view.picture(of: image)
     else { return nil }
@@ -385,12 +387,12 @@ final class InventoryScanner: ObservableObject {
       guard let next = await model.capture.nextFrame(), let nextPicture = view.picture(of: next)
       else { return nil }
       if GrayImage.verticalShift(from: picture, to: nextPicture, within: -4...4) == 0 {
-        return (next, nextPicture)
+        return (next, nextPicture, true)
       }
       image = next
       picture = nextPicture
     }
-    return (image, picture)
+    return (image, picture, false)
   }
 
   /// The grid's picture as it is now, with the pointer moved to `point` first.
@@ -594,7 +596,14 @@ extension InventoryScanner: InventoryStitchGame {
   /// `InventoryGrid.wholeRows` tells.
   func screen() async throws -> InventoryStitch.Screen? {
     try checkSharing()
-    guard let known, let view, let (image, _) = await settled(view) else { return nil }
+    guard let known, let view else { return nil }
+    // Tiles are clicked where this frame shows them, so only a grid that holds still will do.
+    var frame: CGImage?
+    for _ in 0..<2 where frame == nil {
+      guard let settled = await settled(view) else { return nil }
+      if settled.still { frame = settled.image } else { log("screen: the grid didn't hold still") }
+    }
+    guard let image = frame else { return nil }
     let left = cardLeft
     let footer = footer
     let (labels, strips) = await Task.detached {

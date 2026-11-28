@@ -173,12 +173,16 @@ public struct InventoryGrid: Equatable, Sendable {
   /// room for the tile above the strip, so a click on it can't land on the bar; with a strip
   /// among `strips` showing; and above `footer`, the top of the bar under the grid. A row the
   /// lattice puts lower is something pale in that bar falling on the rows' spacing, not tiles.
+  /// Only the first rows in a row: the scan takes rows as following on, so a row between two
+  /// whole ones that isn't can't be left out.
   public func wholeRows(strips: [Double], header: Double, footer: Double) -> [Int] {
-    rows.indices.filter { index in
+    let whole = rows.indices.filter { index in
       let y = rows[index].y
       return y - 0.8 * rowPitch >= header - 0.005 && y + 0.1 * rowPitch <= footer
         && strips.contains { abs($0 - y) < 0.2 * rowPitch }
     }
+    guard let first = whole.first else { return [] }
+    return Array(whole.enumerated().prefix { $0.offset == $0.element - first }.map(\.element))
   }
 
   /// Values within `tolerance` of their neighbor, merged into their mean, in order.

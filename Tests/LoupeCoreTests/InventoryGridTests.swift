@@ -173,6 +173,9 @@ private func label(_ text: String, x: Double, y: Double) -> GridLabel {
   // A row cut off under the bar above isn't whole, nor one without its strip.
   #expect(known.wholeRows(strips: strips, header: 0.32, footer: 0.92) == [1, 2, 3])
   #expect(known.wholeRows(strips: Array(ys.dropFirst()), header: 0.17, footer: 0.92) == [1, 2, 3])
+  // A row in between whose strip wasn't found ends the rows taken: the scan takes them as
+  // following on.
+  #expect(known.wholeRows(strips: [ys[0], ys[1], ys[3]], header: 0.17, footer: 0.92) == [0, 1])
 }
 
 @Test func aSweepMergeCountsCopiesAndReplacesALevelledRecord() throws {

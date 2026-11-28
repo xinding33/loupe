@@ -143,10 +143,10 @@ private func piece(_ index: Int, level: Int) throws -> Artifact {
     #expect(stitch.ending == .belowMinimum)
     #expect(stitch.artifacts == Array(pieces.prefix(71)))
     #expect(stitch.coveredLevels == Set(1...20))
-    // Each screen after the first clicks two tiles it read before to find its place; the
+    // Each screen after the first clicks three tiles it read before to find its place; the
     // first +0 is clicked but not kept.
     let screens = game.lines.filter { $0.hasPrefix("first row shown") }.count
-    #expect(game.reads.count - stitch.cards.count == 2 * screens + 1)
+    #expect(game.reads.count - stitch.cards.count == 3 * screens + 1)
   }
 }
 
@@ -329,9 +329,10 @@ private func piece(_ index: Int, level: Int) throws -> Artifact {
 @MainActor @Test func tilesMisjudgedVacantMidListDontEndIt() async throws {
   let pieces =
     try (0..<100).map { try piece($0, level: 20) } + (100..<120).map { try piece($0, level: 0) }
-  // The last two of a row with full rows under it, the middle of another, and the last three
-  // of a row first read on the second screen, with full rows under it.
-  for misjudged: Set<Int> in [[22, 23], [12], [45, 46, 47]] {
+  // The last two of a row with full rows under it, the middle of another, the last three of a
+  // row first read on the second screen, with full rows under it, and the last two of the
+  // lowest row on that screen, with none under it.
+  for misjudged: Set<Int> in [[22, 23], [12], [45, 46, 47], [62, 63]] {
     let game = Game(pieces)
     game.falseVacant = misjudged
     let stitch = await scan(game)
@@ -339,6 +340,31 @@ private func piece(_ index: Int, level: Int) throws -> Artifact {
     #expect(stitch.artifacts == Array(pieces.prefix(100)))
     #expect(stitch.missed == 0)
   }
+}
+
+@MainActor @Test func aRowLikeAnotherInTwoPlacesIsntTakenForIt() async throws {
+  // A scroll that goes too far shows row 5 first, whose first two pieces are copies of row
+  // 3's, near where row 3 should be.
+  var pieces = try (0..<75).map { try piece($0, level: 20) }
+  pieces[40] = pieces[24]
+  pieces[41] = pieces[25]
+  let game = Game(pieces)
+  game.overshoots = [2]
+  let stitch = await scan(game)
+  #expect(stitch.ending == .endOfList)
+  #expect(stitch.endSeen)
+  #expect(stitch.artifacts == pieces)
+}
+
+@MainActor @Test func aWheelFasterThanGuessedStillGetsThere() async throws {
+  // Twice the rows a line it guesses: every first scroll goes past the rows read.
+  let pieces =
+    try (0..<120).map { try piece($0, level: 20) } + (120..<140).map { try piece($0, level: 0) }
+  let game = Game(pieces)
+  game.rowsPerLine = 0.2
+  let stitch = await scan(game)
+  #expect(stitch.ending == .belowMinimum)
+  #expect(stitch.artifacts == Array(pieces.prefix(120)))
 }
 
 @MainActor @Test func aRowWhoseTilesBringUpNoCardIsntTheEnd() async throws {
