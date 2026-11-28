@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private var window: NSWindow!
+  /// Made the first time it's opened.
+  private var farmingWindow: NSWindow?
   private var overlay: OverlayController!
   private var shortcuts: OverlayShortcuts!
   private let shortcutBackend = CarbonShortcutBackend()
@@ -38,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     window.tabbingMode = .disallowed
     window.center()
     window.makeKeyAndOrderFront(nil)
+    model.showFarming = { [weak self] in self?.showFarming() }
     model.diagnostics.present = { [weak self] in
       self?.window.makeKeyAndOrderFront(nil)
       NSApplication.shared.activate(ignoringOtherApps: true)
@@ -87,6 +90,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     updates.start()
     NSApplication.shared.activate(ignoringOtherApps: true)
+  }
+
+  private func showFarming() {
+    NSApp.activate()
+    if let farmingWindow {
+      farmingWindow.makeKeyAndOrderFront(nil)
+      return
+    }
+    let farming = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
+      styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false
+    )
+    farming.title = "Farming"
+    farming.contentView = NSHostingView(rootView: FarmingWindow(model: model))
+    farming.isReleasedWhenClosed = false
+    farming.isExcludedFromWindowsMenu = true
+    farming.tabbingMode = .disallowed
+    farming.setFrameAutosaveName("Farming")
+    if !farming.setFrameUsingName("Farming") { farming.center() }
+    farming.makeKeyAndOrderFront(nil)
+    farmingWindow = farming
   }
 
   private func showMain() {

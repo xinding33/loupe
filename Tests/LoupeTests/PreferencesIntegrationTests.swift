@@ -47,3 +47,24 @@ import Testing
   model.setEnabled(true)
   #expect(!model.scanMode)
 }
+
+@MainActor
+@Test func ownedCharactersOutlastARelaunchAndPlanOnlyOnceAsked() async throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: folder) }
+  let inventory = folder.appending(path: "inventory.json")
+  let first = Model(inventoryFile: inventory)
+  first.ownedCharacters = [OwnedCharacter(characterID: "furina", building: true)]
+  // Nothing is worked out until a farming view asks.
+  #expect(await first.settledFarmingPlan() == nil)
+  first.requestFarmingPlan()
+  let plan = try #require(await first.settledFarmingPlan())
+  #expect(plan.domains.map(\.domain.name) == ["Denouement of Sin"])
+  #expect(plan.domains.first?.needs.allSatisfy { $0.weight == 2 } == true)
+
+  let second = Model(inventoryFile: inventory)
+  #expect(second.ownedCharacters == first.ownedCharacters)
+  second.ownedCharacters[0].building = false
+  second.requestFarmingPlan()
+  #expect(await second.settledFarmingPlan()?.domains.first?.needs.first?.weight == 1)
+}

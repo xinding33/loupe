@@ -54,6 +54,7 @@ struct Dashboard: View {
               }
               .frame(maxWidth: .infinity).padding(.vertical, 24)
             }
+            FarmingSummary(model: model)
             InventoryView(model: model)
           }
           .padding(20)

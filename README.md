@@ -109,6 +109,24 @@ Before upgrading a candidate, save it and choose **Link upgrade** on its invento
 
 **Paste / correct card text** provides a manual path when OCR cannot read the card. It stops capture so live frames cannot overwrite your correction.
 
+## What to farm
+
+The **Farming** window (**Window > Farming**, ⌘2, or **Open Farming** on the dashboard) says what to spend Resin on. It works from your saved +20 pieces, so [scan your inventory](#scan-your-inventory) first; unscanned pieces make slots look emptier than they are. The dashboard shows its first domain.
+
+**By character** shows one character's build slot by slot: the piece it wears, that piece's grade, the main stats it wants, and how many domain runs it takes, on average, to drop an upgrade there. Above that is the set to farm, its domain, and the runs and days of natural Resin per upgrade for the whole build. Characters with more than one role have a role menu.
+
+**Account** ranks domains for the characters you own, and lists the sets they wear from weakest to strongest: how many of their slots are ready, who uses the set, and runs per upgrade. A ready slot wears an A or better, or a piece valued for its main stat alone. A set is strong with 80% of its slots ready and weak under 40%.
+
+**My characters…** is where you tick the characters you own, optionally. Loupe can't see your account, and the list stays on this Mac. Each character uses its reviewed role, or its first archetype as listed in the [archetype table](docs/archetypes.md), until you pick another. Star the ones you're building now and the account ranking counts them double; the runs it shows don't change. With no characters entered, the account counts every character once, which says more about domains in general than about your account.
+
+How it counts:
+
+- Each role wears its four-piece set: the first five-star set it lists, so a four-star set such as Instructor is passed over.
+- It wears the best saved +20 piece of that set in each slot, except one off-set slot, as a 4+1 build allows. It takes your best piece of another set where that piece beats the set's own the way an upgrade would, and, of those slots, where it's rarer among drops than the set's own by the widest margin.
+- A drop is an upgrade when it's the set, in a slot and with a main stat the role uses, and it finishes at A or better (see [the grades](#what-the-numbers-mean)) and above what's worn there. Mains the role uses count as equal and are compared by substats. A main the role values only for itself, such as an EM sands for an EM support, beats any piece of another main whatever its substats, and one worn fills the slot.
+- The chance is exact for top-level domain drops: half for the set, a fifth for the slot, the main-stat odds, and the share of drops finishing high enough. Runs and Resin use the same assumptions as the rarity line.
+- A domain's rate adds up over characters' slots, so a drop two characters could use counts twice. Off-set drops aren't counted, since every domain drops them alike. Sets only bosses and strongboxes drop have no domain row and no run estimate.
+
 ## What the numbers mean
 
 **The verdict** comes first in the overlay and dashboard: **Keep**, **Level to +N**, **Review**, or **Fodder**, with one reason. It is advice only; nothing acts in the game.

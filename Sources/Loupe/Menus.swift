@@ -129,6 +129,7 @@ final class Menus: NSObject, NSMenuItemValidation {
     add("Zoom", to: window, action: #selector(NSWindow.performZoom(_:)))
     window.addItem(.separator())
     add("Loupe", to: window, action: #selector(showMain), key: "1")
+    add("Farming", to: window, action: #selector(showFarming), key: "2")
     window.addItem(.separator())
     add(
       "Bring All to Front", to: window, action: #selector(NSApplication.arrangeInFront(_:)))
@@ -193,6 +194,7 @@ final class Menus: NSObject, NSMenuItemValidation {
   }
 
   @objc private func showMain() { showMainWindow() }
+  @objc private func showFarming() { model.showFarming?() }
   @objc private func chooseWindow() { model.chooseWindow() }
   @objc private func toggleEnabled() { model.setEnabled(!model.enabled) }
   @objc private func toggleExpanded() { model.overlayExpanded.toggle() }

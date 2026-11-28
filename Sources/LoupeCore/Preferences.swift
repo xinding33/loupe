@@ -13,6 +13,8 @@ public struct Preferences: Codable, Equatable, Sendable {
   public var sameSet = false
   public var profileName = Profile.presets[0].id
   public var customWeights = Dictionary(uniqueKeysWithValues: Stat.substats.map { ($0, 0) })
+  /// The characters the player said they own, for the account's farming plan. Optional.
+  public var ownedCharacters: [OwnedCharacter] = []
 
   public init() {}
 
@@ -21,7 +23,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     // the old key doesn't say whether it was ever chosen.
     case collectCards = "collectWhileBrowsing"
     case bufferDiagnostics, overlayExpanded, manualProfile, sameSet, profileName
-    case customWeights
+    case customWeights, ownedCharacters
   }
 
   /// Tolerates missing, unknown and out-of-range fields so a stored value never blocks launch.
@@ -44,6 +46,25 @@ public struct Preferences: Codable, Equatable, Sendable {
       customWeights[stat] = min(
         max(value, Self.weightRange.lowerBound), Self.weightRange.upperBound)
     }
+    // A character or role dropped from the dataset is forgotten, and a bad entry skipped.
+    struct Owned: Decodable {
+      let entry: OwnedCharacter?
+      init(from decoder: Decoder) throws {
+        // A null or a scalar in the list is skipped rather than failing the whole list.
+        guard let values = try? decoder.container(keyedBy: OwnedCharacter.CodingKeys.self) else {
+          entry = nil
+          return
+        }
+        entry = (try? values.decode(String.self, forKey: .characterID)).map {
+          OwnedCharacter(
+            characterID: $0, roleID: try? values.decode(String.self, forKey: .roleID),
+            building: (try? values.decode(Bool.self, forKey: .building)) ?? false)
+        }
+      }
+    }
+    ownedCharacters = OwnedCharacter.valid(
+      ((try? values.decodeIfPresent([Owned].self, forKey: .ownedCharacters)) ?? [])
+        .compactMap(\.entry))
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -57,6 +78,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     try values.encode(
       Dictionary(uniqueKeysWithValues: customWeights.map { ($0.key.rawValue, $0.value) }),
       forKey: .customWeights)
+    try values.encode(ownedCharacters, forKey: .ownedCharacters)
   }
 
   private static func knownProfile(_ name: String) -> String? {

@@ -5,7 +5,9 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class Model: ObservableObject {
-  @Published var inventory = Inventory()
+  @Published var inventory = Inventory() {
+    didSet { refreshFarmingPlan() }
+  }
   @Published var current: Artifact? {
     didSet { cachedShortlist = nil }
   }
@@ -100,6 +102,24 @@ final class Model: ObservableObject {
     UserDefaults.standard.string(forKey: "recordShortcut") ?? "option+shift+r"
   /// The presets compared side by side, computed only for manual-profile mode, which shows them.
   @Published var allProfiles: [(name: String, result: Potential)] = []
+  /// The characters the player said they own, for the account's farming plan. Optional: with
+  /// none, the plan counts every character.
+  @Published var ownedCharacters: [OwnedCharacter] = [] {
+    didSet {
+      guard ownedCharacters != oldValue else { return }
+      preferences.ownedCharacters = ownedCharacters
+      refreshFarmingPlan()
+    }
+  }
+  /// The account's farming plan: nil before the first is ready. A refresh keeps the last plan on
+  /// screen until its replacement is.
+  @Published private(set) var farmingPlan: FarmingPlan.Result?
+  /// A newer plan is being worked out; the one on screen may be for other characters.
+  @Published private(set) var farmingRefreshing = false
+  private var farmingRefresh: Task<Void, Never>?
+  /// A farming view has asked for the plan. Until then nothing is worked out, so launches and
+  /// tests that never show one don't pay for it.
+  private var farmingWanted = false
   let capture: Capture
   let diagnostics: DiagnosticReportFlow
   /// Not `@Published`: its timestamps change on every frame, so `updateStability` announces only
@@ -151,6 +171,8 @@ final class Model: ObservableObject {
   private var diagnosticRecommendation: DiagnosticRecommendation?
   var diagnosticPlacement: DiagnosticPlacement?
   var updateOverlay: (() -> Void)?
+  /// Opens the Farming window.
+  var showFarming: (() -> Void)?
   var resetOverlayPlacement: (() -> Void)?
   var applyShortcuts: (() -> Void)?
   /// A brief confirmation that shows over a full-screen game.
@@ -177,6 +199,7 @@ final class Model: ObservableObject {
     scope = saved.sameSet ? .sameSet : .offPiece
     profileName = saved.profileName
     customWeights = saved.customWeights
+    ownedCharacters = saved.ownedCharacters
     diagnostics.setOptedIn(saved.bufferDiagnostics)
     diagnostics.didChangeOptIn = { [weak self] in self?.preferences.bufferDiagnostics = $0 }
     do {
@@ -220,6 +243,43 @@ final class Model: ObservableObject {
     capture.receive = { [weak self] in self?.receive($0) }
     capture.setEnabled(true)
     startFreshnessTimer()
+    refreshFarmingPlan()
+  }
+
+  /// Works the farming plan out again off the main thread, after the owned characters or the
+  /// saved inventory change. A newer refresh replaces an older one still running.
+  func refreshFarmingPlan() {
+    farmingRefresh?.cancel()
+    guard farmingWanted else { return }
+    let roles = FarmingPlan.roles(owned: ownedCharacters)
+    let artifacts = inventory.artifacts
+    farmingRefreshing = true
+    farmingRefresh = Task { [weak self] in
+      let worker = Task.detached(priority: .utility) {
+        FarmingPlan.evaluate(roles: roles, inventory: artifacts)
+      }
+      let plan = await withTaskCancellationHandler {
+        await worker.value
+      } onCancel: {
+        worker.cancel()
+      }
+      guard !Task.isCancelled, let self else { return }
+      farmingPlan = plan
+      farmingRefreshing = false
+    }
+  }
+
+  /// Starts keeping the farming plan up to date, for a view that shows it.
+  func requestFarmingPlan() {
+    guard !farmingWanted else { return }
+    farmingWanted = true
+    refreshFarmingPlan()
+  }
+
+  /// The farming plan once it's ready, for tests.
+  func settledFarmingPlan() async -> FarmingPlan.Result? {
+    await farmingRefresh?.value
+    return farmingPlan
   }
 
   private func startFreshnessTimer() {
