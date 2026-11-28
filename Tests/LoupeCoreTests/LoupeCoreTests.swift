@@ -292,7 +292,7 @@ func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
   #expect(inventory.artifacts.count == 2)
 }
 
-@Test func persistsValidatedInventoryAndDoesNotLoadCorruptStats() throws {
+@Test func persistsValidatedInventoryAndKeepsCorruptStatsAsTheyWere() throws {
   let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
   try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
   defer { try? FileManager.default.removeItem(at: folder) }
@@ -304,7 +304,13 @@ func aMisreadUnactivatedMarkerStillMarksTheStat(_ row: String) throws {
   let corrupted = try String(contentsOf: file, encoding: .utf8).replacingOccurrences(
     of: "3.9", with: "99.9")
   try corrupted.write(to: file, atomically: true, encoding: .utf8)
-  #expect(throws: ArtifactError.self) { try Inventory.read(from: file) }
+  let read = try Inventory.read(from: file)
+  #expect(read.artifacts.isEmpty)
+  #expect(read.unreadable.count == 1)
+  try read.write(to: file)
+  #expect(try String(contentsOf: file, encoding: .utf8).contains("99.9"))
+  try "not json".write(to: file, atomically: true, encoding: .utf8)
+  #expect(throws: (any Error).self) { try Inventory.read(from: file) }
 }
 
 @Test func importsGOODAndDoesNotAssumeUnfinishedArtifactsHaveOrdinaryRolls() throws {

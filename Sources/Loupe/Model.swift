@@ -114,6 +114,11 @@ final class Model: ObservableObject {
     file.deletingLastPathComponent().appending(
       path: "Last scan pictures", directoryHint: .isDirectory)
   }
+  /// Copies of the inventory from before each launch's first save.
+  var inventoryBackupsFolder: URL {
+    file.deletingLastPathComponent().appending(
+      path: InventoryBackup.folderName, directoryHint: .isDirectory)
+  }
   private let preferencesFile: URL
   private var preferences: Preferences {
     didSet {
@@ -133,6 +138,8 @@ final class Model: ObservableObject {
   private(set) var shortlistBuilds = 0
   private var undoInventory: Inventory?
   private var persistenceAvailable = true
+  /// Whether this launch has copied the inventory file aside before its first save.
+  private var backedUp = false
   private var enhancementContext: (pieceName: String, artifact: Artifact)?
   private var latestDiagnosticSample: DiagnosticSampleKey?
   private var displayedDiagnosticSample: UUID?
@@ -171,6 +178,13 @@ final class Model: ObservableObject {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       if FileManager.default.fileExists(atPath: file.path) {
         inventory = try Inventory.read(from: file)
+      }
+      if !inventory.unreadable.isEmpty {
+        let count = inventory.unreadable.count
+        issue =
+          "\(count) saved \(count == 1 ? "record isn't" : "records aren't") readable by this "
+          + "version of Loupe, perhaps from a newer one. They stay in the inventory file unchanged "
+          + "but aren't shown or used here."
       }
     } catch {
       persistenceAvailable = false
@@ -628,6 +642,16 @@ final class Model: ObservableObject {
   private func persist(_ next: Inventory) throws {
     guard persistenceAvailable else {
       throw ArtifactError("Saving is disabled because the existing inventory could not be loaded.")
+    }
+    if !backedUp {
+      backedUp = true
+      let build = Updater.isRelease(Bundle.main.bundleURL) ? "" : " dev"
+      do {
+        try InventoryBackup.copy(
+          file, into: inventoryBackupsFolder, label: "\(appVersion)\(build)")
+      } catch {
+        log.error("Couldn't back up the inventory: \(error.localizedDescription, privacy: .public)")
+      }
     }
     try next.write(to: file)
     undoInventory = inventory

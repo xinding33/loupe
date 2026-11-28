@@ -194,7 +194,7 @@ Only the window selected in the sharing picker is captured. Vision OCR runs on t
 ~/Library/Application Support/Loupe/inventory.json
 ```
 
-Writes are atomic. **Undo** under Saved inventory reverses the last inventory change during the current session. Export backups before a large scan. A damaged inventory file disables saving rather than replacing the file.
+Every copy of Loupe uses this one file: each release, older or newer, and a development build (`Loupe Dev`). A record a copy can't read, written by a newer version for example, stays in the file unchanged and isn't shown, and fields a copy doesn't know stay on the records it saves. Writes are atomic. Before its first save after each launch, Loupe copies the file into `Inventory backups` beside it, labelled with the time and version, and keeps the newest 10. **Undo** under Saved inventory reverses the last inventory change during the current session. A file that isn't an inventory at all disables saving rather than being replaced.
 
 **Snapshot** saves the next frame of the shared window as a PNG and copies it, so you can paste it into an issue or a chat. **Record** saves the shared window twice a second as numbered PNG images until you stop it, for up to 240 frames (about two minutes); capture stopping also stops it. Both work from their shortcuts while the game is full screen, with a banner to confirm, and are under Diagnostics in the main window, in the Controls menu and in the menu bar icon's menu. Files go to `~/Library/Application Support/Loupe/Diagnostics/`, and the folder button under Diagnostics shows the last one in Finder. They may contain your UID or chat. They stay outside the repository and nothing uploads them; a copied snapshot goes wherever you paste it.
 

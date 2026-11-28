@@ -1,7 +1,17 @@
 import Foundation
 
+/// Every build, release or development and old or new, reads and writes the same file, so each
+/// keeps what it doesn't understand: a record it can't read is kept as it was, and fields it
+/// doesn't know stay on the records it saves again.
 public struct Inventory: Codable, Sendable {
   public private(set) var artifacts: [Artifact] = []
+  /// Saved records this build can't read, from a newer build or damaged by hand, written back
+  /// unchanged after the others.
+  public private(set) var unreadable: [JSONValue] = []
+  /// Fields a record had that this build doesn't know, by record, put back when it's written.
+  private var unknownFields: [UUID: [String: JSONValue]] = [:]
+  /// Top-level fields this build doesn't know.
+  private var unknownTopLevel: [String: JSONValue] = [:]
   public init() {}
   @discardableResult public mutating func save(
     _ artifact: Artifact, allowIdenticalCopy: Bool = false
@@ -20,7 +30,10 @@ public struct Inventory: Codable, Sendable {
     }
     artifacts[index] = try artifacts[index].upgraded(to: artifact)
   }
-  public mutating func remove(_ id: UUID) { artifacts.removeAll { $0.id == id } }
+  public mutating func remove(_ id: UUID) {
+    artifacts.removeAll { $0.id == id }
+    unknownFields[id] = nil
+  }
 
   public mutating func merge(_ incoming: [Artifact]) throws {
     var available = Dictionary(grouping: artifacts, by: \.identity).mapValues(\.count)
@@ -138,12 +151,68 @@ public struct Inventory: Codable, Sendable {
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     try encoder.encode(self).write(to: url, options: .atomic)
   }
+  /// Throws only for a file that isn't an inventory at all, or one whose readable records share
+  /// an ID. Records that don't read are kept in `unreadable`.
   public static func read(from url: URL) throws -> Inventory {
     let inventory = try JSONDecoder().decode(Inventory.self, from: Data(contentsOf: url))
     guard Set(inventory.artifacts.map(\.id)).count == inventory.artifacts.count else {
       throw ArtifactError("Inventory contains duplicate IDs.")
     }
     return inventory
+  }
+
+  private static let artifactsKey = JSONValue.Key("artifacts")
+  private static let artifactFields = Set(
+    [
+      Artifact.CodingKeys.id, .setName, .slot, .main, .level, .substats, .unactivated, .rule,
+      .rarity,
+    ].map(\.stringValue))
+
+  /// One saved record: the artifact when this build can read it, and the JSON as it was.
+  private struct Record: Decodable {
+    let artifact: Artifact?
+    let json: JSONValue
+    init(from decoder: Decoder) throws {
+      json = try JSONValue(from: decoder)
+      artifact = try? Artifact(from: decoder)
+    }
+  }
+
+  /// An artifact with the fields it was read with that this build doesn't know.
+  private struct Stored: Encodable {
+    let artifact: Artifact
+    let unknown: [String: JSONValue]
+    func encode(to encoder: Encoder) throws {
+      try artifact.encode(to: encoder)
+      var values = encoder.container(keyedBy: JSONValue.Key.self)
+      for (key, value) in unknown { try values.encode(value, forKey: JSONValue.Key(key)) }
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: JSONValue.Key.self)
+    for key in values.allKeys where key != Self.artifactsKey {
+      unknownTopLevel[key.stringValue] = try values.decode(JSONValue.self, forKey: key)
+    }
+    for record in try values.decode([Record].self, forKey: Self.artifactsKey) {
+      guard let artifact = record.artifact, case .object(let fields) = record.json else {
+        unreadable.append(record.json)
+        continue
+      }
+      artifacts.append(artifact)
+      let unknown = fields.filter { !Self.artifactFields.contains($0.key) }
+      if !unknown.isEmpty { unknownFields[artifact.id] = unknown }
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: JSONValue.Key.self)
+    for (key, value) in unknownTopLevel { try values.encode(value, forKey: JSONValue.Key(key)) }
+    var records = values.nestedUnkeyedContainer(forKey: Self.artifactsKey)
+    for artifact in artifacts {
+      try records.encode(Stored(artifact: artifact, unknown: unknownFields[artifact.id] ?? [:]))
+    }
+    for record in unreadable { try records.encode(record) }
   }
 
   public static func importGOOD(_ data: Data) throws -> (artifacts: [Artifact], skipped: Int) {

@@ -294,7 +294,7 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
     return try next.withID(id)
   }
 
-  enum CodingKeys: CodingKey {
+  enum CodingKeys: String, CodingKey {
     case id, setName, slot, main, level, substats, unactivated, rule, rarity
   }
   public init(from decoder: Decoder) throws {
