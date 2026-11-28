@@ -4,6 +4,8 @@ import Foundation
 public enum JSONValue: Codable, Equatable, Sendable {
   case null
   case bool(Bool)
+  /// Whole numbers, kept exact.
+  case integer(Int64)
   case number(Double)
   case string(String)
   case array([JSONValue])
@@ -35,6 +37,8 @@ public enum JSONValue: Codable, Equatable, Sendable {
         self = .null
       } else if let bool = try? value.decode(Bool.self) {
         self = .bool(bool)
+      } else if let integer = try? value.decode(Int64.self) {
+        self = .integer(integer)
       } else if let number = try? value.decode(Double.self) {
         self = .number(number)
       } else {
@@ -57,6 +61,9 @@ public enum JSONValue: Codable, Equatable, Sendable {
     case .bool(let bool):
       var value = encoder.singleValueContainer()
       try value.encode(bool)
+    case .integer(let integer):
+      var value = encoder.singleValueContainer()
+      try value.encode(integer)
     case .number(let number):
       var value = encoder.singleValueContainer()
       try value.encode(number)

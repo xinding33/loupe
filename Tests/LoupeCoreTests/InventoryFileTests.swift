@@ -88,13 +88,46 @@ import Testing
         file, into: backups, label: "1.0.0 dev", at: start.addingTimeInterval(Double(minute) * 60),
         keep: 3)
     }
-    let twin = try #require(
-      try InventoryBackup.copy(
-        file, into: backups, label: "1.0.0 dev", at: start.addingTimeInterval(180), keep: 3))
-    #expect(twin.lastPathComponent.hasSuffix(" 2.json"))
     let names = try FileManager.default.contentsOfDirectory(atPath: backups.path).sorted()
-    #expect(names.count == 3)
-    #expect(names.allSatisfy { $0.hasPrefix("inventory ") && $0.contains("1.0.0 dev") })
-    #expect(try Data(contentsOf: twin) == Data(contentsOf: file))
+    #expect(
+      names == [
+        "inventory 2027-01-15 080100.000Z 1.0.0 dev.json",
+        "inventory 2027-01-15 080200.000Z 1.0.0 dev.json",
+        "inventory 2027-01-15 080300.000Z 1.0.0 dev.json",
+      ])
+    #expect(try Data(contentsOf: backups.appending(path: names[2])) == Data(contentsOf: file))
+  }
+
+  @Test func writesUnchangedRecordsBackExactlyAndKeepsWholeNumbersExact() throws {
+    let record = """
+      {
+        "artifacts" : [
+          {
+            "id" : "068D60FD-019E-466A-AE02-47D646A17480", "level" : 0, "main" : "atk",
+            "rarity" : 5, "rule" : "ordinary", "setName" : "Night of the Sky's Unveiling",
+            "slot" : "plume",
+            "substats" : [
+              { "key" : "hp", "value" : 209, "rolls" : [9007199254740993] },
+              { "key" : "def", "value" : 16 }, { "key" : "eleMas", "value" : 19 }
+            ]
+          }
+        ]
+      }
+      """
+    try record.write(to: file, atomically: true, encoding: .utf8)
+    var inventory = try Inventory.read(from: file)
+    let piece = try Artifact(
+      setName: "Gladiator's Finale", slot: .flower, main: .hp, level: 0,
+      substats: [Substat(.critRate, 3.9), Substat(.atk, 19.5), Substat(.def, 23.2)])
+    inventory.save(piece)
+    try inventory.write(to: file)
+    #expect(try String(contentsOf: file, encoding: .utf8).contains("9007199254740993"))
+  }
+
+  @Test func refusesAnIDAReadableAndAnUnreadableRecordShare() throws {
+    let shared = newer.replacingOccurrences(
+      of: "9A0E1D7B-3E54-4B0B-8E2A-0B6C3C1F7E11", with: "068D60FD-019E-466A-AE02-47D646A17480")
+    try shared.write(to: file, atomically: true, encoding: .utf8)
+    #expect(throws: ArtifactError.self) { try Inventory.read(from: file) }
   }
 }

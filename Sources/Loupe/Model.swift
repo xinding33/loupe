@@ -140,6 +140,10 @@ final class Model: ObservableObject {
   private var persistenceAvailable = true
   /// Whether this launch has copied the inventory file aside before its first save.
   private var backedUp = false
+  private var backupProblemShown = false
+  /// The inventory file as this copy last read or wrote it. Another copy of Loupe, a release
+  /// and a development build say, may save the same file meanwhile.
+  private var savedData: Data?
   private var enhancementContext: (pieceName: String, artifact: Artifact)?
   private var latestDiagnosticSample: DiagnosticSampleKey?
   private var displayedDiagnosticSample: UUID?
@@ -177,7 +181,9 @@ final class Model: ObservableObject {
     do {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       if FileManager.default.fileExists(atPath: file.path) {
-        inventory = try Inventory.read(from: file)
+        let data = try Data(contentsOf: file)
+        inventory = try Inventory.read(data)
+        savedData = data
       }
       if !inventory.unreadable.isEmpty {
         let count = inventory.unreadable.count
@@ -545,6 +551,7 @@ final class Model: ObservableObject {
 
   func saveCurrent(copy: Bool = false) {
     guard canSaveCurrent, let current else { return }
+    reloadIfChanged()
     var next = inventory
     do {
       if let linkedID, !copy {
@@ -579,6 +586,7 @@ final class Model: ObservableObject {
     isScanning = false
     updateOverlay?()
     guard let sweep else { return }
+    reloadIfChanged()
     var next = inventory
     let merge = next.mergeSweep(sweep.artifacts, covered: sweep.coveredLevels)
     do {
@@ -600,6 +608,7 @@ final class Model: ObservableObject {
 
   /// Removes saved records together, as one change.
   func remove(_ ids: [UUID]) {
+    reloadIfChanged()
     var next = inventory
     for id in ids { next.remove(id) }
     do {
@@ -623,6 +632,7 @@ final class Model: ObservableObject {
     evaluate()
   }
   func remove(_ artifact: Artifact) {
+    reloadIfChanged()
     var next = inventory
     next.remove(artifact.id)
     do {
@@ -632,6 +642,8 @@ final class Model: ObservableObject {
     } catch { issue = error.localizedDescription }
   }
   func undo() {
+    // Undo would put back a copy from before another copy of Loupe's changes.
+    if reloadIfChanged() { return }
     guard let previous = undoInventory else { return }
     do {
       try persist(previous)
@@ -639,21 +651,61 @@ final class Model: ObservableObject {
       evaluate()
     } catch { issue = error.localizedDescription }
   }
+  /// Reads the inventory file again when another copy of Loupe saved it since this one last
+  /// read or wrote it, so a change is made to the latest inventory and doesn't undo the other
+  /// copy's. Returns whether it did.
+  @discardableResult
+  private func reloadIfChanged() -> Bool {
+    guard persistenceAvailable, let data = try? Data(contentsOf: file), data != savedData else {
+      return false
+    }
+    do {
+      inventory = try Inventory.read(data)
+      savedData = data
+    } catch {
+      persistenceAvailable = false
+      issue =
+        "Another copy of Loupe saved an inventory this one can't load; saving is disabled to protect it. \(error.localizedDescription)"
+      return true
+    }
+    undoInventory = nil
+    if let linkedID, !inventory.artifacts.contains(where: { $0.id == linkedID }) {
+      self.linkedID = nil
+    }
+    status = "Loaded the inventory another copy of Loupe saved."
+    evaluate()
+    return true
+  }
+
   private func persist(_ next: Inventory) throws {
     guard persistenceAvailable else {
       throw ArtifactError("Saving is disabled because the existing inventory could not be loaded.")
     }
+    if reloadIfChanged() {
+      throw ArtifactError(
+        "Another copy of Loupe changed the saved inventory, so it was loaded again and nothing was saved. Try again."
+      )
+    }
     if !backedUp {
-      backedUp = true
       let build = Updater.isRelease(Bundle.main.bundleURL) ? "" : " dev"
       do {
         try InventoryBackup.copy(
           file, into: inventoryBackupsFolder, label: "\(appVersion)\(build)")
+        backedUp = true
       } catch {
+        // Saving goes ahead: refusing would lose what was read. The next save tries again.
         log.error("Couldn't back up the inventory: \(error.localizedDescription, privacy: .public)")
+        if !backupProblemShown {
+          backupProblemShown = true
+          issue =
+            "Couldn't back up the inventory before saving. \(error.localizedDescription) "
+            + "Export a backup from Saved inventory."
+        }
       }
     }
-    try next.write(to: file)
+    let data = try next.encoded()
+    try data.write(to: file, options: .atomic)
+    savedData = data
     undoInventory = inventory
     inventory = next
   }
@@ -663,19 +715,31 @@ final class Model: ObservableObject {
     panel.canChooseDirectories = false
     guard panel.runModal() == .OK, let url = panel.url else { return }
     do {
-      struct Format: Decodable { let format: String? }
+      // GOOD files name their format; Loupe's don't, or may one day with something else.
+      struct Format: Decodable {
+        let format: String?
+        enum CodingKeys: CodingKey { case format }
+        init(from decoder: Decoder) throws {
+          format = try? decoder.container(keyedBy: CodingKeys.self)
+            .decodeIfPresent(String.self, forKey: .format)
+        }
+      }
       let data = try Data(contentsOf: url)
       let format = try JSONDecoder().decode(Format.self, from: data)
-      let imported =
-        try format.format == nil
-        ? (artifacts: Inventory.read(from: url).artifacts, skipped: 0)
-        : Inventory.importGOOD(data)
+      let imported: (artifacts: [Artifact], skipped: Int)
+      if format.format == nil {
+        let backup = try Inventory.read(data)
+        imported = (backup.artifacts, backup.unreadable.count)
+      } else {
+        imported = try Inventory.importGOOD(data)
+      }
+      reloadIfChanged()
       var next = inventory
       try next.merge(imported.artifacts)
       try persist(next)
       evaluate()
       status =
-        "Imported \(imported.artifacts.count) four- and five-star records; skipped \(imported.skipped) other rarities. Unfinished imports need ordinary-roll verification."
+        "Imported \(imported.artifacts.count) four- and five-star records; skipped \(imported.skipped) records it can't use. Unfinished imports need ordinary-roll verification."
     } catch { issue = "Import failed without changing inventory: \(error.localizedDescription)" }
   }
   func exportInventory() {

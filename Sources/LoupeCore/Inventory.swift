@@ -8,8 +8,9 @@ public struct Inventory: Codable, Sendable {
   /// Saved records this build can't read, from a newer build or damaged by hand, written back
   /// unchanged after the others.
   public private(set) var unreadable: [JSONValue] = []
-  /// Fields a record had that this build doesn't know, by record, put back when it's written.
-  private var unknownFields: [UUID: [String: JSONValue]] = [:]
+  /// Each readable record as it was read, so one this build hasn't changed is written back
+  /// exactly, nested fields it doesn't know included, and a changed one keeps its unknown fields.
+  private var asRead: [UUID: ReadRecord] = [:]
   /// Top-level fields this build doesn't know.
   private var unknownTopLevel: [String: JSONValue] = [:]
   public init() {}
@@ -32,7 +33,7 @@ public struct Inventory: Codable, Sendable {
   }
   public mutating func remove(_ id: UUID) {
     artifacts.removeAll { $0.id == id }
-    unknownFields[id] = nil
+    asRead[id] = nil
   }
 
   public mutating func merge(_ incoming: [Artifact]) throws {
@@ -146,16 +147,32 @@ public struct Inventory: Codable, Sendable {
     return (try? comparable.upgraded(to: later)) != nil
   }
 
-  public func write(to url: URL) throws {
+  /// The file's contents.
+  public func encoded() throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    try encoder.encode(self).write(to: url, options: .atomic)
+    return try encoder.encode(self)
   }
-  /// Throws only for a file that isn't an inventory at all, or one whose readable records share
-  /// an ID. Records that don't read are kept in `unreadable`.
+  public func write(to url: URL) throws {
+    try encoded().write(to: url, options: .atomic)
+  }
   public static func read(from url: URL) throws -> Inventory {
-    let inventory = try JSONDecoder().decode(Inventory.self, from: Data(contentsOf: url))
-    guard Set(inventory.artifacts.map(\.id)).count == inventory.artifacts.count else {
+    try read(Data(contentsOf: url))
+  }
+  /// Throws only for data that isn't an inventory at all, or whose records share an ID, readable
+  /// or not, since a build that reads them all would refuse the file. Records that don't read
+  /// are kept in `unreadable`.
+  public static func read(_ data: Data) throws -> Inventory {
+    let inventory = try JSONDecoder().decode(Inventory.self, from: data)
+    let ids =
+      inventory.artifacts.map(\.id.uuidString)
+      + inventory.unreadable.compactMap { record -> String? in
+        guard case .object(let fields) = record, case .string(let id) = fields["id"] else {
+          return nil
+        }
+        return UUID(uuidString: id)?.uuidString
+      }
+    guard Set(ids).count == ids.count else {
       throw ArtifactError("Inventory contains duplicate IDs.")
     }
     return inventory
@@ -176,6 +193,11 @@ public struct Inventory: Codable, Sendable {
       json = try JSONValue(from: decoder)
       artifact = try? Artifact(from: decoder)
     }
+  }
+
+  private struct ReadRecord: Sendable {
+    let artifact: Artifact
+    let fields: [String: JSONValue]
   }
 
   /// An artifact with the fields it was read with that this build doesn't know.
@@ -200,8 +222,7 @@ public struct Inventory: Codable, Sendable {
         continue
       }
       artifacts.append(artifact)
-      let unknown = fields.filter { !Self.artifactFields.contains($0.key) }
-      if !unknown.isEmpty { unknownFields[artifact.id] = unknown }
+      asRead[artifact.id] = ReadRecord(artifact: artifact, fields: fields)
     }
   }
 
@@ -210,7 +231,12 @@ public struct Inventory: Codable, Sendable {
     for (key, value) in unknownTopLevel { try values.encode(value, forKey: JSONValue.Key(key)) }
     var records = values.nestedUnkeyedContainer(forKey: Self.artifactsKey)
     for artifact in artifacts {
-      try records.encode(Stored(artifact: artifact, unknown: unknownFields[artifact.id] ?? [:]))
+      if let read = asRead[artifact.id], read.artifact == artifact {
+        try records.encode(JSONValue.object(read.fields))
+      } else {
+        let unknown = asRead[artifact.id]?.fields.filter { !Self.artifactFields.contains($0.key) }
+        try records.encode(Stored(artifact: artifact, unknown: unknown ?? [:]))
+      }
     }
     for record in unreadable { try records.encode(record) }
   }
