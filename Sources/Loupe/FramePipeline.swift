@@ -8,6 +8,8 @@ struct FrameDelivery {
   let result: Result<CardReading, Error>
   let key: DiagnosticSampleKey?
   let coverage: DiagnosticCoverage
+  /// When the frame the result describes arrived, which can be well before it's delivered.
+  var frameTime: TimeInterval = 0
 }
 
 /// Whether two deliveries say the same: the reading's text, stars and layout, or the error.
@@ -42,6 +44,7 @@ struct FramePipeline {
   private struct Screen {
     var buffer: CVPixelBuffer?
     var image: CGImage?
+    var time: TimeInterval?
   }
 
   init(ocr: DiagnosticReader) { self.ocr = ocr }
@@ -53,8 +56,8 @@ struct FramePipeline {
 
   /// Takes a complete frame, before `complete` decides what to do with it, so a snapshot or a
   /// recording can have it first.
-  mutating func show(_ buffer: CVPixelBuffer) {
-    screen = Screen(buffer: buffer, image: nil)
+  mutating func show(_ buffer: CVPixelBuffer, at time: TimeInterval? = nil) {
+    screen = Screen(buffer: buffer, image: nil, time: time)
   }
 
   /// The latest frame's image, copied from its buffer the first time it's asked for.
@@ -111,10 +114,16 @@ struct FramePipeline {
         reset()
         return nil
       }
+      let shown = screen?.time ?? time
       let output = ocr.read(image, at: time)
-      return deliver(output.result, key: output.key)
+      var delivery = deliver(output.result, key: output.key)
+      delivery.frameTime = shown
+      return delivery
     case .reuse:
-      return deliver(ocr.reuse(at: time), key: nil)
+      // The screen hasn't changed, so the last reading holds now.
+      var delivery = deliver(ocr.reuse(at: time), key: nil)
+      delivery.frameTime = time
+      return delivery
     case .hold, .ignore:
       return nil
     }

@@ -10,7 +10,7 @@ import Testing
   @Test func defaultsWhenNothingIsSaved() {
     let preferences = Preferences.read(from: file)
     #expect(preferences == Preferences())
-    #expect(!preferences.collectCards)
+    #expect(preferences.collectCards)
     #expect(!preferences.bufferDiagnostics)
     #expect(preferences.profileName == "Crit")
     #expect(preferences.customWeights.values.allSatisfy { $0 == 0 })
@@ -18,7 +18,7 @@ import Testing
 
   @Test func roundTripsEverySetting() throws {
     var preferences = Preferences()
-    preferences.collectCards = true
+    preferences.collectCards = false
     preferences.bufferDiagnostics = true
     preferences.overlayExpanded = true
     preferences.manualProfile = true
@@ -32,18 +32,25 @@ import Testing
 
   @Test func keepsWhatItCanReadFromABadFile() throws {
     let json = """
-      {"collectCards": true, "overlayExpanded": "yes", "profileName": "Gone",
+      {"collectWhileBrowsing": false, "overlayExpanded": "yes", "profileName": "Gone",
        "customWeights": {"critRate_": 250, "eleMas": -5, "pyro_dmg_": 50, "nonsense": 9}, "extra": 1}
       """
     try Data(json.utf8).write(to: file)
     let preferences = Preferences.read(from: file)
-    #expect(preferences.collectCards)
+    #expect(!preferences.collectCards)
     #expect(!preferences.overlayExpanded)
     #expect(preferences.profileName == "Crit")
     #expect(preferences.customWeights[.critRate] == 100)
     #expect(preferences.customWeights[.elementalMastery] == 0)
     #expect(preferences.customWeights[.pyroDamage] == nil)
     #expect(preferences.customWeights.count == Stat.substats.count)
+  }
+
+  @Test func collectingStartsOnWhateverAnOlderFileSaid() throws {
+    try Data(#"{"collectCards": false, "overlayExpanded": true}"#.utf8).write(to: file)
+    let preferences = Preferences.read(from: file)
+    #expect(preferences.collectCards)
+    #expect(preferences.overlayExpanded)
   }
 
   @Test func readsGarbageAsDefaults() throws {

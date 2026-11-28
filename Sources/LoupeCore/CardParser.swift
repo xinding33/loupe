@@ -25,6 +25,19 @@ public enum CardParser {
       rarity: stars)
   }
 
+  /// A card of any rarity, by the stats it shows and its level, for telling one card from the
+  /// next without parsing it as a piece Loupe grades. Nil when no card can be placed.
+  public static func glance(_ text: String) -> (key: String, level: Int)? {
+    guard let card = try? layout(text) else { return nil }
+    let stats = (card.substats + (card.unactivated.map { [$0] } ?? [])).map {
+      "\($0.key.rawValue)=\($0.value)"
+    }
+    let key =
+      [pieceName(text), card.setName, card.slot.rawValue, card.main.rawValue, "+\(card.level)"]
+      + stats
+    return (key.joined(separator: "|"), card.level)
+  }
+
   /// Indices of the newline-separated lines that `parse` reads, or nil when it cannot place them.
   /// Only these lines should decide OCR confidence: Vision reads decorations such as the
   /// rarity stars as low-confidence text.

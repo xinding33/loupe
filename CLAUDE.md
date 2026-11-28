@@ -19,8 +19,9 @@ Scars and invariants only. Anything a grep or `--help` can tell you doesn't go h
   screenshots out of commits, logs pasted into docs, and PR text.
 - Character weights drafted from Genshin Optimizer or guides stay in the gitignored `local/`
   folder until a role is reviewed. `tools/weights/` only writes there.
-- Grading is advice only. Nothing but auto-press sends input to the game, and auto-press only
-  while its target app is frontmost.
+- Grading is advice only. Nothing but auto-press and Scan Inventory sends input to the game,
+  and both only while the game is frontmost. The scan only selects tiles and scrolls, only on
+  the shared window where nothing covers it, and stops for good on any input from the user.
 
 ## Departures from the macOS utility defaults
 

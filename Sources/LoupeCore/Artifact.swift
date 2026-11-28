@@ -232,6 +232,9 @@ public struct Artifact: Codable, Equatable, Sendable, Identifiable {
   /// What makes two records the same saved piece. The roll rule says how the remaining rolls
   /// land, and a finished piece has none left, so it is the same piece under either rule.
   public var identity: String { isFinished ? key(rule: "") : signature }
+  /// What the card shows, without the roll rule, which Loupe sets rather than reads: a live read
+  /// and a GOOD import of the same unfinished piece differ only in it.
+  public var cardKey: String { key(rule: "") }
   private func key(rule: String) -> String {
     "\(setKey)|\(slot.rawValue)|\(main.rawValue)|\(level)|\(rule)|"
       + substats.sorted { $0.key.rawValue < $1.key.rawValue }.map {

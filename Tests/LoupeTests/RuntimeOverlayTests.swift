@@ -234,6 +234,13 @@ private let runtimeCard = """
   #expect(!OverlayPlacement.hits(CGPoint(x: 50, y: 490), regions: [], height: 600))
 }
 
+@Test func runtimeOverlayShowsOnlyWhileTheGameIsInFront() {
+  #expect(OverlayPlacement.showsOverGame(windowOwner: 501, frontmost: 501))
+  #expect(!OverlayPlacement.showsOverGame(windowOwner: 501, frontmost: 502))
+  #expect(!OverlayPlacement.showsOverGame(windowOwner: nil, frontmost: 501))
+  #expect(!OverlayPlacement.showsOverGame(windowOwner: 501, frontmost: nil))
+}
+
 @Test func runtimeOverlayLevelStaysAboveTheSharedWindow() {
   func level(_ layer: Int?) -> Int {
     OverlayPlacement.panelLevel(sharedWindowLayer: layer, capturing: true).rawValue

@@ -6,7 +6,7 @@ public struct Preferences: Codable, Equatable, Sendable {
   public static let weightRange = 0...100
   public static let customProfileName = "Custom"
 
-  public var collectCards = false
+  public var collectCards = true
   public var bufferDiagnostics = false
   public var overlayExpanded = false
   public var manualProfile = false
@@ -17,7 +17,10 @@ public struct Preferences: Codable, Equatable, Sendable {
   public init() {}
 
   private enum CodingKeys: String, CodingKey {
-    case collectCards, bufferDiagnostics, overlayExpanded, manualProfile, sameSet, profileName
+    // Renamed when it started on: earlier files saved it off whenever any setting changed, so
+    // the old key doesn't say whether it was ever chosen.
+    case collectCards = "collectWhileBrowsing"
+    case bufferDiagnostics, overlayExpanded, manualProfile, sameSet, profileName
     case customWeights
   }
 

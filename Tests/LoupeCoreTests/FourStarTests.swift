@@ -227,6 +227,26 @@ import Testing
     #expect(throws: ArtifactError.self) { try CardParser.parse(text, fiveStarsConfirmed: false) }
   }
 
+  @Test func aCardOfAnyRarityIsToldApartByItsStatsAndLevel() throws {
+    let threeStar = """
+      Instructor's Pocket Watch
+      Sands of Eon
+      Elemental Mastery
+      84
+      +12
+      Energy Recharge+9.3%
+      HP+2.8%
+      Instructor:
+      """
+    let card = try #require(CardParser.glance(threeStar))
+    #expect(card.level == 12)
+    let other = try #require(
+      CardParser.glance(threeStar.replacingOccurrences(of: "HP+2.8%", with: "HP+3.3%")))
+    #expect(other.key != card.key)
+    #expect(CardParser.glance(threeStar)?.key == card.key)
+    #expect(CardParser.glance("Instructor's Pocket Watch") == nil)
+  }
+
   @Test func goodImportsKeepFourStarsAndSkipLowerRarities() throws {
     let json = """
       {"format": "GOOD", "artifacts": [

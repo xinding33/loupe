@@ -2,7 +2,7 @@
 
 A macOS overlay that tells you which Genshin Impact artifacts to keep, level or feed, while you play. It's tested with the game streamed through GeForce NOW.
 
-Loupe reads the game window you share with it, recognizes four- and five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Separately, [auto-press](#auto-press) can repeat one key while the game is in front, for skipping dialogue; it stays off until you turn it on.
+Loupe reads the game window you share with it, recognizes four- and five-star English artifact cards, and gives each one a verdict: **Keep**, **Level to +N**, **Review** or **Fodder**, with the character it's for and one reason. It works out every possible +20 outcome, how rare the piece is among new drops, and how it compares with your saved +20 artifacts. The reader never clicks in the game, upgrades or salvages anything. Two features do send input, only when you start them and only while the game is in front: [Scan Inventory](#scan-your-inventory) clicks through the Inventory grid to save the pieces you already have, and [auto-press](#auto-press) repeats one key, for skipping dialogue.
 
 Loupe is a fan-made tool. It isn't affiliated with or endorsed by HoYoverse or NVIDIA.
 
@@ -29,7 +29,7 @@ Artifact Lens, Loupe's earlier name, kept its data elsewhere. On first launch Lo
 3. Select one five-star artifact in Inventory or on a character's Artifacts screen.
 4. Wait for **Live card verified across two frames**.
 
-The overlay starts compact near the top-right of the shared window's display. It follows that window between monitors. Drag the control strip to adjust its position; its reset arrow restores the corner. The strip also has expand/collapse, **Report**, and disable controls; hover for labels. The result surface passes clicks through to the game.
+The overlay shows only while the game, or the app streaming it, is in front; switch to Loupe or anything else and it hides. It starts compact near the top-right of the shared window's display. It follows that window between monitors. Drag the control strip to adjust its position; its reset arrow restores the corner. The strip also has expand/collapse, **Report**, and disable controls; hover for labels. The result surface passes clicks through to the game.
 
 | Default shortcut | Action |
 | --- | --- |
@@ -71,12 +71,30 @@ Loupe finds the game folder from Yaagl's settings. Otherwise it asks once for th
 
 HoYoverse returns only your recent pulls, not your whole history, so Loupe keeps every pull it has downloaded in `~/Library/Application Support/Loupe/wishes.json` and adds new ones on each export. Each export has them all. Export every few months to keep the history complete. If that file can't be read, the export stops and leaves it alone. The game doesn't give item IDs, so `item_id` is empty; a tracker that requires it won't import the file.
 
-## Build the inventory baseline
+## Scan your inventory
 
-Start with upgraded artifacts, not the whole bag:
+Verdicts compare new pieces with the ones you've levelled, so save those first. **Scan Inventory** does it for you: it clicks each levelled tile in the game's Inventory, from the top, reads its card and saves the four- and five-star pieces.
 
-1. Filter Inventory to five-star artifacts and sort by level.
-2. Enable **Collect cards as I browse**.
+1. Choose the game window and open **Inventory**, then **Artifacts**. Sort by level, highest first, with no filter. Leave an artifact selected.
+2. Under **Scan inventory** in the main window, click **Scan Inventory**. The Controls menu and the menu bar icon have it too.
+3. Switch to the game. The scan starts once the game has been in front for a second.
+4. Keep your hands off the mouse and keyboard. Any key, click, scroll or mouse move stops the scan, and so does the game leaving the front. What it read up to then is still saved.
+
+It turns the scroll wheel once each way to learn which way is up and how far a line goes, scrolls to the top, then clicks the tiles row by row and scrolls on. It stops at the first +0 piece, which is why the list must be sorted by level, or at the end of the list. One- to three-star pieces are clicked and passed over, since Loupe grades only four- and five-star ones. Each card takes about a second. The overlay hides while it runs, and **Collect cards as I browse** turns off until you turn it on again or relaunch, so the piece the scan stops on isn't saved after it. It needs **Accessibility** access to click, as auto-press does, and asks for it the first time.
+
+It clicks and scrolls only on the shared game window, only while that window is in front and still shared in the same session, and only where no other window, the game's included, covers it. It never opens Enhance, locks, upgrades or salvages anything.
+
+Each tile is one piece, so the scan counts copies: two identical cards in different tiles are saved twice, and a scan run again saves nothing new. A tile whose card looks unchanged after the click, because the click didn't land, the tile was already selected, or it's an identical copy of the last, is clicked again after the next tile. A tile that still shows the old card then is counted as unread. A tile with no level label and none of the pale strip a label sits on is taken as past the end of the list and isn't clicked. Cards match saved records whatever their roll rule, so a GOOD import isn't saved again. A piece you levelled since it was saved replaces its old record, keeping its roll rule, when exactly one saved record could have become it and the scan covered that record's level without finding it. Covered means every level down to +1, or, for a scan stopped early, the levels above the lowest one it read, less the levels an unread tile could have: those between the pieces either side of it, or any below the last piece when it's the last. The end of the list covers every level only where it's seen to end, at a vacant tile in the last row. A list the wheel never moved covers no level, since the scan can't tell it started at the top. **Last scan** under Saved inventory then lists:
+
+- new pieces with more than one saved record they could have come from. Each was added; remove the old record.
+- saved pieces, at a level and of a set the scan covered, that it didn't find in the game, likely salvaged or fed. **Remove these** removes them. Nothing is removed until you choose that.
+
+**Undo** reverses a whole scan. A tile whose card couldn't be read is counted in the summary; select it by hand with collection on. A listed record that changes after the scan, by an upgrade saved to it, drops out of the list.
+
+### By hand
+
+1. Sort Inventory by level, highest first.
+2. Leave **Collect cards as I browse** on. It starts on, and Loupe remembers whether you turned it off.
 3. Select each +20 artifact, including equipped pieces, and wait for verification.
 4. Check the saved count and recognized stats.
 5. Turn collection off before evaluating new pieces.
