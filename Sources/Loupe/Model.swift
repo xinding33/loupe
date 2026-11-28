@@ -114,6 +114,11 @@ final class Model: ObservableObject {
     file.deletingLastPathComponent().appending(
       path: "Last scan pictures", directoryHint: .isDirectory)
   }
+  /// Copies of the inventory from before each launch's first save.
+  var inventoryBackupsFolder: URL {
+    file.deletingLastPathComponent().appending(
+      path: InventoryBackup.folderName, directoryHint: .isDirectory)
+  }
   private let preferencesFile: URL
   private var preferences: Preferences {
     didSet {
@@ -133,6 +138,13 @@ final class Model: ObservableObject {
   private(set) var shortlistBuilds = 0
   private var undoInventory: Inventory?
   private var persistenceAvailable = true
+  /// Whether this launch has copied the inventory file aside before its first save.
+  private var backedUp = false
+  private var backupProblemShown = false
+  /// The inventory file as this copy last read or wrote it, and when it was changed, since it
+  /// can change under Loupe, as when a backup is put back in Finder.
+  private var savedData: Data?
+  private var savedStamp: FileStamp?
   private var enhancementContext: (pieceName: String, artifact: Artifact)?
   private var latestDiagnosticSample: DiagnosticSampleKey?
   private var displayedDiagnosticSample: UUID?
@@ -170,7 +182,17 @@ final class Model: ObservableObject {
     do {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       if FileManager.default.fileExists(atPath: file.path) {
-        inventory = try Inventory.read(from: file)
+        let data = try Data(contentsOf: file)
+        inventory = try Inventory.read(data)
+        savedData = data
+        savedStamp = FileStamp(file)
+      }
+      if !inventory.unreadable.isEmpty {
+        let count = inventory.unreadable.count
+        issue =
+          "\(count) saved \(count == 1 ? "record isn't" : "records aren't") readable by this "
+          + "version of Loupe, perhaps from a newer one. They stay in the inventory file unchanged "
+          + "but aren't shown or used here."
       }
     } catch {
       persistenceAvailable = false
@@ -531,6 +553,12 @@ final class Model: ObservableObject {
 
   func saveCurrent(copy: Bool = false) {
     guard canSaveCurrent, let current else { return }
+    // An update was asked of the linked record as it was shown; it may be gone or changed now.
+    let linked = linkedID
+    if reloadIfChanged(), linked != nil {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     do {
       if let linkedID, !copy {
@@ -565,6 +593,7 @@ final class Model: ObservableObject {
     isScanning = false
     updateOverlay?()
     guard let sweep else { return }
+    reloadIfChanged()
     var next = inventory
     let merge = next.mergeSweep(sweep.artifacts, covered: sweep.coveredLevels)
     do {
@@ -586,6 +615,11 @@ final class Model: ObservableObject {
 
   /// Removes saved records together, as one change.
   func remove(_ ids: [UUID]) {
+    // The records shown may have changed in the file read again.
+    if reloadIfChanged() {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     for id in ids { next.remove(id) }
     do {
@@ -609,6 +643,10 @@ final class Model: ObservableObject {
     evaluate()
   }
   func remove(_ artifact: Artifact) {
+    if reloadIfChanged() {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     next.remove(artifact.id)
     do {
@@ -618,6 +656,8 @@ final class Model: ObservableObject {
     } catch { issue = error.localizedDescription }
   }
   func undo() {
+    // Undo would put back an inventory from before the file changed on disk.
+    if reloadIfChanged() { return }
     guard let previous = undoInventory else { return }
     do {
       try persist(previous)
@@ -625,13 +665,96 @@ final class Model: ObservableObject {
       evaluate()
     } catch { issue = error.localizedDescription }
   }
+  private static let reloadedNotice =
+    "The inventory file changed on disk, so it was loaded again and nothing was changed. Check it and try again."
+
+  private enum DiskState: Equatable {
+    case unchanged, reloaded
+    /// Saving now would replace something it shouldn't, for this reason.
+    case unusable(String)
+  }
+
+  /// Compares the inventory file with what this copy last read or wrote, and reads it again when
+  /// it changed, so a change is made to the inventory on disk. `thorough` compares the contents
+  /// even when the file's identity, date and size match, as a copy that keeps the date can.
+  private func checkDisk(thorough: Bool = false) -> DiskState {
+    guard persistenceAvailable else { return .unchanged }
+    let stamp = FileStamp(file)
+    guard thorough || stamp != savedStamp else { return .unchanged }
+    guard let data = try? Data(contentsOf: file) else {
+      if FileManager.default.fileExists(atPath: file.path) {
+        return .unusable(
+          "Loupe can't read the inventory file, so nothing was saved over it. Check its permissions."
+        )
+      }
+      // No file yet is fine; one that went away may be on its way back from a backup.
+      guard savedData != nil else { return .unchanged }
+      return .unusable(
+        "The inventory file was moved or deleted while Loupe was open, so nothing was saved. "
+          + "Put it back, or quit and reopen Loupe to start a new one.")
+    }
+    savedStamp = stamp
+    guard data != savedData else { return .unchanged }
+    do {
+      inventory = try Inventory.read(data)
+      savedData = data
+    } catch {
+      persistenceAvailable = false
+      let reason =
+        "The inventory file changed into one Loupe can't load; saving is disabled to protect it. \(error.localizedDescription)"
+      issue = reason
+      return .unusable(reason)
+    }
+    undoInventory = nil
+    if let linkedID, !inventory.artifacts.contains(where: { $0.id == linkedID }) {
+      self.linkedID = nil
+    }
+    status = "Loaded the inventory file again, since it changed on disk."
+    evaluate()
+    return .reloaded
+  }
+
+  /// Whether the inventory was read again because the file changed.
+  @discardableResult
+  private func reloadIfChanged() -> Bool { checkDisk() == .reloaded }
+
   private func persist(_ next: Inventory) throws {
     guard persistenceAvailable else {
       throw ArtifactError("Saving is disabled because the existing inventory could not be loaded.")
     }
-    try next.write(to: file)
+    switch checkDisk(thorough: true) {
+    case .unchanged: break
+    case .reloaded:
+      throw ArtifactError(
+        "The inventory file changed on disk, so it was loaded again and nothing was saved. Try again."
+      )
+    case .unusable(let reason): throw ArtifactError(reason)
+    }
+    var backupProblem: String?
+    if !backedUp {
+      let build = Updater.isRelease(Bundle.main.bundleURL) ? "" : " dev"
+      do {
+        try InventoryBackup.copy(
+          file, into: inventoryBackupsFolder, label: "\(appVersion)\(build)")
+        backedUp = true
+      } catch {
+        // Saving goes ahead: refusing would lose what was read. The next save tries again.
+        log.error("Couldn't back up the inventory: \(error.localizedDescription, privacy: .public)")
+        backupProblem = error.localizedDescription
+      }
+    }
+    let data = try next.encoded()
+    try data.write(to: file, options: .atomic)
+    savedData = data
+    savedStamp = FileStamp(file)
     undoInventory = inventory
     inventory = next
+    if let backupProblem, !backupProblemShown {
+      backupProblemShown = true
+      issue =
+        "Couldn't back up the inventory before saving. \(backupProblem) "
+        + "Export a backup from Saved inventory."
+    }
   }
   func importInventory() {
     let panel = NSOpenPanel()
@@ -639,19 +762,31 @@ final class Model: ObservableObject {
     panel.canChooseDirectories = false
     guard panel.runModal() == .OK, let url = panel.url else { return }
     do {
-      struct Format: Decodable { let format: String? }
+      // GOOD files say so; Loupe's don't, or may one day name a format of their own.
+      struct Format: Decodable {
+        let format: String?
+        enum CodingKeys: CodingKey { case format }
+        init(from decoder: Decoder) throws {
+          format = try? decoder.container(keyedBy: CodingKeys.self)
+            .decodeIfPresent(String.self, forKey: .format)
+        }
+      }
       let data = try Data(contentsOf: url)
       let format = try JSONDecoder().decode(Format.self, from: data)
-      let imported =
-        try format.format == nil
-        ? (artifacts: Inventory.read(from: url).artifacts, skipped: 0)
-        : Inventory.importGOOD(data)
+      let imported: (artifacts: [Artifact], skipped: Int)
+      if format.format != "GOOD" {
+        let backup = try Inventory.read(data)
+        imported = (backup.artifacts, backup.unreadable.count)
+      } else {
+        imported = try Inventory.importGOOD(data)
+      }
+      reloadIfChanged()
       var next = inventory
       try next.merge(imported.artifacts)
       try persist(next)
       evaluate()
       status =
-        "Imported \(imported.artifacts.count) four- and five-star records; skipped \(imported.skipped) other rarities. Unfinished imports need ordinary-roll verification."
+        "Imported \(imported.artifacts.count) four- and five-star records; skipped \(imported.skipped) records it can't use. Unfinished imports need ordinary-roll verification."
     } catch { issue = "Import failed without changing inventory: \(error.localizedDescription)" }
   }
   func exportInventory() {
@@ -786,5 +921,22 @@ final class Model: ObservableObject {
     capture.setEnabled(value)
     if value { startFreshnessTimer() }
     updateOverlay?()
+  }
+}
+
+/// When a file last changed and its size, to tell cheaply whether it changed since.
+/// A file's identity, when it last changed and its size, to tell cheaply whether it changed
+/// since. A save or a copy put in its place is a new file, even when it keeps the date and size.
+private struct FileStamp: Equatable {
+  let file: Int?
+  let modified: Date?
+  let size: Int?
+  init?(_ url: URL) {
+    guard let values = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+      return nil
+    }
+    file = (values[.systemFileNumber] as? NSNumber)?.intValue
+    modified = values[.modificationDate] as? Date
+    size = (values[.size] as? NSNumber)?.intValue
   }
 }

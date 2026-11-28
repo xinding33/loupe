@@ -17,6 +17,10 @@ Scars and invariants only. Anything a grep or `--help` can tell you doesn't go h
   same Developer ID, so that key is what stops a release overwriting one.
 - The repo is public. Keep account emails, tokens, machine names, personal config, game UIDs and
   screenshots out of commits, logs pasted into docs, and PR text.
+- Every build reads and writes the one `inventory.json`, so `Inventory` keeps records and fields it
+  can't read. 0.8.0 and earlier don't: they refuse a file with a record they reject and drop fields
+  they don't know when they save, and don't stop a second copy opening. Add inventory fields only
+  as optional extras.
 - Character weights drafted from Genshin Optimizer or guides stay in the gitignored `local/`
   folder until a role is reviewed. `tools/weights/` only writes there.
 - Grading is advice only. Nothing but auto-press and Scan Inventory sends input to the game,
@@ -29,6 +33,8 @@ Scars and invariants only. Anything a grep or `--help` can tell you doesn't go h
   report flow need a window, and the overlay is a separate panel. It has a menu bar icon as well,
   for the reader's controls, and the icon can't be hidden. Settings stay out of the icon's menu.
 - No login item. It's a tool you open to play.
+- One copy at a time, release or development: `SingleCopy` offers to quit the open one, since each
+  saves its whole inventory over the shared file.
 - Capture uses `SCContentSharingPicker`, so it needs no Screen Recording grant. Only auto-press
   needs a permission (Accessibility).
 - `make` wraps SwiftPM with `--disable-sandbox` and in-repo cache paths so agents can run it
