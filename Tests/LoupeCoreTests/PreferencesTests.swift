@@ -26,6 +26,10 @@ import Testing
     preferences.profileName = "Custom"
     preferences.customWeights[.critRate] = 100
     preferences.customWeights[.energyRecharge] = 40
+    preferences.ownedCharacters = [
+      OwnedCharacter(characterID: "kazuha", building: true),
+      OwnedCharacter(characterID: "raiden-shogun", roleID: "raiden-shogun.er-crit"),
+    ]
     try preferences.write(to: file)
     #expect(Preferences.read(from: file) == preferences)
   }
@@ -44,6 +48,27 @@ import Testing
     #expect(preferences.customWeights[.elementalMastery] == 0)
     #expect(preferences.customWeights[.pyroDamage] == nil)
     #expect(preferences.customWeights.count == Stat.substats.count)
+  }
+
+  @Test func skipsOwnedCharactersItCannotUse() throws {
+    let json = #"""
+      {"ownedCharacters": [
+        {"characterID": "furina", "roleID": "gone.role", "building": true},
+        {"characterID": "nobody"},
+        null,
+        3,
+        {"roleID": "kazuha.em-swirl-support"},
+        {"characterID": "furina"},
+        {"characterID": "kazuha", "building": "yes"}
+      ]}
+      """#
+    try Data(json.utf8).write(to: file)
+    let owned = Preferences.read(from: file).ownedCharacters
+    #expect(
+      owned == [
+        OwnedCharacter(characterID: "furina", roleID: "furina.off-field-hp", building: true),
+        OwnedCharacter(characterID: "kazuha", roleID: "kazuha.em-swirl-support"),
+      ])
   }
 
   @Test func collectingStartsOnWhateverAnOlderFileSaid() throws {
