@@ -6,6 +6,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
   case bool(Bool)
   /// Whole numbers, kept exact.
   case integer(Int64)
+  case unsigned(UInt64)
   case number(Double)
   case string(String)
   case array([JSONValue])
@@ -39,6 +40,8 @@ public enum JSONValue: Codable, Equatable, Sendable {
         self = .bool(bool)
       } else if let integer = try? value.decode(Int64.self) {
         self = .integer(integer)
+      } else if let unsigned = try? value.decode(UInt64.self) {
+        self = .unsigned(unsigned)
       } else if let number = try? value.decode(Double.self) {
         self = .number(number)
       } else {
@@ -64,6 +67,9 @@ public enum JSONValue: Codable, Equatable, Sendable {
     case .integer(let integer):
       var value = encoder.singleValueContainer()
       try value.encode(integer)
+    case .unsigned(let unsigned):
+      var value = encoder.singleValueContainer()
+      try value.encode(unsigned)
     case .number(let number):
       var value = encoder.singleValueContainer()
       try value.encode(number)

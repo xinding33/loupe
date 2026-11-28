@@ -107,7 +107,7 @@ import Testing
             "rarity" : 5, "rule" : "ordinary", "setName" : "Night of the Sky's Unveiling",
             "slot" : "plume",
             "substats" : [
-              { "key" : "hp", "value" : 209, "rolls" : [9007199254740993] },
+              { "key" : "hp", "value" : 209, "rolls" : [9007199254740993, 18446744073709551615] },
               { "key" : "def", "value" : 16 }, { "key" : "eleMas", "value" : 19 }
             ]
           }
@@ -121,7 +121,9 @@ import Testing
       substats: [Substat(.critRate, 3.9), Substat(.atk, 19.5), Substat(.def, 23.2)])
     inventory.save(piece)
     try inventory.write(to: file)
-    #expect(try String(contentsOf: file, encoding: .utf8).contains("9007199254740993"))
+    let text = try String(contentsOf: file, encoding: .utf8)
+    #expect(text.contains("9007199254740993"))
+    #expect(text.contains("18446744073709551615"))
   }
 
   @Test func refusesAnIDAReadableAndAnUnreadableRecordShare() throws {

@@ -32,6 +32,8 @@ Scars and invariants only. Anything a grep or `--help` can tell you doesn't go h
   report flow need a window, and the overlay is a separate panel. It has a menu bar icon as well,
   for the reader's controls, and the icon can't be hidden. Settings stay out of the icon's menu.
 - No login item. It's a tool you open to play.
+- One copy at a time, release or development: `SingleCopy` offers to quit the open one, since each
+  saves its whole inventory over the shared file.
 - Capture uses `SCContentSharingPicker`, so it needs no Screen Recording grant. Only auto-press
   needs a permission (Accessibility).
 - `make` wraps SwiftPM with `--disable-sandbox` and in-repo cache paths so agents can run it

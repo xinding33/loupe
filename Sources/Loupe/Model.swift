@@ -141,9 +141,10 @@ final class Model: ObservableObject {
   /// Whether this launch has copied the inventory file aside before its first save.
   private var backedUp = false
   private var backupProblemShown = false
-  /// The inventory file as this copy last read or wrote it. Another copy of Loupe, a release
-  /// and a development build say, may save the same file meanwhile.
+  /// The inventory file as this copy last read or wrote it, and when it was changed, since it
+  /// can change under Loupe, as when a backup is put back in Finder.
   private var savedData: Data?
+  private var savedStamp: FileStamp?
   private var enhancementContext: (pieceName: String, artifact: Artifact)?
   private var latestDiagnosticSample: DiagnosticSampleKey?
   private var displayedDiagnosticSample: UUID?
@@ -184,6 +185,7 @@ final class Model: ObservableObject {
         let data = try Data(contentsOf: file)
         inventory = try Inventory.read(data)
         savedData = data
+        savedStamp = FileStamp(file)
       }
       if !inventory.unreadable.isEmpty {
         let count = inventory.unreadable.count
@@ -642,7 +644,7 @@ final class Model: ObservableObject {
     } catch { issue = error.localizedDescription }
   }
   func undo() {
-    // Undo would put back a copy from before another copy of Loupe's changes.
+    // Undo would put back an inventory from before the file changed on disk.
     if reloadIfChanged() { return }
     guard let previous = undoInventory else { return }
     do {
@@ -651,41 +653,63 @@ final class Model: ObservableObject {
       evaluate()
     } catch { issue = error.localizedDescription }
   }
-  /// Reads the inventory file again when another copy of Loupe saved it since this one last
-  /// read or wrote it, so a change is made to the latest inventory and doesn't undo the other
-  /// copy's. Returns whether it did.
-  @discardableResult
-  private func reloadIfChanged() -> Bool {
-    guard persistenceAvailable, let data = try? Data(contentsOf: file), data != savedData else {
-      return false
+  private enum DiskState: Equatable {
+    case unchanged, reloaded
+    /// Saving now would replace something it shouldn't, for this reason.
+    case unusable(String)
+  }
+
+  /// Compares the inventory file with what this copy last read or wrote, and reads it again when
+  /// it changed, so a change is made to the inventory on disk.
+  private func checkDisk() -> DiskState {
+    guard persistenceAvailable else { return .unchanged }
+    let stamp = FileStamp(file)
+    guard stamp != savedStamp else { return .unchanged }
+    guard let data = try? Data(contentsOf: file) else {
+      // No file yet is fine; one that went away may be on its way back from a backup.
+      guard savedData != nil else { return .unchanged }
+      return .unusable(
+        "The inventory file was moved or deleted while Loupe was open, so nothing was saved. "
+          + "Put it back, or quit and reopen Loupe to start a new one.")
     }
+    savedStamp = stamp
+    guard data != savedData else { return .unchanged }
     do {
       inventory = try Inventory.read(data)
       savedData = data
     } catch {
       persistenceAvailable = false
-      issue =
-        "Another copy of Loupe saved an inventory this one can't load; saving is disabled to protect it. \(error.localizedDescription)"
-      return true
+      let reason =
+        "The inventory file changed into one Loupe can't load; saving is disabled to protect it. \(error.localizedDescription)"
+      issue = reason
+      return .unusable(reason)
     }
     undoInventory = nil
     if let linkedID, !inventory.artifacts.contains(where: { $0.id == linkedID }) {
       self.linkedID = nil
     }
-    status = "Loaded the inventory another copy of Loupe saved."
+    status = "Loaded the inventory file again, since it changed on disk."
     evaluate()
-    return true
+    return .reloaded
   }
+
+  /// Whether the inventory was read again because the file changed.
+  @discardableResult
+  private func reloadIfChanged() -> Bool { checkDisk() == .reloaded }
 
   private func persist(_ next: Inventory) throws {
     guard persistenceAvailable else {
       throw ArtifactError("Saving is disabled because the existing inventory could not be loaded.")
     }
-    if reloadIfChanged() {
+    switch checkDisk() {
+    case .unchanged: break
+    case .reloaded:
       throw ArtifactError(
-        "Another copy of Loupe changed the saved inventory, so it was loaded again and nothing was saved. Try again."
+        "The inventory file changed on disk, so it was loaded again and nothing was saved. Try again."
       )
+    case .unusable(let reason): throw ArtifactError(reason)
     }
+    var backupProblem: String?
     if !backedUp {
       let build = Updater.isRelease(Bundle.main.bundleURL) ? "" : " dev"
       do {
@@ -695,19 +719,21 @@ final class Model: ObservableObject {
       } catch {
         // Saving goes ahead: refusing would lose what was read. The next save tries again.
         log.error("Couldn't back up the inventory: \(error.localizedDescription, privacy: .public)")
-        if !backupProblemShown {
-          backupProblemShown = true
-          issue =
-            "Couldn't back up the inventory before saving. \(error.localizedDescription) "
-            + "Export a backup from Saved inventory."
-        }
+        backupProblem = error.localizedDescription
       }
     }
     let data = try next.encoded()
     try data.write(to: file, options: .atomic)
     savedData = data
+    savedStamp = FileStamp(file)
     undoInventory = inventory
     inventory = next
+    if let backupProblem, !backupProblemShown {
+      backupProblemShown = true
+      issue =
+        "Couldn't back up the inventory before saving. \(backupProblem) "
+        + "Export a backup from Saved inventory."
+    }
   }
   func importInventory() {
     let panel = NSOpenPanel()
@@ -715,7 +741,7 @@ final class Model: ObservableObject {
     panel.canChooseDirectories = false
     guard panel.runModal() == .OK, let url = panel.url else { return }
     do {
-      // GOOD files name their format; Loupe's don't, or may one day with something else.
+      // GOOD files say so; Loupe's don't, or may one day name a format of their own.
       struct Format: Decodable {
         let format: String?
         enum CodingKeys: CodingKey { case format }
@@ -727,7 +753,7 @@ final class Model: ObservableObject {
       let data = try Data(contentsOf: url)
       let format = try JSONDecoder().decode(Format.self, from: data)
       let imported: (artifacts: [Artifact], skipped: Int)
-      if format.format == nil {
+      if format.format != "GOOD" {
         let backup = try Inventory.read(data)
         imported = (backup.artifacts, backup.unreadable.count)
       } else {
@@ -874,5 +900,18 @@ final class Model: ObservableObject {
     capture.setEnabled(value)
     if value { startFreshnessTimer() }
     updateOverlay?()
+  }
+}
+
+/// When a file last changed and its size, to tell cheaply whether it changed since.
+private struct FileStamp: Equatable {
+  let modified: Date?
+  let size: Int?
+  init?(_ url: URL) {
+    guard let values = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+      return nil
+    }
+    modified = values[.modificationDate] as? Date
+    size = (values[.size] as? NSNumber)?.intValue
   }
 }

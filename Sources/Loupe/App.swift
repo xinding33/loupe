@@ -113,9 +113,10 @@ struct LoupeApp {
     // Command-line modes run before AppKit starts, so they work over SSH and from agents.
     if CommandLine.arguments.contains("--diagnose") { Diagnose.run() }
     DiagnosticCommand.dispatchIfRequested()
-    Migration.run()
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
+    SingleCopy.ensure()
+    Migration.run()
     let delegate = AppDelegate()
     app.delegate = delegate
     app.run()
