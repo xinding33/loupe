@@ -257,6 +257,47 @@ private func expectRead(_ sweep: InventorySweep, _ game: Game, count: Int, misse
   #expect(result.coveredLevels == Set(1...20))
 }
 
+@Test func aPlusZeroCardUnderAPositiveLabelDoesNotEndTheSweep() throws {
+  let pieces =
+    try (0..<20).map { try piece($0, level: 20) } + (20..<30).map { try piece($0, level: 8) }
+    + (30..<70).map { try piece($0, level: 0) }
+  var game = Game(pieces: pieces, scroll: 0)
+  var known = try #require(InventoryGrid.detect(game.labels).map(game.markVacant))
+  var sweep = InventorySweep(screen: known)
+  var step = sweep.start()
+  var misread = false
+  for _ in 0..<2000 {
+    switch step {
+    case .finish: break
+    case .click(_, let point, _):
+      let shown = game.pieces[game.selected]
+      game.click(point)
+      var card = game.pieces[game.selected]
+      // The card of tile 24 reads +0 though its label reads +8.
+      if game.selected == 24 && !misread {
+        misread = true
+        card = try piece(24, level: 0)
+      }
+      step = sweep.clicked(card.cardKey == shown.cardKey ? .unchanged : .read(card))
+      continue
+    case .scroll(let lines, _):
+      let before = game.scroll
+      game.wheel(lines)
+      let grid = InventoryGrid.detect(game.labels, known: known).map(game.markVacant)
+      if let grid { known = grid }
+      step = sweep.scrolled(to: grid, moved: game.scroll - before)
+      continue
+    }
+    break
+  }
+  #expect(misread)
+  #expect(sweep.ending == .belowMinimum)
+  #expect(sweep.pieces.count == 29)
+  #expect(sweep.missed == [InventorySweep.Cell(row: 3, column: 0)])
+  #expect(!sweep.coveredLevels.contains(8))
+  #expect(sweep.coveredLevels.contains(20))
+}
+
 @Test func aSweepLearnsAReversedWheel() throws {
   let pieces = try (0..<70).map { try piece($0, level: $0 < 50 ? 20 : 0) }
   for start in [0.0, 0.3] {

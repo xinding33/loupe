@@ -26,15 +26,23 @@ public enum CardParser {
   }
 
   /// A card of any rarity, by the stats it shows and its level, for telling one card from the
-  /// next without parsing it as a piece Loupe grades. Nil when no card can be placed.
-  public static func glance(_ text: String) -> (key: String, level: Int)? {
-    guard let card = try? layout(text) else { return nil }
+  /// next without parsing it as a piece Loupe grades. Nil when no card can be placed, or when
+  /// its level is past what `stars` allow, so the stars were miscounted. A one-star piece
+  /// starts with no substats, so none are needed here.
+  public static func glance(_ text: String, stars: Int) -> (key: String, level: Int)? {
+    let maximum = [1: 4, 2: 4, 3: 12, 4: 16, 5: 20][stars] ?? -1
+    guard let card = try? layout(text, substatsRequired: false), card.level <= maximum else {
+      return nil
+    }
     let stats = (card.substats + (card.unactivated.map { [$0] } ?? [])).map {
       "\($0.key.rawValue)=\($0.value)"
     }
-    let key =
-      [pieceName(text), card.setName, card.slot.rawValue, card.main.rawValue, "+\(card.level)"]
-      + stats
+    // Names keep only letters and digits, so a curly apostrophe read in one frame and a straight
+    // one in the next don't make two cards.
+    let names = [pieceName(text), card.setName].map {
+      String($0.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains))
+    }
+    let key = names + [card.slot.rawValue, card.main.rawValue, "+\(card.level)"] + stats
     return (key.joined(separator: "|"), card.level)
   }
 
@@ -95,7 +103,7 @@ public enum CardParser {
     var used: [Int]
   }
 
-  private static func layout(_ text: String) throws -> Layout {
+  private static func layout(_ text: String, substatsRequired: Bool = true) throws -> Layout {
     let lines = text.components(separatedBy: .newlines).map(tidied)
     let filled = lines.indices.filter { !lines[$0].isEmpty }
     guard
@@ -161,7 +169,7 @@ public enum CardParser {
           card.substats.append(stat)
         }
         card.used += [index] + (wrapped.map { [$0] } ?? [])
-      } else if !card.substats.isEmpty,
+      } else if !card.substats.isEmpty || !substatsRequired,
         // The character screen adds the equipped count: "Set Name: (4)".
         let colon = line.range(of: #":\s*(\(\d\))?$"#, options: .regularExpression)
       {

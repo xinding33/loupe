@@ -272,12 +272,18 @@ public struct InventorySweep: Sendable {
       if !retried { return click(pending, retried: true) }
       missed.insert(pending.cell)
     case .read(let artifact) where previous != artifact.cardKey:
-      if artifact.level < minimumLevel { return finish(.belowMinimum) }
+      if artifact.level < minimumLevel {
+        if let step = belowMinimum(pending, key: artifact.cardKey) { return step }
+        break
+      }
       repeats = 0
       pieces[pending.cell] = artifact
       previous = artifact.cardKey
     case .other(let key, let level) where previous != key:
-      if level < minimumLevel { return finish(.belowMinimum) }
+      if level < minimumLevel {
+        if let step = belowMinimum(pending, key: key) { return step }
+        break
+      }
       repeats = 0
       others[pending.cell] = level
       previous = key
@@ -299,6 +305,18 @@ public struct InventorySweep: Sendable {
     }
     current = nil
     return next()
+  }
+
+  /// A card below the minimum ends the sweep, unless the label under its tile read a level at
+  /// or above it: then one of the two is misread, and ending there would take every level as
+  /// covered with tiles still unread. Such a tile is left unread, since clicking it again would
+  /// show the same card, and the sweep goes on: nil.
+  private mutating func belowMinimum(_ pending: Pending, key: String) -> Step? {
+    guard let label = pending.level, label >= minimumLevel else { return finish(.belowMinimum) }
+    missed.insert(pending.cell)
+    previous = key
+    repeats = 0
+    return nil
   }
 
   private var phaseIsProbeDown: Bool {

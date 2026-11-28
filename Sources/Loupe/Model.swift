@@ -335,11 +335,11 @@ final class Model: ObservableObject {
   }
 
   /// An Inventory card of a rarity Loupe doesn't grade, one to three stars, for the scan to
-  /// pass over.
+  /// pass over. A level past what its stars allow means a five-star miscounted: not passed.
   private static func otherCard(_ result: Result<CardReading, Error>) -> InventorySweep.Card? {
     guard case .success(let reading) = result, !reading.isEnhancement,
       (1...3).contains(reading.stars), reading.confidence >= 0.65,
-      let card = CardParser.glance(reading.text)
+      let card = CardParser.glance(reading.text, stars: reading.stars)
     else { return nil }
     return .other(key: card.key, level: card.level)
   }
