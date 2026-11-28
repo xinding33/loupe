@@ -5,11 +5,13 @@ import Vision
 /// What the last inventory scan did, for the summary and review list under Saved inventory.
 struct ScanReport: Equatable {
   let merge: SweepMerge
-  let ending: InventorySweep.Ending?
+  let ending: InventoryStitch.Ending?
   /// Tiles whose card couldn't be read.
   let missed: Int
   /// One- to three-star pieces, which Loupe doesn't save.
   let passed: Int
+  /// A vacant tile showed where the list ends.
+  let endSeen: Bool
   /// Each listed record's card at the end of the scan. One changed since, by an upgrade saved to
   /// it, is no longer what the scan judged, so it drops out of the list.
   let cards: [UUID: String]
@@ -23,16 +25,16 @@ struct ScanReport: Equatable {
     var text = parts.joined(separator: ", ") + "."
     if passed > 0 { text += " Passed over \(passed) pieces below four stars." }
     if missed > 0 { text += " \(missed) tiles couldn't be read; select them by hand." }
-    if let ending { text += " " + Self.describe(ending) }
+    if let ending { text += " " + Self.describe(ending, endSeen: endSeen) }
     return text
   }
 
-  static func describe(_ ending: InventorySweep.Ending) -> String {
+  static func describe(_ ending: InventoryStitch.Ending, endSeen: Bool) -> String {
     switch ending {
     case .belowMinimum: "Stopped at the first +0 piece."
-    case .endOfList: "Reached the end of the list."
-    case .clicksNotLanding:
-      "Stopped: clicked tiles kept showing the same card, so clicks aren't reaching the game."
+    case .endOfList where endSeen: "Reached the end of the list."
+    case .endOfList:
+      "Stopped where the list stopped scrolling, with no empty tile to show its end. If more pieces follow, scan again."
     case .lostTrack(let reason): "Stopped: \(reason)"
     case .stopped: "Stopped before the end, so saved pieces below the last level read are kept."
     }
@@ -44,7 +46,9 @@ struct ScanReport: Equatable {
 ///
 /// It clicks and scrolls only while the shared game window is frontmost and the point is on
 /// it, not covered by another window. It stops for good on any key, click, scroll or mouse move
-/// from the user, when the game leaves the front, or when the reader stops.
+/// from the user, when the game leaves the front, or when the reader stops. Where it is in the
+/// list it works out from the cards, as `InventoryStitch` describes; this class only looks,
+/// clicks and scrolls.
 @MainActor
 final class InventoryScanner: ObservableObject {
   enum State: Equatable { case idle, waiting, running }
@@ -62,11 +66,30 @@ final class InventoryScanner: ObservableObject {
   private var session: UUID?
   /// Why the user's input stopped the scan, once it has.
   private var interruption: String?
-  /// Cards read while scanning, in order, with when their frames arrived.
-  private var readings: [(frame: TimeInterval, card: InventorySweep.Card?)] = []
+  /// The game window, and the game, the scan posts to.
+  private var context: ScanContext?
+  /// The grid's columns and row spacing, from the first screen.
+  private var known: InventoryGrid?
+  /// The part of the window the list scrolls in, for telling whether it moved.
+  private var view: ScanView?
+  /// The left edge of the card beside the grid, the bottom of the bar above the grid, and the
+  /// top of the bar under it.
+  private var cardLeft = 0.0
+  private var header = 0.0
+  private var footer = 1.0
+  /// The card panel, and the card it shows as of the last frame looked at.
+  private var cardView: CardView?
+  private var cardPicture: GrayImage?
+  /// Tiles whose card was read so far, for the progress line.
+  private var tilesRead = 0
   /// Where and when Loupe last moved the pointer, to tell its own move from the user's.
   private var lastPosted: (point: CGPoint, time: TimeInterval)?
   private let source = CGEventSource(stateID: .hidSystemState)
+  /// The steps of the scan under way, saved beside the inventory when it ends.
+  private var scanLog: [String] = []
+  private var scanStart: TimeInterval?
+  /// Scrolls so far, numbering the pictures saved for each.
+  private var scrolls = 0
 
   init(model: Model) {
     self.model = model
@@ -119,7 +142,8 @@ final class InventoryScanner: ObservableObject {
   private func run(windowID: CGWindowID, target: AutoPressTarget) async {
     defer {
       removeMonitor()
-      model.cardObserver = nil
+      model.capture.setScanning(false)
+      context = nil
       state = .idle
       task = nil
     }
@@ -128,100 +152,82 @@ final class InventoryScanner: ObservableObject {
       return
     }
     state = .running
-    readings = []
     // The scan belongs to one capture session: a new stream, even of the same window, ends it.
     guard let session = model.capture.sessionID, model.capture.selectedWindowID == windowID else {
       progress = "The shared window changed, so the scan didn't start."
       return
     }
     self.session = session
-    model.cardObserver = { [weak self] card, frame in
-      guard let self, model.capture.sessionID == session else { return }
-      let now = ProcessInfo.processInfo.systemUptime
-      readings.removeAll { now - $0.frame > 10 }
-      readings.append((frame, card))
-    }
+    // The scan reads its own frames, faster than the live reader, which pauses meanwhile.
+    model.capture.setScanning(true)
     installMonitor()
     model.beginScan()
     model.banner?("Scanning Inventory. Move the mouse to stop.")
     progress = "Scanning. Move the mouse or press a key to stop."
-    let context = ScanContext(windowID: windowID, target: target)
     guard let first = await firstScreen() else {
       model.finishScan(nil)
       report(
         "Couldn't find the Inventory grid. Open Inventory with an artifact selected, then scan.")
       return
     }
+    context = ScanContext(windowID: windowID, target: target)
+    known = first.grid
+    view = first.view
+    cardLeft = first.cardLeft
+    header = first.header
+    footer = first.footer
+    cardView = first.card
+    cardPicture = first.cardPicture
+    tilesRead = 0
+    scanStart = ProcessInfo.processInfo.systemUptime
+    scrolls = 0
+    try? FileManager.default.removeItem(at: model.scanPicturesFolder)
+    try? FileManager.default.createDirectory(
+      at: model.scanPicturesFolder, withIntermediateDirectories: true)
+    scanLog = [
+      "grid \(first.grid.columns.count)x\(first.grid.rows.count) row pitch "
+        + format(first.grid.rowPitch) + " header " + format(first.header) + " footer "
+        + format(first.footer)
+    ]
     // Every levelled piece: the list is sorted by level, so the first +0 ends it.
-    var sweep = InventorySweep(minimumLevel: 1, screen: first.grid)
-    var known = first.grid
-    var view = first.view
-    var before = first.picture
-    var step = sweep.start()
-    var failure: String?
-    loop: while true {
-      let sharing =
-        model.enabled && model.capture.isCapturing && model.capture.sessionID == session
-      if Task.isCancelled || !sharing {
-        if !sharing { interruption = interruption ?? "The reader stopped sharing the game window." }
-        step = sweep.stop()
-      }
-      do {
-        switch step {
-        case .finish:
-          break loop
-        case .click(_, let point, let level):
-          let pressed = try await click(point, context)
-          var card = await card(after: pressed, level: level)
-          // The card on screen before the press, from frames taken then, however late read.
-          let shown = readings.last { $0.frame < pressed && $0.card?.key != nil }?.card
-          if let key = card.key, key == shown?.key { card = .unchanged }
-          // Readings from another capture session say nothing about this tile.
-          if model.capture.sessionID != session { card = .unread }
-          step = sweep.clicked(card)
-          progress =
-            "Scanning: \(sweep.pieces.count + sweep.others.count) read. Move the mouse to stop."
-        case .scroll(let lines, let expected):
-          try await scroll(lines, at: view.center, context)
-          guard
-            var next = await settledScreen(known: known, view: view, cardLeft: first.cardLeft)
-          else {
-            step = sweep.scrolled(to: nil, moved: nil)
-            continue
-          }
-          var moved = view.shift(from: before, to: next.picture, expected: expected)
-          // Generously, since the sweep refines this estimate before judging it.
-          if let small = moved, abs(small) < 0.3 * view.rowPitch {
-            // A streamed game can take a moment to answer the wheel. Look again before taking
-            // the list for still, which can end the scan; without a second look, don't.
-            try? await Task.sleep(for: .seconds(1))
-            if let again = await settledScreen(known: known, view: view, cardLeft: first.cardLeft) {
-              next = again
-              moved = view.shift(from: before, to: again.picture, expected: expected)
-            } else {
-              moved = nil
-            }
-          }
-          step = sweep.scrolled(to: next.grid, moved: moved)
-          if let grid = next.grid {
-            known = grid
-            view = view.with(grid)
-          }
-          before = next.picture
-        }
-      } catch {
-        failure = error.localizedDescription
-        step = sweep.stop()
-      }
-    }
-    model.finishScan(sweep)
+    let (stitch, error) = await InventoryStitch.scan(self, minimumLevel: 1)
+    let failure: String? =
+      if let error, !(error is CancellationError) { error.localizedDescription } else { nil }
+    model.finishScan(stitch)
+    log(
+      "end \(stitch.ending.map { ScanReport.describe($0, endSeen: stitch.endSeen) } ?? "-") read "
+        + "\(stitch.artifacts.count) passed \(stitch.others) missed \(stitch.missed) "
+        + "covered \(stitch.coveredLevels.sorted())" + (failure.map { " (\($0))" } ?? ""))
+    try? scanLog.joined(separator: "\n").appending("\n").write(
+      to: model.scanLogFile, atomically: true, encoding: .utf8)
     let summary = model.lastScan?.summary ?? ""
-    if let reason = failure ?? interruption, sweep.ending == .stopped {
+    // The user's own stop says why better than the error it caused.
+    if let reason = interruption ?? failure, stitch.ending == .stopped {
       progress = reason + " " + summary
       model.banner?("Scan stopped")
     } else {
       progress = summary
-      model.banner?("Scan finished: \(sweep.pieces.count) read")
+      model.banner?("Scan finished: \(stitch.artifacts.count) read")
+    }
+  }
+
+  /// A grid picture, as a PGM file anything can open.
+  private func save(_ picture: GrayImage, as name: String) {
+    var data = Data("P5\n\(picture.width) \(picture.height)\n255\n".utf8)
+    data.append(contentsOf: picture.pixels)
+    try? data.write(to: model.scanPicturesFolder.appending(path: name + ".pgm"))
+  }
+
+  private func format(_ value: Double?) -> String {
+    value.map { String(format: "%.4f", $0) } ?? "none"
+  }
+
+  private func describe(_ card: InventoryStitch.Card?) -> String {
+    switch card {
+    case .read(let artifact): "\(artifact.rarity)* +\(artifact.level) \(artifact.slot.rawValue)"
+    case .other(_, let level): "low rarity +\(level)"
+    case .unread: "unread"
+    case nil: "unchanged"
     }
   }
 
@@ -242,37 +248,109 @@ final class InventoryScanner: ObservableObject {
     return false
   }
 
-  /// Waits for the card the tile shows: the two newest readings, both of frames that arrived
-  /// after the click had time to show, agreeing. A card that disagrees with the level read under
-  /// the tile is taken only after a second and a half, in case the label was misread. A card
-  /// that's still the last tile's is returned too; the sweep clicks again and then gives up.
-  private func card(after click: TimeInterval, level: Int?) async -> InventorySweep.Card {
-    // The game, and a stream from GeForce NOW, take a moment to show the new card.
-    let fresh = click + 0.3
-    while !Task.isCancelled {
-      let now = ProcessInfo.processInfo.systemUptime
-      let recent = readings.filter { $0.frame >= fresh }.suffix(2).map(\.card)
-      if recent.count == 2, let card = recent[1], let signature = card.signature,
-        recent[0]?.signature == signature
-      {
-        if level == nil || card.level == level || now >= click + 1.5 { return card }
-      }
-      if now >= click + 4 { return .unread }
-      try? await Task.sleep(for: .milliseconds(50))
+  /// Throws once the reader stops sharing the game window the scan started on.
+  private func checkSharing() throws {
+    guard model.enabled, model.capture.isCapturing, model.capture.sessionID == session else {
+      throw InputError.captureStopped
     }
-    return .unread
+  }
+
+  // MARK: Clicking tiles
+
+  /// A tile clicked: the card it brought up, read in the background, or none when the card
+  /// didn't change.
+  private struct Shot {
+    let reading: Task<(card: InventoryStitch.Card, note: String), Never>?
+    /// How long the new card took to show and hold still.
+    let settled: TimeInterval?
+  }
+
+  /// Clicks a tile and waits for its card: a picture of the card panel that differs from the
+  /// one before the click, held still across two frames. That frame is read in the background.
+  /// A card that doesn't change in a second and a half is the one before: the click didn't land,
+  /// the tile was selected already, or it's an identical copy of the last.
+  private func shot(_ point: CGPoint, label: Int?, _ context: ScanContext) async throws -> Shot {
+    guard let cardView else { return Shot(reading: nil, settled: nil) }
+    let before = cardPicture
+    let pressed = try await click(point, context)
+    var changing: (image: CGImage, picture: GrayImage)?
+    while ProcessInfo.processInfo.systemUptime < pressed + 1.5 {
+      try Task.checkCancellation()
+      guard let image = await model.capture.nextFrame(timeout: 0.5),
+        let picture = cardView.picture(of: image)
+      else {
+        try await Task.sleep(for: .milliseconds(50))
+        continue
+      }
+      let new = before.flatMap { GrayImage.largestBlockDifference($0, picture, block: 6) }.map {
+        $0 > 20
+      }
+      guard new ?? true else {
+        changing = nil
+        continue
+      }
+      if let changing,
+        (GrayImage.largestBlockDifference(changing.picture, picture, block: 6) ?? 99) < 10
+      {
+        cardPicture = picture
+        return Shot(
+          reading: Task.detached(priority: .userInitiated) { Self.read(image, label: label) },
+          settled: ProcessInfo.processInfo.systemUptime - pressed)
+      }
+      changing = (image, picture)
+    }
+    // A new card that never held still is read as it last looked.
+    guard let changing else { return Shot(reading: nil, settled: nil) }
+    cardPicture = changing.picture
+    let image = changing.image
+    return Shot(
+      reading: Task.detached(priority: .userInitiated) { Self.read(image, label: label) },
+      settled: nil)
+  }
+
+  /// The card in a frame, with why it couldn't be read. Four- and five-star cards are parsed as
+  /// pieces; one to three stars are passed over, unless the level is past what the stars allow,
+  /// which means the stars were miscounted. A card that doesn't parse at the level read on it is
+  /// tried at `label`, the level read under its tile: the substats' rolls must fit that level,
+  /// so a misread digit can't pass for a level the card doesn't have.
+  nonisolated static func read(_ image: CGImage, label: Int? = nil) -> (
+    card: InventoryStitch.Card, note: String
+  ) {
+    let reading: CardReading
+    do { reading = try CardOCR.readInventory(image) } catch {
+      return (.unread, error.localizedDescription)
+    }
+    // The card's lines up to its set name, for the log when it fails. Lines further down can
+    // hold the UID.
+    let lines = reading.text.components(separatedBy: .newlines)
+    let setLine =
+      lines.firstIndex { CardParser.tidied($0).hasSuffix(":") } ?? min(9, lines.count - 1)
+    let text = lines.prefix(setLine + 1).filter { !$0.localizedCaseInsensitiveContains("UID") }
+      .joined(separator: " / ")
+    guard reading.confidence >= 0.65 else {
+      return (.unread, String(format: "confidence %.2f: ", reading.confidence) + text)
+    }
+    if (1...3).contains(reading.stars) {
+      guard let card = CardParser.glance(reading.text, stars: reading.stars) else {
+        return (.unread, "\(reading.stars) stars counted: " + text)
+      }
+      return (.other(key: card.key, level: card.level), "")
+    }
+    do {
+      let card = try CardParser.parseScanned(reading.text, stars: reading.stars, label: label)
+      return (.read(card.artifact), card.note)
+    } catch {
+      return (.unread, error.localizedDescription + ": " + text)
+    }
   }
 
   // MARK: Reading the grid
 
-  private struct Screen {
-    let grid: InventoryGrid?
-    let picture: GrayImage
-  }
-
-  /// The first screen: where the card starts, so labels right of it aren't taken as tiles.
+  /// The first screen: where the card starts, so labels right of it aren't taken as tiles,
+  /// where the bar above the grid ends, and where the bar under it starts.
   private func firstScreen() async -> (
-    grid: InventoryGrid, view: ScanView, picture: GrayImage, cardLeft: Double
+    grid: InventoryGrid, view: ScanView, cardLeft: Double, header: Double, footer: Double,
+    card: CardView, cardPicture: GrayImage?
   )? {
     guard let image = await model.capture.nextFrame(),
       let left = await Task.detached(operation: { GridReader.cardLeft(in: image) }).value,
@@ -281,17 +359,24 @@ final class InventoryScanner: ObservableObject {
     let labels = await Task.detached {
       GridReader.labels(in: image, left: left) + GridReader.labels(in: second, left: left)
     }.value
-    guard let found = InventoryGrid.detect(labels), found.rows.count >= 2,
-      let view = ScanView(found), let picture = view.picture(of: second)
+    // Without the bar above, a row cut off under it could pass for whole, and a click on it land
+    // on the bar. Without the bar below, its pale buttons could pass for a row's strips, and
+    // their tiles for the end of the list.
+    guard let header = GridReader.header(labels), let footer = GridReader.footer(labels),
+      let lattice = InventoryGrid.detect(labels)
     else { return nil }
-    let grid = GridReader.markVacant(found, in: second)
-    return (grid, view, picture, left)
+    // Rows whose labels weren't read, from the strips under them.
+    let strips = GridReader.strips(in: second, columns: lattice, above: footer)
+    let found = InventoryGrid.detect(labels, known: lattice, strips: strips) ?? lattice
+    guard found.rows.count >= 2, let view = ScanView(found, below: header, strips: strips)
+    else { return nil }
+    let card = CardView(left: left)
+    return (found, view, left, header, footer, card, card.picture(of: second))
   }
 
-  /// The screen once a scroll has stopped moving: two frames in a row with nothing moved.
-  private func settledScreen(known: InventoryGrid, view: ScanView, cardLeft: Double) async
-    -> Screen?
-  {
+  /// The grid's picture once it holds still: two frames in a row with nothing moved, and the
+  /// frame.
+  private func settled(_ view: ScanView) async -> (image: CGImage, picture: GrayImage)? {
     try? await Task.sleep(for: .milliseconds(300))
     guard var image = await model.capture.nextFrame(), var picture = view.picture(of: image)
     else { return nil }
@@ -300,20 +385,23 @@ final class InventoryScanner: ObservableObject {
       guard let next = await model.capture.nextFrame(), let nextPicture = view.picture(of: next)
       else { return nil }
       if GrayImage.verticalShift(from: picture, to: nextPicture, within: -4...4) == 0 {
-        let earlier = image
-        let labels = await Task.detached {
-          GridReader.labels(in: earlier, left: cardLeft)
-            + GridReader.labels(in: next, left: cardLeft)
-        }.value
-        return Screen(
-          grid: InventoryGrid.detect(labels, known: known).map {
-            GridReader.markVacant($0, in: next)
-          }, picture: nextPicture)
+        return (next, nextPicture)
       }
       image = next
       picture = nextPicture
     }
-    return nil
+    return (image, picture)
+  }
+
+  /// The grid's picture as it is now, with the pointer moved to `point` first.
+  private func picture(at point: CGPoint, view: ScanView, _ context: ScanContext) async throws
+    -> GrayImage?
+  {
+    post(.mouseMoved, at: try target(point, context))
+    try await Task.sleep(for: .milliseconds(150))
+    // A frame from before the move may be on its way.
+    _ = await model.capture.nextFrame()
+    return await model.capture.nextFrame().flatMap { view.picture(of: $0) }
   }
 
   // MARK: Input
@@ -369,7 +457,7 @@ final class InventoryScanner: ObservableObject {
     return pressed
   }
 
-  /// Turns the wheel over the grid, a line at a time.
+  /// Turns the wheel over the grid, a line at a time, positive as `CGEvent` counts up.
   private func scroll(_ lines: Int, at point: CGPoint, _ context: ScanContext) async throws {
     post(.mouseMoved, at: try target(point, context))
     try? await Task.sleep(for: .milliseconds(60))
@@ -501,43 +589,155 @@ final class InventoryScanner: ObservableObject {
   }
 }
 
-/// The part of the window the grid scrolls in, as a small grayscale picture for measuring
-/// scrolls, and where to point the wheel.
+extension InventoryScanner: InventoryStitchGame {
+  /// The rows the grid shows whole, between the bars above and below it, as
+  /// `InventoryGrid.wholeRows` tells.
+  func screen() async throws -> InventoryStitch.Screen? {
+    try checkSharing()
+    guard let known, let view, let (image, _) = await settled(view) else { return nil }
+    let left = cardLeft
+    let footer = footer
+    let (labels, strips) = await Task.detached {
+      (
+        GridReader.labels(in: image, left: left),
+        GridReader.strips(in: image, columns: known, above: footer)
+      )
+    }.value
+    guard let found = InventoryGrid.detect(labels, known: known, strips: strips) else {
+      log("screen: no grid")
+      return nil
+    }
+    let grid = GridReader.markVacant(found, in: image, strips: strips)
+    let whole = grid.wholeRows(strips: strips, header: header, footer: footer)
+    log("screen: whole rows at " + whole.map { format(grid.rows[$0].y) }.joined(separator: " "))
+    return InventoryStitch.Screen(
+      rows: whole.map { row in
+        grid.columns.indices.map { column in
+          InventoryStitch.Tile(
+            point: grid.tile(row: row, column: column), label: grid.rows[row].levels[column],
+            vacant: grid.rows[row].vacant[column])
+        }
+      })
+  }
+
+  /// Clicks each tile, reading its card in the background while the next is clicked. A tile
+  /// whose card didn't change shows the card before it: an identical copy, or a click that
+  /// didn't land. It's clicked again after a tile with another card, and again after a tile
+  /// with a third if need be, since its card can't match both: a copy then shows, and a tile
+  /// that still doesn't is left unread.
+  func read(_ tiles: [InventoryStitch.Tile]) async throws -> [InventoryStitch.Card] {
+    guard let context else { throw InputError.interrupted }
+    try checkSharing()
+    var shots: [Shot] = []
+    for tile in tiles { shots.append(try await shot(tile.point, label: tile.label, context)) }
+    var cards: [InventoryStitch.Card?] = []
+    for (index, shot) in shots.enumerated() {
+      var card: InventoryStitch.Card?
+      var note = ""
+      if let reading = shot.reading { (card, note) = await reading.value }
+      log(
+        "tile \(index) label \(tiles[index].label.map { "+\($0)" } ?? "-") card "
+          + describe(card) + (note.isEmpty ? "" : " (\(note))")
+          + (shot.settled.map { String(format: " settled %.2fs", $0) } ?? ""))
+      cards.append(card)
+    }
+    var keyed: [Int] = []
+    for index in cards.indices {
+      guard let key = cards[index]?.key, !keyed.contains(where: { cards[$0]?.key == key })
+      else { continue }
+      keyed.append(index)
+    }
+    for index in cards.indices where cards[index] == nil {
+      var card = InventoryStitch.Card.unread
+      for other in keyed.prefix(2) where other != index {
+        _ = try await shot(tiles[other].point, label: tiles[other].label, context)
+        let again = try await shot(tiles[index].point, label: tiles[index].label, context)
+        guard let reading = again.reading else { continue }
+        card = await reading.value.card
+        break
+      }
+      log("tile \(index) again: \(describe(card))")
+      cards[index] = card
+    }
+    try checkSharing()
+    tilesRead += tiles.count
+    progress = "Scanning: \(tilesRead) tiles read. Move the mouse to stop."
+    return cards.map { $0 ?? .unread }
+  }
+
+  /// Turns the wheel over the grid and tells whether the grid moved, from pictures taken just
+  /// before and once it holds still: on a still grid only a tile's pulsing highlight changes.
+  func scroll(_ lines: Int) async throws -> Bool {
+    guard let context, let view else { throw InputError.interrupted }
+    try checkSharing()
+    let before = try await picture(at: view.center, view: view, context)
+    try await scroll(lines, at: view.center, context)
+    guard let after = await settled(view)?.picture else { return false }
+    scrolls += 1
+    if let before { save(before, as: "\(scrolls) before") }
+    save(after, as: "\(scrolls) after")
+    let difference = before.flatMap { GrayImage.meanDifference($0, after) }
+    let moved = difference.map { $0 >= 4 } ?? true
+    log(
+      "scroll \(scrolls): \(lines) lines, \(moved ? "moved" : "still")"
+        + (difference.map { String(format: " (difference %.1f)", $0) } ?? ""))
+    return moved
+  }
+
+  func pause(_ seconds: Double) async throws {
+    try await Task.sleep(for: .seconds(seconds))
+  }
+
+  func log(_ line: String) {
+    let time = ProcessInfo.processInfo.systemUptime - (scanStart ?? 0)
+    scanLog.append(String(format: "%7.1f ", time) + line)
+  }
+}
+
+/// The part of the window the grid scrolls in, as a small grayscale picture for telling whether
+/// it moved, and where to point the wheel.
 struct ScanView {
   /// Window coordinates from the top left.
   let area: CGRect
   let rowPitch: Double
   static let size = (width: 120, height: 240)
 
-  init?(_ grid: InventoryGrid) {
+  /// The grid's rows, only as far as the list shows them: below `header`, the bar above the
+  /// grid that doesn't scroll, and down to the last of `strips` shown whole, above where the
+  /// list fades out. A picture reaching past either compares what stays put, or what the fade
+  /// changes, with what scrolled.
+  init?(_ grid: InventoryGrid, below header: Double? = nil, strips: [Double] = []) {
     guard let first = grid.columns.first, let last = grid.columns.last,
       let top = grid.rows.first?.y, let bottom = grid.rows.last?.y
     else { return nil }
     let x = first - 0.5 * grid.columnPitch
-    let y = top - 0.6 * grid.rowPitch
-    area = CGRect(
-      x: x, y: y, width: last + 0.5 * grid.columnPitch - x, height: bottom + 0.03 - y)
+    let y = max(top - 0.6 * grid.rowPitch, header ?? 0)
+    var end = bottom + 0.03
+    let shown = strips.filter { strip in
+      grid.rows.contains { abs($0.y - strip) < 0.2 * grid.rowPitch }
+    }
+    if let lastStrip = shown.max(), lastStrip > y { end = min(end, lastStrip + 0.012) }
+    area = CGRect(x: x, y: y, width: last + 0.5 * grid.columnPitch - x, height: end - y)
     rowPitch = grid.rowPitch
     guard area.width > 0, area.height > 0 else { return nil }
   }
 
-  private init(area: CGRect, rowPitch: Double) {
-    self.area = area
-    self.rowPitch = rowPitch
-  }
-
-  /// The same area with a newer row pitch.
-  func with(_ grid: InventoryGrid) -> ScanView { ScanView(area: area, rowPitch: grid.rowPitch) }
-
   var center: CGPoint { CGPoint(x: area.midX, y: area.midY) }
 
   func picture(of image: CGImage) -> GrayImage? {
+    Self.picture(of: image, area: area, size: Self.size)
+  }
+
+  /// `area` of `image`, in grays, scaled to `size`.
+  static func picture(of image: CGImage, area: CGRect, size: (width: Int, height: Int))
+    -> GrayImage?
+  {
     let rect = CGRect(
       x: area.minX * Double(image.width), y: area.minY * Double(image.height),
       width: area.width * Double(image.width), height: area.height * Double(image.height)
     ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
     guard !rect.isEmpty, let crop = image.cropping(to: rect) else { return nil }
-    let (width, height) = Self.size
+    let (width, height) = size
     var pixels = [UInt8](repeating: 0, count: width * height)
     let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
       guard
@@ -553,29 +753,22 @@ struct ScanView {
     return drawn ? GrayImage(width: width, height: height, pixels: pixels) : nil
   }
 
-  /// How far the content moved up between two pictures, in window heights. With an expected
-  /// move, the search runs from no move to a little past it, since a list that ends early moves
-  /// less. Nil when no move in range fits, or when the pictures differ but line up best unmoved,
-  /// as they can after a jump of whole rows.
-  func shift(from before: GrayImage, to after: GrayImage, expected: Double?) -> Double? {
-    // Only the selected tile's pulsing highlight changes on a still screen.
-    if let difference = GrayImage.meanDifference(before, after), difference < 4 { return 0 }
-    let scale = Double(Self.size.height) / area.height
-    let limit = Int(Double(Self.size.height) * 0.8)
-    let range: ClosedRange<Int>
-    if let expected {
-      let margin = 0.45 * rowPitch * scale
-      let low = max(-limit, Int((min(0, expected * scale) - margin).rounded(.down)))
-      let high = min(limit, Int((max(0, expected * scale) + margin).rounded(.up)))
-      guard low <= high else { return nil }
-      range = low...high
-    } else {
-      range = -limit...limit
-    }
-    guard let pixels = GrayImage.verticalShift(from: before, to: after, within: range),
-      pixels != 0
-    else { return nil }
-    return Double(pixels) / scale
+}
+
+/// The selected artifact's card, beside the grid, for telling when a click brought up another.
+struct CardView {
+  /// Window coordinates from the top left.
+  let area: CGRect
+  /// Fine enough that one changed digit fills most of a block.
+  static let size = (width: 240, height: 480)
+
+  /// The card whose slot line starts just right of `left`.
+  init(left: Double) {
+    area = CGRect(x: left, y: 0.14, width: min(0.36, 0.99 - left), height: 0.74)
+  }
+
+  func picture(of image: CGImage) -> GrayImage? {
+    ScanView.picture(of: image, area: area, size: Self.size)
   }
 }
 
@@ -613,11 +806,91 @@ enum GridReader {
     }
   }
 
+  /// The bottom of the bar above the grid, "Show 5-star Artifacts in the order of when they
+  /// were obtained", which stays put as the list scrolls; nil when it wasn't read.
+  static func header(_ labels: [GridLabel]) -> Double? {
+    labels.filter {
+      $0.text.localizedCaseInsensitiveContains("obtained")
+        || $0.text.localizedCaseInsensitiveContains("5-star Artifacts")
+    }.map { Double($0.bounds.maxY) + 0.008 }.max()
+  }
+
+  /// The top of the bar under the grid, whose "Lock Assistance" and "Salvage" buttons are the
+  /// pale cream of a label strip; nil when neither was read. The buttons start a little above
+  /// their text, and Vision's bounds take in more or less of them.
+  static func footer(_ labels: [GridLabel]) -> Double? {
+    labels.filter {
+      $0.text.localizedCaseInsensitiveContains("Lock Assistance")
+        || $0.text.localizedCaseInsensitiveContains("Salvage")
+    }.map { Double($0.bounds.minY) - 0.015 }.min()
+  }
+
+  /// The middles of the pale strips under the tiles of `grid`'s columns, from how much of each
+  /// line of pixels across them is strip-colored, in window coordinates. Only above `footer`,
+  /// the bar under the grid.
+  static func strips(in image: CGImage, columns grid: InventoryGrid, above footer: Double)
+    -> [Double]
+  {
+    guard let first = grid.columns.first, let last = grid.columns.last else { return [] }
+    let top = 0.1
+    let bottom = min(0.95, footer)
+    let rect = CGRect(
+      x: (first - 0.5 * grid.columnPitch) * Double(image.width), y: top * Double(image.height),
+      width: (last - first + grid.columnPitch) * Double(image.width),
+      height: (bottom - top) * Double(image.height)
+    ).integral.intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    guard !rect.isEmpty, let crop = image.cropping(to: rect) else { return [] }
+    let width = crop.width
+    let height = crop.height
+    var bytes = [UInt8](repeating: 0, count: width * height * 4)
+    let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+      guard
+        let context = CGContext(
+          data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+          bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+      else { return false }
+      context.draw(crop, in: CGRect(x: 0, y: 0, width: width, height: height))
+      return true
+    }
+    guard drawn else { return [] }
+    // The middle three fifths of each tile's width, where its strip is.
+    let spans = grid.columns.map { column -> Range<Int> in
+      let low = Int(((column - 0.3 * grid.columnPitch) * Double(image.width) - rect.minX).rounded())
+      let high = Int(
+        ((column + 0.3 * grid.columnPitch) * Double(image.width) - rect.minX).rounded())
+      return max(0, low)..<min(width, max(low, high))
+    }
+    let total = spans.reduce(0) { $0 + $1.count }
+    guard total > 0 else { return [] }
+    let share = (0..<height).map { y -> Double in
+      var cream = 0
+      for span in spans {
+        for x in span {
+          let i = (y * width + x) * 4
+          if abs(Int(bytes[i]) - 233) < 14 && abs(Int(bytes[i + 1]) - 229) < 14
+            && abs(Int(bytes[i + 2]) - 221) < 14
+          {
+            cream += 1
+          }
+        }
+      }
+      return Double(cream) / Double(total)
+    }
+    return InventoryGrid.strips(
+      share, top: rect.minY / Double(image.height), step: 1 / Double(image.height))
+  }
+
   /// Marks the tiles with no level label and none of the pale strip the label sits on, about
   /// three quarters of a tile's strip and none of the background behind the grid.
-  static func markVacant(_ grid: InventoryGrid, in image: CGImage) -> InventoryGrid {
+  /// Only rows whose strip shows whole, among `strips`, are judged: in a row cut off by the
+  /// edge of the grid, a tile's strip can be out of sight.
+  static func markVacant(_ grid: InventoryGrid, in image: CGImage, strips: [Double])
+    -> InventoryGrid
+  {
     var grid = grid
-    for row in grid.rows.indices {
+    for row in grid.rows.indices
+    where strips.contains(where: { abs($0 - grid.rows[row].y) < 0.2 * grid.rowPitch }) {
       for column in grid.columns.indices where grid.rows[row].levels[column] == nil {
         let area = CGRect(
           x: grid.columns[column] - 0.3 * grid.columnPitch, y: grid.rows[row].y - 0.009,

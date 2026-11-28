@@ -80,9 +80,6 @@ final class Model: ObservableObject {
   private var collectionPausedByScan = false
   /// What the last inventory scan added, for the review list under Saved inventory.
   @Published var lastScan: ScanReport?
-  /// Each Inventory card parsed while scanning, nil for a frame with none, before it's verified,
-  /// with when its frame arrived.
-  var cardObserver: ((InventorySweep.Card?, TimeInterval) -> Void)?
   @Published var search = ""
   @Published private(set) var enabled = true
   @Published var overlayExpanded = false {
@@ -109,6 +106,14 @@ final class Model: ObservableObject {
   /// a change in what views read.
   private(set) var stability = CardStability()
   private let file: URL
+  /// What the last inventory scan did, step by step, for working out why one went wrong.
+  var scanLogFile: URL { file.deletingLastPathComponent().appending(path: "Last scan.log") }
+  /// The grid pictures each scroll of the last scan was measured from: the grid area only, in
+  /// grays, small.
+  var scanPicturesFolder: URL {
+    file.deletingLastPathComponent().appending(
+      path: "Last scan pictures", directoryHint: .isDirectory)
+  }
   private let preferencesFile: URL
   private var preferences: Preferences {
     didSet {
@@ -259,7 +264,6 @@ final class Model: ObservableObject {
   private func receive(_ result: Result<CardReading, Error>) {
     guard enabled else { return }
     let key = capture.currentSample
-    let frameTime = capture.currentFrameTime ?? ProcessInfo.processInfo.systemUptime
     latestDiagnosticSample = key
     var parsed: Artifact?
     var decision = "OCR did not produce a confirmed reading"
@@ -272,7 +276,6 @@ final class Model: ObservableObject {
     switch result {
     case .failure(let error):
       decision = error.localizedDescription
-      cardObserver?(nil, frameTime)
       missedReading(error)
     case .success(let reading):
       if rawText != reading.text { rawText = reading.text }
@@ -293,7 +296,6 @@ final class Model: ObservableObject {
             rule: special ? .special : .ordinary)
         }
         parsed = artifact
-        cardObserver?(reading.isEnhancement ? nil : .read(artifact), frameTime)
         decision = "Parsed; checking card stability"
         updateStability { $0.observe(artifact.signature, at: Date()) }
         guard stability.isVerified else {
@@ -328,20 +330,9 @@ final class Model: ObservableObject {
         }
       } catch {
         decision = error.localizedDescription
-        if parsed == nil { cardObserver?(Self.otherCard(result), frameTime) }
         missedReading(error)
       }
     }
-  }
-
-  /// An Inventory card of a rarity Loupe doesn't grade, one to three stars, for the scan to
-  /// pass over. A level past what its stars allow means a five-star miscounted: not passed.
-  private static func otherCard(_ result: Result<CardReading, Error>) -> InventorySweep.Card? {
-    guard case .success(let reading) = result, !reading.isEnhancement,
-      (1...3).contains(reading.stars), reading.confidence >= 0.65,
-      let card = CardParser.glance(reading.text, stars: reading.stars)
-    else { return nil }
-    return .other(key: card.key, level: card.level)
   }
 
   private func clearResult() {
@@ -570,7 +561,7 @@ final class Model: ObservableObject {
 
   /// Saves what a scan read, all in one change that Undo reverses. Nil for a scan that read
   /// nothing.
-  func finishScan(_ sweep: InventorySweep?) {
+  func finishScan(_ sweep: InventoryStitch?) {
     isScanning = false
     updateOverlay?()
     guard let sweep else { return }
@@ -583,8 +574,8 @@ final class Model: ObservableObject {
       }
       let listed = merge.unseen + merge.ambiguous.flatMap { [$0.added] + $0.earlier }
       lastScan = ScanReport(
-        merge: merge, ending: sweep.ending, missed: sweep.missed.count,
-        passed: sweep.others.count,
+        merge: merge, ending: sweep.ending, missed: sweep.missed,
+        passed: sweep.others, endSeen: sweep.endSeen,
         cards: Dictionary(
           next.artifacts.filter { listed.contains($0.id) }.map { ($0.id, $0.signature) },
           uniquingKeysWith: { first, _ in first }))

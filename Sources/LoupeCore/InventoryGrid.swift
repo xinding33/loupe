@@ -10,10 +10,11 @@ public struct GridLabel: Equatable, Sendable {
     self.bounds = bounds
   }
 
-  /// The level under a tile, or nil for other text. Vision reads "+20" as "20" or "-20" at times.
+  /// The level under a tile, or nil for other text. Vision reads "+20" as "20" or "-20" at
+  /// times, and "+4" as "†4".
   public var level: Int? {
     let trimmed = text.trimmingCharacters(in: .whitespaces)
-    guard trimmed.range(of: #"^[+\-]?\s?\d{1,2}$"#, options: .regularExpression) != nil,
+    guard trimmed.range(of: #"^[+\-†]?\s?\d{1,2}$"#, options: .regularExpression) != nil,
       let value = Int(trimmed.filter(\.isNumber)), value <= 20
     else { return nil }
     return value
@@ -60,17 +61,20 @@ public struct InventoryGrid: Equatable, Sendable {
     CGPoint(x: columns[column], y: rows[row].y - 0.35 * rowPitch)
   }
 
-  /// The lattice through `labels`. `known` is the lattice of an earlier screen, kept as it is:
-  /// columns don't move as the grid scrolls and rows keep their spacing, so a tile keeps the
-  /// column it had, and rows whose labels were all missed can't change the spacing. Nil when
-  /// the labels don't make a lattice.
-  public static func detect(_ labels: [GridLabel], known: InventoryGrid? = nil) -> InventoryGrid? {
+  /// The lattice through `labels`, and through `strips`, the middles of the pale strips the
+  /// labels sit on, which show where rows are when their labels can't be read. `known` is the
+  /// lattice of an earlier screen, kept as it is: columns don't move as the grid scrolls and
+  /// rows keep their spacing, so a tile keeps the column it had, and rows whose labels were all
+  /// missed can't change the spacing. Nil when they don't make a lattice.
+  public static func detect(
+    _ labels: [GridLabel], known: InventoryGrid? = nil, strips: [Double] = []
+  ) -> InventoryGrid? {
     let levels: [(bounds: CGRect, level: Int)] = labels.compactMap { label in
       label.level.map { (label.bounds, $0) }
     }
-    guard !levels.isEmpty else { return nil }
-    let height = median(levels.map { Double($0.bounds.height) })
-    let width = median(levels.map { Double($0.bounds.width) })
+    guard !levels.isEmpty || (known != nil && !strips.isEmpty) else { return nil }
+    let height = levels.isEmpty ? 0.013 : median(levels.map { Double($0.bounds.height) })
+    let width = levels.isEmpty ? 0.02 : median(levels.map { Double($0.bounds.width) })
 
     let columnPitch: Double
     let columnOrigin: Double
@@ -87,7 +91,21 @@ public struct InventoryGrid: Equatable, Sendable {
       columnCount = fit.count
     }
 
-    let ys = clusters(levels.map { Double($0.bounds.midY) }, tolerance: max(0.004, 0.5 * height))
+    let labelYs = levels.map { Double($0.bounds.midY) }
+    var rowYs = labelYs + strips
+    if let known, known.rowPitch > 0, !strips.isEmpty {
+      // Strips off the rows' spacing are something else pale, as below the grid.
+      let pitch = known.rowPitch
+      let anchor = phase(labelYs.isEmpty ? strips : labelYs, pitch: pitch)
+      rowYs =
+        labelYs
+        + strips.filter { strip in
+          guard let anchor else { return true }
+          let offset = (strip - anchor) / pitch
+          return abs(offset - offset.rounded()) < 0.2
+        }
+    }
+    let ys = clusters(rowYs, tolerance: max(0.004, 0.5 * height))
     let rowPitch: Double
     if let known, known.rowPitch > 0 {
       rowPitch = known.rowPitch
@@ -112,6 +130,55 @@ public struct InventoryGrid: Equatable, Sendable {
     }
     return InventoryGrid(
       columns: columns, columnPitch: columnPitch, rowPitch: rowPitch, rows: rows)
+  }
+
+  /// Where `values` fall within a `pitch`, averaged around the circle. Nil for none.
+  static func phase(_ values: [Double], pitch: Double) -> Double? {
+    guard !values.isEmpty, pitch > 0 else { return nil }
+    let angles = values.map { 2 * Double.pi * $0 / pitch }
+    let x = angles.map(cos).reduce(0, +)
+    let y = angles.map(sin).reduce(0, +)
+    guard x * x + y * y > 1e-12 else { return nil }
+    var angle = atan2(y, x)
+    if angle < 0 { angle += 2 * .pi }
+    return angle / (2 * .pi) * pitch
+  }
+
+  /// The middles of the label strips in `share`, how much of each line of pixels across the
+  /// tiles' strips is strip-colored, from `top` down by `step`, in window heights. A strip cut
+  /// off by the edge of the grid, shorter than most, or by either end of `share`, is left out:
+  /// its middle isn't its middle. So is anything much taller than most, such as the pale
+  /// buttons in the bar under the grid: every label strip is the same height.
+  public static func strips(_ share: [Double], top: Double, step: Double) -> [Double] {
+    var runs: [(start: Int, end: Int)] = []
+    var start: Int?
+    for (index, value) in share.enumerated() {
+      // One tile of eight is enough: the last row of the list may hold only that.
+      if value >= 0.08 {
+        if start == nil { start = index }
+      } else if let first = start {
+        if first > 0 { runs.append((first, index)) }
+        start = nil
+      }
+    }
+    guard !runs.isEmpty else { return [] }
+    let typical = median(runs.map { Double($0.end - $0.start) })
+    return runs.filter {
+      let length = Double($0.end - $0.start)
+      return length >= 0.7 * typical && length <= 1.5 * typical
+    }.map { top + (Double($0.start + $0.end) / 2) * step }
+  }
+
+  /// The rows shown whole, by index: below `header`, the bottom of the bar above the grid, with
+  /// room for the tile above the strip, so a click on it can't land on the bar; with a strip
+  /// among `strips` showing; and above `footer`, the top of the bar under the grid. A row the
+  /// lattice puts lower is something pale in that bar falling on the rows' spacing, not tiles.
+  public func wholeRows(strips: [Double], header: Double, footer: Double) -> [Int] {
+    rows.indices.filter { index in
+      let y = rows[index].y
+      return y - 0.8 * rowPitch >= header - 0.005 && y + 0.1 * rowPitch <= footer
+        && strips.contains { abs($0 - y) < 0.2 * rowPitch }
+    }
   }
 
   /// Values within `tolerance` of their neighbor, merged into their mean, in order.
@@ -187,12 +254,50 @@ public struct GrayImage: Equatable, Sendable {
     return Double(total) / Double(a.pixels.count)
   }
 
+  /// The largest average difference over any `block` by `block` square, 0 to 255: high when
+  /// anything changed in one place, such as a single digit, which an average over the whole
+  /// picture would wash out. Nil for pictures of different sizes.
+  public static func largestBlockDifference(_ a: GrayImage, _ b: GrayImage, block: Int = 8)
+    -> Double?
+  {
+    guard a.width == b.width, a.height == b.height, !a.pixels.isEmpty, block > 0 else {
+      return nil
+    }
+    var largest = 0.0
+    for top in stride(from: 0, to: a.height, by: block) {
+      for left in stride(from: 0, to: a.width, by: block) {
+        var total = 0
+        var count = 0
+        for y in top..<min(top + block, a.height) {
+          for x in left..<min(left + block, a.width) {
+            let i = y * a.width + x
+            total += abs(Int(a.pixels[i]) - Int(b.pixels[i]))
+            count += 1
+          }
+        }
+        largest = max(largest, Double(total) / Double(count))
+      }
+    }
+    return largest
+  }
+
   /// How many rows the content moved up from `before` to `after`: row y of `after` shows what
   /// row y + shift of `before` showed. Searched within `range`, keeping at least a fifth of the
   /// picture overlapping. Nil when no shift in range leaves that much.
   public static func verticalShift(
     from before: GrayImage, to after: GrayImage, within range: ClosedRange<Int>
   ) -> Int? {
+    bestShift(from: before, to: after, within: range)?.shift
+  }
+
+  /// The best shift, as `verticalShift` finds it, and how far apart the pictures still are
+  /// there, 0 to 255; and the runner-up, the least difference at any shift `separation` or more
+  /// from the best. A real move stands out: its difference is well under the runner-up's. A move
+  /// outside `range`, or a picture that changed, leaves no clear best.
+  public static func bestShift(
+    from before: GrayImage, to after: GrayImage, within range: ClosedRange<Int>,
+    separation: Int = 1
+  ) -> (shift: Int, difference: Double, runnerUp: Double?)? {
     guard before.width == after.width, before.height == after.height, before.width > 0 else {
       return nil
     }
@@ -200,6 +305,7 @@ public struct GrayImage: Equatable, Sendable {
     let height = before.height
     let minimumOverlap = max(1, height / 5)
     var best: (shift: Int, difference: Double)?
+    var differences: [(shift: Int, difference: Double)] = []
     for shift in range {
       let overlap = height - abs(shift)
       guard overlap >= minimumOverlap else { continue }
@@ -213,6 +319,7 @@ public struct GrayImage: Equatable, Sendable {
         }
       }
       let difference = Double(total) / Double(overlap * width)
+      differences.append((shift, difference))
       // Of equally good shifts, the smallest move is the likeliest.
       if best == nil || difference < best!.difference - 1e-9
         || (abs(difference - best!.difference) <= 1e-9 && abs(shift) < abs(best!.shift))
@@ -220,6 +327,9 @@ public struct GrayImage: Equatable, Sendable {
         best = (shift, difference)
       }
     }
-    return best?.shift
+    guard let best else { return nil }
+    let runnerUp = differences.filter { abs($0.shift - best.shift) >= separation }
+      .map(\.difference).min()
+    return (best.shift, best.difference, runnerUp)
   }
 }

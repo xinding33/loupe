@@ -595,7 +595,7 @@ private struct ScanPanel: View {
   var body: some View {
     Panel(title: "Scan inventory", systemImage: "square.grid.3x3") {
       Text(
-        "Clicks each levelled piece in the game's Inventory, from the top, and saves the four- and five-star ones. Sort by level first; the scan ends at the first +0 piece. Move the mouse or press a key to stop."
+        "Clicks each levelled piece in the game's Inventory, from the top, and saves the four- and five-star ones. Sort by level and scroll the list to the top first; the scan ends at the first +0 piece. Move the mouse or press a key to stop."
       )
       .font(.caption).foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
