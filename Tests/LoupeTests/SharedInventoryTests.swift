@@ -64,3 +64,45 @@ private func piece(_ crit: Double) throws -> Artifact {
   #expect(model.issue?.contains("moved or deleted") == true)
   #expect(model.inventory.artifacts.count == 2)
 }
+
+@MainActor
+@Test func aRemoveShownBeforeTheFileChangedDoesNothing() throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: folder) }
+  let file = folder.appending(path: "inventory.json")
+  var saved = Inventory()
+  let first = saved.save(try piece(2.7))
+  try saved.write(to: file)
+
+  let model = Model(inventoryFile: file)
+  defer { model.setEnabled(false) }
+  // A backup put back, with the same piece upgraded under the same ID.
+  var restored = Inventory()
+  restored.save(try piece(3.1).withID(first))
+  try restored.write(to: file)
+  model.remove([first])
+  #expect(try Inventory.read(from: file).artifacts.map(\.id) == [first])
+  #expect(model.inventory.artifacts.first?.substats.first?.value == 3.1)
+}
+
+@MainActor
+@Test func aFileLoupeCannotReadIsNotSavedOver() throws {
+  let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: folder) }
+  let file = folder.appending(path: "inventory.json")
+  let model = Model(inventoryFile: file)
+  defer { model.setEnabled(false) }
+  var restored = Inventory()
+  let id = restored.save(try piece(2.7))
+  try restored.write(to: file)
+  try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: file.path)
+  defer {
+    try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+  }
+  model.remove([UUID()])
+  #expect(model.issue?.contains("can't read") == true)
+  try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+  #expect(try Inventory.read(from: file).artifacts.map(\.id) == [id])
+}

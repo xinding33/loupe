@@ -553,7 +553,12 @@ final class Model: ObservableObject {
 
   func saveCurrent(copy: Bool = false) {
     guard canSaveCurrent, let current else { return }
-    reloadIfChanged()
+    // An update was asked of the linked record as it was shown; it may be gone or changed now.
+    let linked = linkedID
+    if reloadIfChanged(), linked != nil {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     do {
       if let linkedID, !copy {
@@ -610,7 +615,11 @@ final class Model: ObservableObject {
 
   /// Removes saved records together, as one change.
   func remove(_ ids: [UUID]) {
-    reloadIfChanged()
+    // The records shown may have changed in the file read again.
+    if reloadIfChanged() {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     for id in ids { next.remove(id) }
     do {
@@ -634,7 +643,10 @@ final class Model: ObservableObject {
     evaluate()
   }
   func remove(_ artifact: Artifact) {
-    reloadIfChanged()
+    if reloadIfChanged() {
+      status = Self.reloadedNotice
+      return
+    }
     var next = inventory
     next.remove(artifact.id)
     do {
@@ -653,6 +665,9 @@ final class Model: ObservableObject {
       evaluate()
     } catch { issue = error.localizedDescription }
   }
+  private static let reloadedNotice =
+    "The inventory file changed on disk, so it was loaded again and nothing was changed. Check it and try again."
+
   private enum DiskState: Equatable {
     case unchanged, reloaded
     /// Saving now would replace something it shouldn't, for this reason.
@@ -660,12 +675,18 @@ final class Model: ObservableObject {
   }
 
   /// Compares the inventory file with what this copy last read or wrote, and reads it again when
-  /// it changed, so a change is made to the inventory on disk.
-  private func checkDisk() -> DiskState {
+  /// it changed, so a change is made to the inventory on disk. `thorough` compares the contents
+  /// even when the file's identity, date and size match, as a copy that keeps the date can.
+  private func checkDisk(thorough: Bool = false) -> DiskState {
     guard persistenceAvailable else { return .unchanged }
     let stamp = FileStamp(file)
-    guard stamp != savedStamp else { return .unchanged }
+    guard thorough || stamp != savedStamp else { return .unchanged }
     guard let data = try? Data(contentsOf: file) else {
+      if FileManager.default.fileExists(atPath: file.path) {
+        return .unusable(
+          "Loupe can't read the inventory file, so nothing was saved over it. Check its permissions."
+        )
+      }
       // No file yet is fine; one that went away may be on its way back from a backup.
       guard savedData != nil else { return .unchanged }
       return .unusable(
@@ -701,7 +722,7 @@ final class Model: ObservableObject {
     guard persistenceAvailable else {
       throw ArtifactError("Saving is disabled because the existing inventory could not be loaded.")
     }
-    switch checkDisk() {
+    switch checkDisk(thorough: true) {
     case .unchanged: break
     case .reloaded:
       throw ArtifactError(
@@ -904,13 +925,17 @@ final class Model: ObservableObject {
 }
 
 /// When a file last changed and its size, to tell cheaply whether it changed since.
+/// A file's identity, when it last changed and its size, to tell cheaply whether it changed
+/// since. A save or a copy put in its place is a new file, even when it keeps the date and size.
 private struct FileStamp: Equatable {
+  let file: Int?
   let modified: Date?
   let size: Int?
   init?(_ url: URL) {
     guard let values = try? FileManager.default.attributesOfItem(atPath: url.path) else {
       return nil
     }
+    file = (values[.systemFileNumber] as? NSNumber)?.intValue
     modified = values[.modificationDate] as? Date
     size = (values[.size] as? NSNumber)?.intValue
   }
